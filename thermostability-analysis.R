@@ -1,0 +1,666 @@
+## thermostability-analysis.R by Rohan Maddamsetti.
+
+## get functions for dealing with LTEE metagenomics data.
+source("../../LTEE-purifying-selection/src/metagenomics-library.R")
+
+## get the lengths of all genes in REL606.
+## This excludes genes in repetitive regions of the genome.
+## See Section 4.3.1
+## "Removing mutations in repetitive regions of the genome"
+## in Ben Good's LTEE metagenomics paper for more details.
+## This filtering is done in my python script printEcoliIDs.py.
+## Do by running:
+## python printEcoliIDs.py -i ../data/REL606.8-RM.gbk > ../results/REL606_IDs.csv.
+
+REL606.genes <- read.csv('../results/REL606_IDs.csv',as.is=TRUE) %>%
+    mutate(gene_length=strtoi(gene_length))
+## It turns out that some gene names map to multiple genes.
+duplicate.genes <- REL606.genes %>%
+    group_by(Gene) %>%
+    summarize(copies=length(unique(gene_length))) %>%
+    filter(copies>1)
+## There are 3 such cases: alr, bioD, maf (3 each for 6 loci total).
+## filter them from this analysis.
+REL606.genes <- REL606.genes %>%
+    filter(!(Gene %in% duplicate.genes$Gene))
+
+## Order nonmutator pops, then hypermutator pops by converting Population to
+## factor type and setting the levels.
+nonmutator.pops <- c("Ara-5", "Ara-6", "Ara+1", "Ara+2", "Ara+4", "Ara+5")
+hypermutator.pops <- c("Ara-1", "Ara-2", "Ara-3", "Ara-4", "Ara+3", "Ara+6")
+
+## import genes in the table created by:
+## conda activate ltee-metagenomix
+## cd LTEE-metagenomic-repo
+## python rohan-write-csv.py > ../results/LTEE-metagenome-mutations.csv
+gene.mutation.data <- read.csv(
+    '../results/LTEE-metagenome-mutations.csv',
+    header=TRUE,as.is=TRUE) %>%
+    mutate(Generation=t0/10000) %>%
+    ## This for changing the ordering of populations in plots.
+    mutate(Population=factor(Population,levels=c(nonmutator.pops,hypermutator.pops))) %>%
+    inner_join(REL606.genes) %>%
+    filter(Gene!='intergenic')
+
+## ask about melting temperature of essential genes from Couce data set,
+## versus those with no mutations.
+## Get essential and near-essential genes reported in
+## Supplementary Table 1 of Couce et al. 2017.
+## I manually fixed the names of a couple genes in this dataset.
+## The original names are in the "Name" column, and updated names
+## are in the "Gene" column.
+essential.genes <- read.csv("../data/Couce2017-LTEE-essential.csv") %>%
+    inner_join(REL606.genes) %>% filter(!(is.na(locus_tag)))
+
+## for extra filtering for genes with no mutations at all.
+LTEE.genomics.muts <- read.csv("../data/LTEE-Ecoli-data 2020-02-24 14_35_41.csv") %>%
+    ## ignore MOB, DEL, etc. that are annotated as intergenic.
+    ## this is to prevent false negatives, i.e. removing genes in the gene_list
+    ## that weren't directly affected by the intergenic mutation.
+    filter(!(str_detect(html_mutation_annotation,"intergenic")))
+    
+## remove genes from 'no.mutation.genes' that have mutations in LTEE.genomics.muts.
+## make a big string of all mutated genes in the LTEE-genomics data, and search this for
+## matches.
+LTEE.genomics.mutated.genestr <- str_c(unique(LTEE.genomics.muts$gene_list),collapse = ",")
+
+no.mutation.genes <- REL606.genes %>%
+    ## no hits allowed in the metagenomics.
+    filter(!(Gene %in% gene.mutation.data$Gene)) %>%
+    ## and no hits (other than dS, amps, and intergenic) allowed in the genomics.
+    filter(!(str_detect(LTEE.genomics.mutated.genestr,Gene))) %>%
+    arrange(desc(gene_length))
+
+## Look at genes that only have dS.
+all.mutation.density <- calc.gene.mutation.density(
+    gene.mutation.data,
+    c("missense", "sv", "synonymous", "noncoding", "indel", "nonsense")) %>%
+    rename(all.mut.count = mut.count) %>%
+    rename(all.mut.density = density)
+all.except.dS.density <- calc.gene.mutation.density(
+    gene.mutation.data,c("sv", "indel", "nonsense", "missense")) %>%
+    rename(all.except.dS.mut.count = mut.count) %>%
+    rename(all.except.dS.mut.density = density)
+## combine these into one dataframe.
+gene.mutation.densities <- REL606.genes %>%
+    full_join(all.mutation.density) %>%
+    full_join(all.except.dS.density)
+#### CRITICAL STEP: replace NAs with zeros.
+#### We need to keep track of genes that haven't been hit by any mutations
+#### in a given mutation class (sv, indels, dN, etc.)
+gene.mutation.densities[is.na(gene.mutation.densities)] <- 0
+gene.mutation.densities <- tbl_df(gene.mutation.densities)
+
+## genes that are only affected by synonymous mutations.
+only.dS.allowed.genes <- gene.mutation.densities %>%
+    filter(all.except.dS.mut.count == 0) %>%
+    ## no hits (other than dS, amps, and intergenic) allowed in the LTEE genomics
+    ## to remove false positives.
+    filter(!(str_detect(LTEE.genomics.mutated.genestr,Gene))) %>%
+    arrange(desc(gene_length))
+
+## 105 genes just have dS.
+only.dS.genes <- only.dS.allowed.genes %>% filter(!(Gene %in% no.mutation.genes$Gene))
+## 65 genes don't have even dS in the metagenomic data.
+no.dS.genes <- only.dS.allowed.genes %>% filter(Gene %in% no.mutation.genes$Gene)
+
+## calculate mutation densities for genes, but separately for
+## non-mutators and hyper-mutators.
+
+nonmut.gene.mutation.data <- filter(gene.mutation.data,
+                                    Population %in% nonmutator.pops)
+nonmut.density <- calc.gene.mutation.density(
+    nonmut.gene.mutation.data,
+    c("missense","sv", "indel","noncoding","nonsense"))
+nonmut.density[is.na(nonmut.density)] <- 0
+nonmut.density <- tbl_df(nonmut.density) %>%
+    ## want to keep locus_tag for comparison to Caglar data.
+    left_join(select(REL606.genes,Gene, locus_tag))
+
+## do the same thing, but just using hypermutator data.
+hypermut.gene.mutation.data <- filter(gene.mutation.data,
+                                    Population %in% hypermutator.pops)
+hypermut.density <- calc.gene.mutation.density(
+    hypermut.gene.mutation.data,
+    c("missense","sv", "indel","noncoding","nonsense"))
+hypermut.density[is.na(hypermut.density)] <- 0
+hypermut.density <- tbl_df(hypermut.density) %>%
+    ## want to keep locus_tag for comparison to Caglar data.
+    left_join(select(REL606.genes,Gene, locus_tag))
+
+## calculate knockout (KO) mutation densities for genes, separately
+## for non-mutators and hypermutators.
+nonmut.KO.density <- calc.gene.mutation.density(
+    nonmut.gene.mutation.data,
+    c("sv", "indel","nonsense"))
+nonmut.KO.density[is.na(nonmut.KO.density)] <- 0
+nonmut.KO.density <- tbl_df(nonmut.KO.density) %>%
+    ## want to keep locus_tag for comparison to Caglar data.
+    left_join(select(REL606.genes,Gene, locus_tag))
+
+hypermut.KO.density <- calc.gene.mutation.density(
+    hypermut.gene.mutation.data,
+    c("sv", "indel","nonsense"))
+hypermut.KO.density[is.na(hypermut.KO.density)] <- 0
+hypermut.KO.density <- tbl_df(hypermut.KO.density) %>%
+    ## want to keep locus_tag for comparison to Caglar data.
+    left_join(select(REL606.genes,Gene, locus_tag))
+
+
+##########################################################################
+## python ProteomeVis-to-REL606.py produces the table we need to join with REL606.genes.
+REL606.to.ProteomeVis.df <- read.csv("../results/thermostability/REL606-to-ProteomeVis.csv",
+                                     as.is=TRUE, header=TRUE)
+
+## Import relevant E. coli ProteomeVis data. See Razban et al. (2018) in Bioinformatics:
+## "ProteomeVis: a web app for exploration of protein properties from structure to sequence evolution across organisms’ proteomes"
+
+## available protein data. 1262 E. coli proteins here.
+proteome.vis.inspect.df <- read.csv("../results/thermostability/Ecoli-ProteomeVis-data/Ecoli-proteomevis_inspect.csv", as.is=TRUE, header=TRUE)
+proteome.vis.chain.df <- read.csv("../results/thermostability/Ecoli-ProteomeVis-data/Ecoli-proteomevis_chain.csv", as.is=TRUE, header=TRUE)
+proteome.vis.df <- full_join(proteome.vis.chain.df,proteome.vis.inspect.df) %>%
+    left_join(REL606.to.ProteomeVis.df) %>%
+    filter(!(is.na(Gene))) ## 1237 genes pass filters. 
+
+## just looking at nonmut data, skipping dS.
+LTEE.nonmut.proteome.vis.comp.df <- inner_join(proteome.vis.df,nonmut.density)
+
+## significant positive correlation with abundant proteins.
+cor.test(LTEE.nonmut.proteome.vis.comp.df$abundance,
+         LTEE.nonmut.proteome.vis.comp.df$density)
+
+### significant negative correlation between evolutionary rates in nature
+### and rates in the LTEE, as reported in Maddamsetti et al. (2017).
+cor.test(LTEE.nonmut.proteome.vis.comp.df$evolutionary_rate,
+         LTEE.nonmut.proteome.vis.comp.df$density)
+
+## negative correlation here with contact density, but why?
+cor.test(LTEE.nonmut.proteome.vis.comp.df$contact_density,
+         LTEE.nonmut.proteome.vis.comp.df$density)
+
+## no correlation with PPI when only looking at non-mutator data. only when
+## looking at hypermutator data.
+cor.test(LTEE.nonmut.proteome.vis.comp.df$PPI_degree,
+         LTEE.nonmut.proteome.vis.comp.df$density)
+####################
+## just looking at hypermut data, skipping dS.
+LTEE.hypermut.proteome.vis.comp.df <- inner_join(proteome.vis.df,hypermut.density)
+
+## no correlation with abundant proteins.
+cor.test(LTEE.hypermut.proteome.vis.comp.df$abundance,
+         LTEE.hypermut.proteome.vis.comp.df$density)
+
+### no correlation between evolutionary rates in nature
+### and rates in hypermutators.
+cor.test(LTEE.hypermut.proteome.vis.comp.df$evolutionary_rate,
+         LTEE.hypermut.proteome.vis.comp.df$density)
+
+## again, a negative correlation here with contact density. but why?
+cor.test(LTEE.hypermut.proteome.vis.comp.df$contact_density,
+         LTEE.hypermut.proteome.vis.comp.df$density)
+
+## super strong negative correlation with PPI when
+## looking at hypermutator data.
+cor.test(LTEE.hypermut.proteome.vis.comp.df$PPI_degree,
+         LTEE.hypermut.proteome.vis.comp.df$density)
+
+####################
+## using all LTEE data.
+LTEE.proteome.vis.comp.df <- inner_join(proteome.vis.df, gene.mutation.densities)
+
+## significant correlation between rate and abundance as reported in Razban et al. 2018
+## and other papers.
+cor.test(LTEE.proteome.vis.comp.df$abundance,
+         LTEE.proteome.vis.comp.df$evolutionary_rate)
+
+################################################################################
+## Import thermostability data for the E. coli proteome, from Leuenberger et al. (2017)
+## in Science. 757 proteins here.
+LeuenbergerS3.df <- read.csv("../results/thermostability/Ecoli-Leuenberger-data/Ecoli-Leuenberger_Table-S3.csv",as.is=TRUE, header=TRUE) %>%
+    select(Tm.Protein,Length,Protein_ID,Protinfo,is.disordered,Protein.Abundance,
+           Essential,Synthesis.Rate,Synthesis.Rate..Min.,T.90..Unfolded) %>%
+    distinct() %>% ## examine proteins rather than peptides/domains.
+    ## set uniprot column to be compatible with ProteomeViz
+    rename(uniprot = Protein_ID) %>%
+    left_join(proteome.vis.df)
+
+## IMPORTANT TODO: NOT ALL OF THESE GENES MAP TO ProteomeViz!
+## I will have to find a separate solution to match these to REL606 genes.
+Leuentest <- LeuenbergerS3.df %>% filter(!(is.na(Gene)))
+## only 442 out of 757 are in ProteomeViz.
+
+## as another solution, use the supplementary data from Razban (2019).
+## get 577 genes with abundance, Tm, and evolutionary rates.
+Razban2019.df <- read.csv("../results/thermostability/Ecoli-Razban2019.csv") %>%
+    left_join(REL606.genes)
+
+nonmut.thermo.df <- Razban2019.df %>% inner_join(nonmut.density)
+hypermut.thermo.df <- Razban2019.df %>% inner_join(hypermut.density)
+
+## significant negative correlation with non-mutators.
+cor.test(nonmut.thermo.df$evolutionary_rate_seq_identity,
+         nonmut.thermo.df$density)
+## really significant POSITIVE correlation with hypermutators!
+cor.test(hypermut.thermo.df$evolutionary_rate_seq_identity,
+         hypermut.thermo.df$density)
+
+## positive correlation with abundance in non-mutators.
+cor.test(nonmut.thermo.df$abundance_absolute_counts,
+         nonmut.thermo.df$density)
+## no correlation with abundance in hypermutators.
+cor.test(hypermut.thermo.df$abundance_absolute_counts,
+         hypermut.thermo.df$density)
+
+## positive correlation with melting temperature in non-mutators.
+cor.test(nonmut.thermo.df$melting_temperature_Celsius,
+         nonmut.thermo.df$density)
+## no correlation with melting temperature in hypermutators.
+cor.test(hypermut.thermo.df$melting_temperature_Celsius,
+         hypermut.thermo.df$density)
+
+############################################################
+## compare melting temperature and abundance for
+## essential genes in REL606 and genes with no dS in LTEE.
+
+## IMPORTANT TODO: ask whether results depend on including or excluding
+## essential genes that are under selection.
+
+nonmut.essential.thermo.df <- right_join(essential.genes,nonmut.thermo.df) %>%
+    ## turn NAs to 0s.
+    mutate(mut.count=ifelse(is.na(mut.count),0,mut.count)) %>%
+    mutate(density=ifelse(is.na(density),0,density))
+
+hypermut.essential.thermo.df <- right_join(essential.genes,hypermut.thermo.df) %>%
+        ## turn NAs to 0s.
+    mutate(mut.count=ifelse(is.na(mut.count),0,mut.count)) %>%
+    mutate(density=ifelse(is.na(density),0,density))
+
+## negative correlation between conservation and mutation density.
+cor.test(nonmut.essential.thermo.df$evolutionary_rate_seq_identity,
+         nonmut.essential.thermo.df$density)
+
+## negative correlation between conservation and mutation density.
+cor.test(hypermut.essential.thermo.df$evolutionary_rate_seq_identity,
+         hypermut.essential.thermo.df$density)
+
+## positive correlation between abundance and mutation density
+cor.test(nonmut.essential.thermo.df$abundance_absolute_counts,
+         nonmut.essential.thermo.df$density)
+
+## no correlation between abundance and mutation density
+cor.test(hypermut.thermo.df$abundance_absolute_counts,
+         hypermut.thermo.df$density)
+
+## positive correlation between melting temperature and mutation density
+cor.test(nonmut.thermo.df$melting_temperature_Celsius,
+         nonmut.thermo.df$density)
+
+## no correlation between melting temperature and mutation density
+cor.test(hypermut.thermo.df$melting_temperature_Celsius,
+         hypermut.thermo.df$density)
+
+########################################################################
+## Do mRNA and protein abundances prediction evolutionary rates in the LTEE and in nature?
+## Import RNA and protein abundance data from Caglar et al. (2017).
+## make sure to check abundances during BOTH exponential and stationary phase.
+Caglar.samples <- read.csv("../results/thermostability/glucose-Caglar2017-REL606-data/glucose-Caglar2017-S1.csv", as.is=TRUE, header=TRUE) %>%
+    ## turn growthTime_hr into a number from string.
+    mutate(growthTime_hr = as.numeric(growthTime_hr)) %>%
+    ## drop columns which are the same for all samples,
+    ## and ones I don't care about.
+    select(-sampleNum, -experiment, -harvestDate,
+           -carbonSource, -RNA_Data_Freq, -Protein_Data_Freq,
+           -Mg_mM, -Na_mM, -Mg_mM_Levels, -Na_mM_Levels,
+           -rSquared, -uniqueCondition, -uniqueCondition02,
+           -cellTotal, -cellsPerTube)
+
+Caglar.mRNA <- read.csv("../results/thermostability/glucose-Caglar2017-REL606-data/glucose-Caglar2017-S2.csv", as.is=TRUE, header=TRUE)
+Caglar.protein <- read.csv("../results/thermostability/glucose-Caglar2017-REL606-data/glucose-Caglar2017-S3.csv", as.is=TRUE, header=TRUE)
+## reshape and merge the mRNA and protein abundance datasets using tidyr.
+tidy.mRNA <- Caglar.mRNA %>%
+    gather(`MURI_016`,`MURI_017`,`MURI_018`,`MURI_019`,`MURI_020`,`MURI_021`,
+           `MURI_022`,`MURI_023`,`MURI_024`,`MURI_025`,`MURI_026`,`MURI_027`,
+           `MURI_028`,`MURI_029`,`MURI_030`,`MURI_031`,`MURI_032`,`MURI_033`,
+           `MURI_097`,`MURI_098`,`MURI_099`,`MURI_100`,`MURI_101`,`MURI_102`,
+           `MURI_103`,`MURI_104`,`MURI_105`,key="dataSet",value="mRNA")
+tidy.protein <- Caglar.protein %>%
+    gather(`MURI_016`,`MURI_017`,`MURI_018`,`MURI_019`,`MURI_020`,`MURI_021`,
+           `MURI_022`,`MURI_023`,`MURI_024`,`MURI_025`,`MURI_026`,`MURI_027`,
+           `MURI_028`,`MURI_029`,`MURI_030`,`MURI_031`,`MURI_032`,`MURI_033`,
+           `MURI_097`,`MURI_098`,`MURI_099`,`MURI_100`,`MURI_101`,`MURI_102`,
+           `MURI_103`,`MURI_104`,`MURI_105`,key="dataSet",value="Protein") %>%
+    select(-old_refseq)
+
+full.Caglar.data <- Caglar.samples %>%
+    inner_join(tidy.mRNA) %>%
+    inner_join(tidy.protein)
+
+Caglar.summary <- full.Caglar.data %>%
+    group_by(locus_tag,growthPhase,growthTime_hr) %>%
+    summarise(mRNA.mean=mean(mRNA), mRNA.sd=sd(mRNA),
+              Protein.mean=mean(Protein), Protein.sd=sd(Protein))
+
+## Now compare mRNA and protein abundance at each timepoint to
+## mutation density in non-mutators and hypermutators.
+nonmut.density.Caglar <- nonmut.density %>% left_join(Caglar.summary)
+hypermut.density.Caglar <- hypermut.density %>% left_join(Caglar.summary)
+
+correlate.mut.density.with.timepoint <- function(density.Caglar) {
+    for (t in sort(unique(density.Caglar$growthTime_hr))) {
+        my.data <- density.Caglar %>%
+            filter(growthTime_hr == t)
+        
+        mRNA.result <- cor.test(my.data$mRNA.mean, my.data$density)
+        Protein.result <- cor.test(my.data$Protein.mean, my.data$density)
+        print(paste("TIME:",t,'hrs'))
+        print("mRNA abundance correlation with mut density:")
+        print(mRNA.result)
+        print("Protein abundance correlation with mut density:")
+        print(Protein.result)
+    }
+}
+
+## no correlation in mutation density and mRNA or protein abundance in
+## non-mutators.
+correlate.mut.density.with.timepoint(nonmut.density.Caglar)
+## HIGHLY SIGNIFICANT anti-correlations with mutation density with
+## both mRNA and protein abundances in REL606 in all timepoints!
+correlate.mut.density.with.timepoint(hypermut.density.Caglar)
+
+plot.mut.density.RNA.protein.anticorrelations <- function(density.Caglar) {
+    for (t in sort(unique(density.Caglar$growthTime_hr))) {
+        my.data <- density.Caglar %>%
+            filter(growthTime_hr == t)
+        
+        mRNA.plot <- my.data %>%
+            ggplot(aes(x=mRNA.mean,y=density)) +
+            geom_point() +
+            ##geom_smooth() +
+            geom_smooth(method='lm', formula= y~x) +
+            theme_classic()
+        
+        mRNA.fname <- paste0("../results/thermostability/figures/mRNA-",
+                             as.character(t), "-hr-rate-correlation.pdf")
+        ggsave(mRNA.fname, mRNA.plot)
+        
+        Protein.plot <- my.data %>%
+            ggplot(aes(x=Protein.mean,y=density)) +
+            geom_point() +
+            ##geom_smooth() +
+            geom_smooth(method='lm', formula= y~x) +
+            theme_classic()
+        
+        Protein.fname <- paste0("../results/thermostability/figures/Protein-",
+                                as.character(t), "-hr-rate-correlation.pdf")
+        ggsave(Protein.fname, Protein.plot)
+    }
+}
+
+## Make figures for anticorrelations with hypermutator data.
+plot.mut.density.RNA.protein.anticorrelations(hypermut.density.Caglar)
+
+########################################################
+## No evidence of purifying selection on chaperones as a whole.
+## This set of 36 proteins fits the background model.
+
+chaperone.df <- read.csv("../results/thermostability/REL606-chaperones.csv")
+
+chaperone.mut.data <- gene.mutation.data %>%
+    filter(Gene %in% chaperone.df$Gene)
+
+c.chaperones <- calc.cumulative.muts(chaperone.mut.data)
+
+chaperone.base.layer <- plot.base.layer(
+    gene.mutation.data,
+    subset.size=length(unique(chaperone.df$Gene)))
+
+## plot of chaperone analysis
+chaperone.fig <- chaperone.base.layer %>% 
+    add.cumulative.mut.layer(c.chaperones, my.color="black")
+ggsave("../results/thermostability/figures/chaperones.pdf", chaperone.fig)
+
+## what about just:
+## HSP70 (DnaK/DnaJ/GrpE) and the HSP60 chaperonin system (GroEL/GroES)?
+hsp70.60 <- chaperone.df %>% filter(Gene %in% c('dnaK','dnaJ','grpE','groEL','groES'))
+hsp70.60.mut.data <- gene.mutation.data %>%
+    filter(Gene %in% hsp70.60$Gene)
+c.hsp70.60 <- calc.cumulative.muts(hsp70.60.mut.data)
+hsp70.60.base.layer <- plot.base.layer(
+    gene.mutation.data,
+    subset.size=length(unique(hsp70.60$Gene)))
+
+## plot of HSP70-60 analysis.
+hsp70.60.fig <- hsp70.60.base.layer %>% 
+    add.cumulative.mut.layer(c.hsp70.60, my.color="black")
+ggsave("../results/thermostability/figures/hsp70-60.pdf", hsp70.60.fig)
+## nothing really. but interesting dynamics per population. check out
+## what the star-spangled banner shows.
+
+########################################################
+
+## PPI network statistics analysis.
+## to generate these files, run: python snap-ppi-analysis.py 
+zitnik.network.df <- read.csv("../results/thermostability/Zitnik_network_statistics.csv",as.is=TRUE,header=TRUE) %>% inner_join(REL606.genes)
+    
+cong.network.df <- read.csv("../results/thermostability/Cong_network_statistics.csv",as.is=TRUE,header=TRUE) %>% inner_join(REL606.genes)
+
+nonmut.PPI.zitnik <- zitnik.network.df %>% left_join(nonmut.density) %>%
+    ## turn NAs to 0s.
+    mutate(mut.count=ifelse(is.na(mut.count),0,mut.count)) %>%
+    mutate(density=ifelse(is.na(density),0,density))
+
+hypermut.PPI.zitnik <- zitnik.network.df %>% left_join(hypermut.density) %>%
+    ## turn NAs to 0s.
+    mutate(mut.count=ifelse(is.na(mut.count),0,mut.count)) %>%
+    mutate(density=ifelse(is.na(density),0,density))
+
+nonmut.PPI.cong <- cong.network.df %>% left_join(nonmut.density) %>%
+    ## turn NAs to 0s.
+    mutate(mut.count=ifelse(is.na(mut.count),0,mut.count)) %>%
+    mutate(density=ifelse(is.na(density),0,density))
+
+hypermut.PPI.cong <- cong.network.df %>% left_join(hypermut.density) %>%
+    ## turn NAs to 0s.
+    mutate(mut.count=ifelse(is.na(mut.count),0,mut.count)) %>%
+    mutate(density=ifelse(is.na(density),0,density))
+
+## look at Zitnik network.
+
+## all are significant.
+cor.test(nonmut.PPI.zitnik$Pagerank, nonmut.PPI.zitnik$density)
+cor.test(nonmut.PPI.zitnik$HubScore, nonmut.PPI.zitnik$density)
+cor.test(nonmut.PPI.zitnik$AuthorityScore, nonmut.PPI.zitnik$density)
+cor.test(nonmut.PPI.zitnik$ClosenessCentrality, nonmut.PPI.zitnik$density)
+cor.test(nonmut.PPI.zitnik$BetweenessCentrality, nonmut.PPI.zitnik$density)
+cor.test(nonmut.PPI.zitnik$EigenvectorCentrality, nonmut.PPI.zitnik$density)
+cor.test(nonmut.PPI.zitnik$Degree, nonmut.PPI.zitnik$density)
+cor.test(nonmut.PPI.zitnik$DegreeCentrality, nonmut.PPI.zitnik$density)
+cor.test(nonmut.PPI.zitnik$IsArticulationPoint, nonmut.PPI.zitnik$density)
+
+## These ones are significant.
+cor.test(hypermut.PPI.zitnik$Pagerank, hypermut.PPI.zitnik$density)
+cor.test(hypermut.PPI.zitnik$HubScore, hypermut.PPI.zitnik$density)
+cor.test(hypermut.PPI.zitnik$AuthorityScore, hypermut.PPI.zitnik$density)
+cor.test(hypermut.PPI.zitnik$ClosenessCentrality, hypermut.PPI.zitnik$density)
+cor.test(hypermut.PPI.zitnik$BetweenessCentrality, hypermut.PPI.zitnik$density)
+cor.test(hypermut.PPI.zitnik$EigenvectorCentrality, hypermut.PPI.zitnik$density)
+cor.test(hypermut.PPI.zitnik$Degree, hypermut.PPI.zitnik$density)
+cor.test(hypermut.PPI.zitnik$DegreeCentrality, hypermut.PPI.zitnik$density)
+## This last one is not significant.
+cor.test(hypermut.PPI.zitnik$IsArticulationPoint, hypermut.PPI.zitnik$density)
+
+
+## now look at Cong network.
+cor.test(nonmut.PPI.cong$Pagerank, nonmut.PPI.cong$density)
+cor.test(nonmut.PPI.cong$HubScore, nonmut.PPI.cong$density) ## NS
+cor.test(nonmut.PPI.cong$AuthorityScore, nonmut.PPI.cong$density) ## NS
+cor.test(nonmut.PPI.cong$ClosenessCentrality, nonmut.PPI.cong$density) ## NS
+cor.test(nonmut.PPI.cong$BetweenessCentrality, nonmut.PPI.cong$density) ## NS
+cor.test(nonmut.PPI.cong$EigenvectorCentrality, nonmut.PPI.cong$density) ## NS
+cor.test(nonmut.PPI.cong$Degree, nonmut.PPI.cong$density) ## significant
+cor.test(nonmut.PPI.cong$DegreeCentrality, nonmut.PPI.cong$density) ## significant
+cor.test(nonmut.PPI.cong$IsArticulationPoint, nonmut.PPI.cong$density) ## NS
+
+
+cor.test(hypermut.PPI.cong$Pagerank, hypermut.PPI.cong$density) ## NS
+cor.test(hypermut.PPI.cong$HubScore, hypermut.PPI.cong$density) ## significant
+cor.test(hypermut.PPI.cong$AuthorityScore, hypermut.PPI.cong$density) ## sig
+cor.test(hypermut.PPI.cong$ClosenessCentrality, hypermut.PPI.cong$density) #sig
+cor.test(hypermut.PPI.cong$BetweenessCentrality, hypermut.PPI.cong$density) ## NS
+cor.test(hypermut.PPI.cong$EigenvectorCentrality, hypermut.PPI.cong$density) ## sig
+cor.test(hypermut.PPI.cong$Degree, hypermut.PPI.cong$density) ## significant
+cor.test(hypermut.PPI.cong$DegreeCentrality, hypermut.PPI.cong$density) ## significant
+
+cor.test(hypermut.PPI.cong$IsArticulationPoint, hypermut.PPI.cong$density) ## NS
+
+
+####### Let's specifically ask about knockout mutations.
+nonmut.KO.PPI.zitnik <- zitnik.network.df %>% left_join(nonmut.KO.density) %>%
+    ## turn NAs to 0s.
+    mutate(mut.count=ifelse(is.na(mut.count),0,mut.count)) %>%
+    mutate(density=ifelse(is.na(density),0,density))
+
+hypermut.KO.PPI.zitnik <- zitnik.network.df %>% left_join(hypermut.KO.density) %>%
+    ## turn NAs to 0s.
+    mutate(mut.count=ifelse(is.na(mut.count),0,mut.count)) %>%
+    mutate(density=ifelse(is.na(density),0,density))
+
+nonmut.KO.PPI.cong <- cong.network.df %>% left_join(nonmut.KO.density) %>%
+    ## turn NAs to 0s.
+    mutate(mut.count=ifelse(is.na(mut.count),0,mut.count)) %>%
+    mutate(density=ifelse(is.na(density),0,density))
+
+hypermut.KO.PPI.cong <- cong.network.df %>% left_join(hypermut.KO.density) %>%
+    ## turn NAs to 0s.
+    mutate(mut.count=ifelse(is.na(mut.count),0,mut.count)) %>%
+    mutate(density=ifelse(is.na(density),0,density))
+
+######## test for KO mutation density with Zitnik PPI data.
+## None are significant for non-mutators.
+cor.test(nonmut.KO.PPI.zitnik$Pagerank, nonmut.KO.PPI.zitnik$density)
+cor.test(nonmut.KO.PPI.zitnik$HubScore, nonmut.KO.PPI.zitnik$density)
+cor.test(nonmut.KO.PPI.zitnik$AuthorityScore, nonmut.KO.PPI.zitnik$density)
+cor.test(nonmut.KO.PPI.zitnik$ClosenessCentrality, nonmut.KO.PPI.zitnik$density)
+cor.test(nonmut.KO.PPI.zitnik$BetweenessCentrality, nonmut.KO.PPI.zitnik$density)
+cor.test(nonmut.KO.PPI.zitnik$EigenvectorCentrality, nonmut.KO.PPI.zitnik$density)
+cor.test(nonmut.KO.PPI.zitnik$Degree, nonmut.KO.PPI.zitnik$density)
+cor.test(nonmut.KO.PPI.zitnik$DegreeCentrality, nonmut.KO.PPI.zitnik$density)
+cor.test(nonmut.KO.PPI.zitnik$IsArticulationPoint, nonmut.KO.PPI.zitnik$density)
+
+## These are all significant for hypermutators.
+cor.test(hypermut.KO.PPI.zitnik$Pagerank, hypermut.KO.PPI.zitnik$density)
+cor.test(hypermut.KO.PPI.zitnik$HubScore, hypermut.KO.PPI.zitnik$density)
+cor.test(hypermut.KO.PPI.zitnik$AuthorityScore, hypermut.KO.PPI.zitnik$density)
+cor.test(hypermut.KO.PPI.zitnik$ClosenessCentrality, hypermut.KO.PPI.zitnik$density)
+cor.test(hypermut.KO.PPI.zitnik$BetweenessCentrality, hypermut.KO.PPI.zitnik$density)
+cor.test(hypermut.KO.PPI.zitnik$EigenvectorCentrality, hypermut.KO.PPI.zitnik$density)
+cor.test(hypermut.KO.PPI.zitnik$Degree, hypermut.KO.PPI.zitnik$density)
+cor.test(hypermut.KO.PPI.zitnik$DegreeCentrality, hypermut.KO.PPI.zitnik$density)
+## not significant
+cor.test(hypermut.KO.PPI.zitnik$IsArticulationPoint, hypermut.KO.PPI.zitnik$density)
+
+## now look at KOs in Cong network.
+## significant negative correlation for closeness centrality,
+## NS for the rest.
+cor.test(nonmut.KO.PPI.cong$Pagerank, nonmut.KO.PPI.cong$density)
+cor.test(nonmut.KO.PPI.cong$HubScore, nonmut.KO.PPI.cong$density)
+cor.test(nonmut.KO.PPI.cong$AuthorityScore, nonmut.KO.PPI.cong$density) 
+cor.test(nonmut.KO.PPI.cong$ClosenessCentrality, nonmut.KO.PPI.cong$density) 
+cor.test(nonmut.KO.PPI.cong$BetweenessCentrality, nonmut.KO.PPI.cong$density) 
+cor.test(nonmut.KO.PPI.cong$EigenvectorCentrality, nonmut.KO.PPI.cong$density) 
+cor.test(nonmut.KO.PPI.cong$Degree, nonmut.KO.PPI.cong$density) 
+cor.test(nonmut.KO.PPI.cong$DegreeCentrality, nonmut.KO.PPI.cong$density)
+cor.test(nonmut.KO.PPI.cong$IsArticulationPoint, nonmut.KO.PPI.cong$density)
+
+## significant for some but not all.
+cor.test(hypermut.KO.PPI.cong$Pagerank, hypermut.KO.PPI.cong$density)
+cor.test(hypermut.KO.PPI.cong$HubScore, hypermut.KO.PPI.cong$density)
+cor.test(hypermut.KO.PPI.cong$AuthorityScore, hypermut.KO.PPI.cong$density)
+cor.test(hypermut.KO.PPI.cong$ClosenessCentrality, hypermut.KO.PPI.cong$density)
+cor.test(hypermut.KO.PPI.cong$BetweenessCentrality, hypermut.KO.PPI.cong$density)
+cor.test(hypermut.KO.PPI.cong$EigenvectorCentrality, hypermut.KO.PPI.cong$density)
+cor.test(hypermut.KO.PPI.cong$Degree, hypermut.KO.PPI.cong$density)
+cor.test(hypermut.KO.PPI.cong$DegreeCentrality, hypermut.KO.PPI.cong$density)
+
+cor.test(hypermut.KO.PPI.cong$IsArticulationPoint, hypermut.KO.PPI.cong$density)
+
+
+#######################################################################
+## METABOLIC ENZYME ANALYSIS.
+########################################################
+
+## Only Ara-1 and Ara+6 show evidence of purifying selection on
+## superessential metabolic enzymes. Why only these two? No idea why.
+
+## examine superessential metabolic reactions reported by Barve and Wagner (2012).
+superessential.rxns.df <- read.csv("../results/thermostability/Barve2012-S6-superessential.csv")
+
+superessential.mut.data <- gene.mutation.data %>%
+    filter(Gene %in% superessential.rxns.df$Gene)
+
+c.superessential <- calc.cumulative.muts(superessential.mut.data)
+
+superessential.base.layer <- plot.base.layer(
+    gene.mutation.data,
+    subset.size=length(unique(superessential.rxns.df$Gene)))
+
+## plot of superessential metabolic enzymes analysis
+superessential.fig <- superessential.base.layer %>% 
+    add.cumulative.mut.layer(c.superessential, my.color="black")
+ggsave("../results/thermostability/figures/superessential.pdf", superessential.fig)
+
+## calculate formal p-values.
+superessential.pvals <- calc.traj.pvals(gene.mutation.data, unique(superessential.rxns.df$Gene))
+## results:
+## A tibble: 12 x 3
+##   Population count p.val
+##   <fct>      <int> <dbl>
+## 1 Ara-5       6363 0.636
+## 2 Ara-6       9150 0.915
+## 3 Ara+1       8365 0.836
+## 4 Ara+2       6800 0.68 
+## 5 Ara+4       8913 0.891
+## 6 Ara+5       1892 0.189
+## 7 Ara-1       9999 1.00 
+## 8 Ara-2       6484 0.648
+## 9 Ara-3       6178 0.618
+##10 Ara-4       8766 0.877
+##11 Ara+3       5669 0.567
+##12 Ara+6       9933 0.993
+
+################################################################
+## look at generalist and specialist enzymes in Nam et al. (2012)
+## Network context and selection in the evolution of enzyme specificity.
+
+## 1157 genes.
+Nam.df <- read.csv("../results/thermostability/Nam2012_Database_S1.csv") %>%
+    left_join(REL606.genes) %>% filter(!is.na(Gene))
+
+specialist.enzymes <- Nam.df %>% filter(Class=="Spec.")
+generalist.enzymes <- Nam.df %>% filter(Class=="Gen.")
+
+specialist.mut.data <- gene.mutation.data %>%
+    filter(Gene %in% specialist.enzymes$Gene)
+c.specialists <- calc.cumulative.muts(specialist.mut.data)
+
+generalist.mut.data <- gene.mutation.data %>%
+    filter(Gene %in% generalist.enzymes$Gene)
+c.generalists <- calc.cumulative.muts(generalist.mut.data)
+
+specialist.base.layer <- plot.base.layer(
+    gene.mutation.data,
+    subset.size=length(unique(specialist.enzymes$Gene)))
+
+generalist.base.layer <- plot.base.layer(
+    gene.mutation.data,
+    subset.size=length(unique(generalist.enzymes$Gene)))
+
+## specialist fig.
+specialist.fig <- specialist.base.layer %>% ## null for specialists
+    add.cumulative.mut.layer(c.specialists, my.color="black")
+ggsave("../results/thermostability/figures/specialist.pdf", specialist.fig)
+
+generalist.fig <- generalist.base.layer %>% ## null for generalists
+    add.cumulative.mut.layer(c.generalists, my.color="black")
+ggsave("../results/thermostability/figures/generalist.pdf", generalist.fig)
+
