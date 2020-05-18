@@ -14,7 +14,7 @@ nonmutator.pops <- c("Ara-5", "Ara-6", "Ara+1", "Ara+2", "Ara+4", "Ara+5")
 hypermutator.pops <- c("Ara-1", "Ara-2", "Ara-3", "Ara-4", "Ara+3", "Ara+6")
 
 
-## -- add LTEE strains with no KO to table, with ancestral resilience.x
+## -- add LTEE strains with no KO to table, with ancestral resilience.
 
 LTEE.genomes.KO.metadata <- read.csv("../data/LTEE-264-genomes-SNP-nonsense-small-indel-MOB-large-deletions.csv") %>%
     select(population,time,strain,clone,mutator_status) %>%

@@ -664,3 +664,81 @@ generalist.fig <- generalist.base.layer %>% ## null for generalists
     add.cumulative.mut.layer(c.generalists, my.color="black")
 ggsave("../results/thermostability/figures/generalist.pdf", generalist.fig)
 
+################################################
+ ## Essential gene age distribution, quickly.
+################################################
+## look at distribution of evolutionary rates for essential
+## and non-essential genes.
+
+## also look at distribution of protein abundance for
+## essential and non-essential genes.
+
+REL606.genes.with.essential.annotation <- REL606.genes %>%
+    mutate(Couce.essential = Gene %in% essential.genes$Gene) %>%
+    mutate(no.mut.essential = Gene %in% no.mutation.genes$Gene) %>%
+    mutate(only.dS.essential = Gene %in% only.dS.allowed.genes$Gene)
+
+## select just the relevant columns.
+relevant.proteome.vis.df <- proteome.vis.df %>%
+    select(length, abundance, evolutionary_rate, contact_density, PPI_degree,
+           dosage_tolerance, Gene) %>%
+    left_join(REL606.genes.with.essential.annotation)
+
+## Are there any essential genes that are not in the ProteomeVis database? Yes, about half of them.
+missing.essential <- REL606.genes.with.essential.annotation %>%
+    filter(Couce.essential==TRUE) %>%
+    filter(!(Gene %in% relevant.proteome.vis.df$Gene))
+
+## examine distribution of abundance, evolutionary_rate, contact_density, PPI_degree,
+## dosage tolerance, between essential and non-essential genes.
+## my hypothesis is that essential genes in REL606 should have two peaks, at
+## each end of the distribution, if recent addictive genes are present.
+
+proteome.vis.abundance.essential.plot <- ggplot(relevant.proteome.vis.df,
+                                                aes(x=abundance)) +
+    geom_histogram() + theme_classic() + facet_wrap(.~Couce.essential)
+
+## there's does look like a peak of relatively low abundance in the essential genes.
+## let's take a look. Not so promising though.
+test1 <- filter(relevant.proteome.vis.df,Couce.essential==TRUE) %>%
+    filter(abundance<2)
+
+proteome.vis.rate.essential.plot <- ggplot(relevant.proteome.vis.df,
+                                                aes(x=evolutionary_rate)) +
+    geom_histogram() + theme_classic() + facet_wrap(.~Couce.essential)
+
+proteome.vis.contact_density.essential.plot <- ggplot(relevant.proteome.vis.df,
+                                                aes(x=contact_density)) +
+    geom_histogram() + theme_classic() + facet_wrap(.~Couce.essential)
+
+proteome.vis.PPI.degree.essential.plot <- ggplot(relevant.proteome.vis.df,
+                                                aes(x=PPI_degree)) +
+    geom_histogram() + theme_classic() + facet_wrap(.~Couce.essential)
+
+proteome.vis.dosage_tolerance.essential.plot <- ggplot(relevant.proteome.vis.df,
+                                                aes(x=dosage_tolerance)) +
+    geom_histogram() + theme_classic() + facet_wrap(.~Couce.essential)
+
+proteome.vis.rate.essential.plot
+proteome.vis.contact_density.essential.plot
+proteome.vis.PPI.degree.essential.plot
+proteome.vis.dosage_tolerance.essential.plot
+
+## repeat the abundance comparison using the Caglar data.
+
+annotated.Couce.essential <- REL606.genes.with.essential.annotation %>%
+    filter(Couce.essential==TRUE) %>%
+    left_join(nonmut.density.Caglar) %>%
+    left_join(hypermut.density.Caglar) %>%
+    ## remove rows with NAs.
+    drop_na() %>%
+    arrange(growthPhase,desc(Protein.mean))
+
+write.csv(annotated.Couce.essential,file="../results/resilience/annotated-Couce-essential.csv")
+
+## plot these essential genes by their protein abundance over time?
+## rank them by the area under the curve of their protein
+## abundance over time?
+
+
+## TODO: go more in depth with these analyses.

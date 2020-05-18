@@ -420,40 +420,55 @@ def GraphResilience(G):
     resilience = 1 - AUC
     return resilience
 
-
-def resilience_analysis_of_LTEE_genomes(G, g_to_node, outf, reps=100):
+def get_LTEE_genome_knockout_muts():
     '''
-    Input: a starting PPI graph G, and a dictionary of genes to nodes.
+    I downloaded this table from Jeff's Shiny web app interface
+    to the 264 LTEE genomes dataset. 
+    knockout mutations are: nonsense SNPs, small indels, mobile element insertions, and large deletions.
+    250 out of 264 genomes have knockout mutations.
+    '''
+    LTEE_nonsense_indel_MOB_deletions_in_genomes_f = "../data/LTEE-264-genomes-SNP-nonsense-small-indel-MOB-large-deletions.csv"
+    LTEE_mut_df = pd.read_csv(LTEE_nonsense_indel_MOB_deletions_in_genomes_f)
+    ## filter out all intergenic mutations.
+    LTEE_knockout_muts = LTEE_mut_df[~LTEE_mut_df['gene_position'].str.contains("intergenic",na=False)]
+    return LTEE_knockout_muts
+
+def LTEE_strain_to_KO_genes(LTEE_knockout_muts):
+    ''' return a dict of LTEE strain to set of knocked out genes in that strain.'''
+    LTEE_strain_KO_dict = {}
+    ## 250 out of 264 genomes have knockout mutations.
+    LTEE_genome_metadata = LTEE_knockout_muts[['treatment','population','time','strain','clone','mutator_status']].drop_duplicates()
+    LTEE_strains = list(LTEE_genome_metadata['strain'])
+    for clone in LTEE_strains:
+        clone_knockout_muts = LTEE_knockout_muts[LTEE_knockout_muts['strain']==clone]
+        ## remove square brackets from each gene string in the column, split into a list of entries (which are lists),
+        KO_list_of_lists = [x.replace('[', '').replace(']','').split(',') for x in clone_knockout_muts['gene_list']]
+        ## and then flatten the list of lists into a set of knocked out genes.
+        knocked_out_genes = {item for sublist in KO_list_of_lists for item in sublist}
+        LTEE_strain_KO_dict[clone] = knocked_out_genes
+    return LTEE_strain_KO_dict
+    
+
+def resilience_analysis_of_LTEE_genomes(LTEE_strain_to_KO_dict, G, g_to_node, reps=100):
+    '''
+    Input: 
+    a dict of LTEE strain to set of knocked out genes,
+    a starting PPI graph G, 
+    and a dictionary of genes to nodes.
 
     1) Import KO mutations in the genomes in the Tenaillon dataset.
     2) Generate a graph for each genome: take the starting PPI graph,
        and delete nodes/genes hit by nonsense SNPs, indels, mobile elements.
     3) calculate PPI network resilience for each genome.
-    4) print out a csv file with the timepoint (Generations), genome metadata such
-       as name and populations, and the resilience statistics.
+    4) return a pandas DataFrame of the PPI network resilience of each strain.
     '''
 
     REL606_resilience = np.mean([GraphResilience(G) for x in range(reps)])
-    ## I downloaded this table from Jeff's Shiny web app interface
-    ## to the 264 LTEE genomes dataset.
-    LTEE_knockout_muts_in_genomes_f = "../data/LTEE-264-genomes-SNP-nonsense-small-indel-MOB-large-deletions.csv"
-    LTEE_knockout_muts = pd.read_csv(LTEE_knockout_muts_in_genomes_f)
-    ## filter out all intergenic mutations.
-    LTEE_knockout_muts = LTEE_knockout_muts[~LTEE_knockout_muts['gene_position'].str.contains("intergenic",na=False)]
-    
-    LTEE_genome_metadata = LTEE_knockout_muts[['treatment','population','time','strain','clone','mutator_status']]
-    LTEE_genome_metadata = LTEE_genome_metadata.drop_duplicates()
-    ## 250 out of 264 genomes have knockout mutations.
-    ## knockout mutations are: nonsense SNPs, small indels, mobile element insertions, and large deletions.
-    LTEE_strains = list(LTEE_genome_metadata['strain'])
 
+    clone_col = []
     LTEE_strain_resilience = []
-    for clone in LTEE_strains:
-        clone_knockout_muts = LTEE_knockout_muts[LTEE_knockout_muts['strain']==clone]
-        ## remove square brackets from each gene string in the column, split into a list of entries (which are lists),
-        KO_list_of_lists = [x.replace('[', '').replace(']','').split(',') for x in clone_knockout_muts['gene_list']]
-        ## and then flatten the list of lists into a list of knocked out genes.
-        knocked_out_genes = [item for sublist in KO_list_of_lists for item in sublist]
+    for clone, knocked_out_genes in LTEE_strain_to_KO_dict.items():
+        clone_col.append(clone) ## to ensure that clone and resilience match up.
         ## get the nodes to remove from the REL606 graph.
         knocked_out_nodes = []
         for x in knocked_out_genes:
@@ -477,24 +492,23 @@ def resilience_analysis_of_LTEE_genomes(G, g_to_node, outf, reps=100):
         my_resilience = np.mean([GraphResilience(G2) for x in range(reps)])
         print(my_resilience)
         LTEE_strain_resilience.append(my_resilience)
-    strain_col = ['REL606'] + LTEE_strains
+    strain_col = ['REL606'] + clone_col
     resilience_col = [REL606_resilience] + LTEE_strain_resilience
     resilience_results = pd.DataFrame.from_dict({'strain': strain_col, 'resilience': resilience_col})
-    ## write results to file.
-    resilience_results.to_csv(outf)
+    return resilience_results
 
 
-def randomized_resilience_analysis(G, g_to_node, KO_set, reps=100):
+def resilience_randomized_over_gene_set(LTEE_strain_to_KO_dict, G, g_to_node, KO_set, reps=100):
     '''
-    Input: a starting PPI graph G, a dictionary of genes to nodes,
-    a dict of LTEE strains to number of KO mutations in that strain,
+    Input:
+    a dict of LTEE strains to set of knocked out genes,
+    a starting PPI graph G, 
+    a dictionary of genes to nodes,
     and a set of genes to draw KOs from.
-    
-    This set of genes will be:
-    A) KOs in one focal population, from the LTEE metagenomics data
-    B) KOs in the entire LTEE, from the LTEE metagenomics data
-    C) all genes in REL606.
 
+    This set of genes will be:
+    A) all genes in REL606.
+    B) KOs in the entire LTEE, from the LTEE metagenomics data.
 
     1) Generate a graph for each genome: take the starting PPI graph,
     draw X KO'ed genes from the bag,
@@ -503,7 +517,140 @@ def randomized_resilience_analysis(G, g_to_node, KO_set, reps=100):
     3) return a DataFrame with the timepoint (Generations), population,
     name, and resilience statistic.
     '''
-    pass
+    REL606_resilience = np.mean([GraphResilience(G) for x in range(reps)])
+    ## seed random number generator.
+    random.seed()
+    clone_col = []
+    randomized_resilience = []
+    for clone, gset in LTEE_strain_to_KO_dict.items():
+        clone_col.append(clone) ## to ensure that clone and randomized resilience match up.
+        KOsamplesize = len(gset)
+        ## sample the genes to remove from the REL606 graph.
+        knocked_out_genes = random.sample(KO_set, KOsamplesize)
+        knocked_out_nodes = []
+        for x in knocked_out_genes:
+            if x in g_to_node:
+                knocked_out_nodes.append(g_to_node[x])
+        ## copy starting graph G into G2 so that we don't mess up G as a side-effect.
+        ## when we do so, exclude the genes affected by knockout mutations.
+        G2 = snap.TUNGraph.New(G.GetNodes(),G.GetEdges())
+        ## add nodes.
+        for n in G.Nodes():
+            nId = n.GetId()
+            if nId not in knocked_out_nodes:
+                G2.AddNode(nId)
+        ## add edges.
+        for e in G.Edges():
+            srcN = e.GetSrcNId()
+            dstN = e.GetDstNId()
+            if (srcN not in knocked_out_nodes) and (dstN not in knocked_out_nodes):
+                G2.AddEdge(srcN, dstN)
+        ## calculate this clone's resilience. default is 100 replicates.
+        my_resilience = np.mean([GraphResilience(G2) for x in range(reps)])
+        print(my_resilience)
+        randomized_resilience.append(my_resilience)
+    strain_col = ['REL606'] + clone_col
+    resilience_col = [REL606_resilience] + randomized_resilience
+    resilience_results = pd.DataFrame.from_dict({'strain': strain_col, 'randomized_resilience': resilience_col})
+    return resilience_results
+
+def get_LTEE_metagenomics_knockouts():
+    ''' 
+    Import csv of LTEE metagenomics data, and
+    return a list of genes affected by knockout mutations.
+    knockout mutations are: nonsense SNPs, small indels, mobile element insertions, and large deletions.
+'''
+    LTEE_metagenomics_df = pd.read_csv("../results/LTEE-metagenome-mutations.csv")
+    KO_mut_classes = ["nonsense","indel","sv"]
+    KO_df = LTEE_metagenomics_df[LTEE_metagenomics_df.Annotation.isin(KO_mut_classes)]
+    KO_genes = {x for x in KO_df['Gene']} - {"intergenic"} ## intergenic is not a Gene.
+    return KO_genes
+
+def resilience_randomized_within_LTEE_pops(LTEE_strain_to_KO_dict, LTEE_strain_to_pop_dict, G, g_to_node, KO_dict, reps=100):
+    '''
+    Input:
+    a dict of LTEE strains to set of knocked out genes,
+    a dict of LTEE strains to their source populations,
+    a starting PPI graph G, 
+    a dictionary of genes to nodes,
+    and a dict from LTEE population to the set of genes
+    with KOs in that population, from the LTEE metagenomics data
+
+    1) Generate a graph for each genome: take the starting PPI graph,
+    draw X KO'ed genes from the bag,
+       and delete nodes/genes from the graph.
+    2) calculate PPI network resilience for each genome.
+    3) return a DataFrame with the timepoint (Generations), population,
+    name, and resilience statistic.
+    '''
+    REL606_resilience = np.mean([GraphResilience(G) for x in range(reps)])
+    ## seed random number generator.
+    random.seed()
+    clone_col = []
+    randomized_resilience = []
+    for clone, gset in LTEE_strain_to_KO_dict.items():
+        clone_col.append(clone) ## to ensure that clone and randomized resilience match up.
+        KOsamplesize = len(gset)
+        ## sample the genes to remove from the REL606 graph.
+        pop = LTEE_strain_to_pop_dict[clone]
+        KO_set = KO_dict[pop]
+        knocked_out_genes = random.sample(KO_set, KOsamplesize)
+        knocked_out_nodes = []
+        for x in knocked_out_genes:
+            if x in g_to_node:
+                knocked_out_nodes.append(g_to_node[x])
+        ## copy starting graph G into G2 so that we don't mess up G as a side-effect.
+        ## when we do so, exclude the genes affected by knockout mutations.
+        G2 = snap.TUNGraph.New(G.GetNodes(),G.GetEdges())
+        ## add nodes.
+        for n in G.Nodes():
+            nId = n.GetId()
+            if nId not in knocked_out_nodes:
+                G2.AddNode(nId)
+        ## add edges.
+        for e in G.Edges():
+            srcN = e.GetSrcNId()
+            dstN = e.GetDstNId()
+            if (srcN not in knocked_out_nodes) and (dstN not in knocked_out_nodes):
+                G2.AddEdge(srcN, dstN)
+        ## calculate this clone's resilience. default is 100 replicates.
+        my_resilience = np.mean([GraphResilience(G2) for x in range(reps)])
+        print(my_resilience)
+        randomized_resilience.append(my_resilience)
+    strain_col = ['REL606'] + clone_col
+    resilience_col = [REL606_resilience] + randomized_resilience
+    resilience_results = pd.DataFrame.from_dict({'strain': strain_col, 'randomized_resilience': resilience_col})
+    return resilience_results
+
+def make_LTEE_strain_to_pop_dict(LTEE_knockout_muts):
+    ''' return a dict of LTEE strain to the population it comes from.'''
+    LTEE_strain_to_pop = {}
+    LTEE_genome_metadata = LTEE_knockout_muts[['treatment','population','time','strain','clone','mutator_status']].drop_duplicates()
+    LTEE_strains = list(LTEE_genome_metadata['strain'])
+    matching_pops = list(LTEE_genome_metadata['population'])
+    LTEE_strain_to_pop = {x:y for x,y in zip(LTEE_strains, matching_pops)}
+    return LTEE_strain_to_pop
+
+def make_LTEE_pop_to_KO_dict(LTEE_strain_to_KO, LTEE_strain_to_pop):
+    ''' 
+    return a dict of LTEE pops to the set of knockout muts in that pop in the 
+    metagenomics dataset. Then add the union of KO mutations found in clones
+    isolated in that population.
+    '''
+    LTEE_pop_to_KOset = {}
+    LTEE_metagenomics_df = pd.read_csv("../results/LTEE-metagenome-mutations.csv")
+    KO_mut_classes = ["nonsense","indel","sv"]
+    KO_df = LTEE_metagenomics_df[LTEE_metagenomics_df.Annotation.isin(KO_mut_classes)]
+    LTEE_pops = set(KO_df['Population'])
+    for p in LTEE_pops:
+        ## 'intergenic' is not a gene, so remove.
+        KO_set = {x for x in KO_df[KO_df['Population']==p].Gene} - {"intergenic"}
+        LTEE_pop_to_KOset[p] = KO_set
+    ## now add the KO mutations in the genomics.
+    for clone, pop in LTEE_strain_to_pop.items():
+        clone_KOset = LTEE_strain_to_KO[clone]
+        LTEE_pop_to_KOset[pop].update(clone_KOset)
+    return LTEE_pop_to_KOset
 
 
 def main():
@@ -534,15 +681,62 @@ def main():
     ##write_NetworkStatistics(G1, node_to_g1, G1file)
     ##write_NetworkStatistics(G2, node_to_g2, G2file, use_blattner=False)
 
+    LTEE_knockouts_df = get_LTEE_genome_knockout_muts()
+    LTEE_strain_to_knockouts = LTEE_strain_to_KO_genes(LTEE_knockouts_df)
+    
     ## Run the resilience analysis, using the graph from Zitnik paper.
     resilience_outf1 = "../results/resilience/Zitnik_PPI_LTEE_genome_resilience.csv"
-    ##resilience_analysis_of_LTEE_genomes(G1, g_to_node1, resilience_outf1)
+    resilience_results1 = resilience_analysis_of_LTEE_genomes(LTEE_strain_to_knockouts, G1, g_to_node1, reps=100)
+    resilience_results1.to_csv(resilience_outf1)
     ## Run the resilience analysis, using the graph from Cong paper.
     resilience_outf2 = "../results/resilience/Cong_PPI_LTEE_genome_resilience.csv"
-    ##resilience_analysis_of_LTEE_genomes(G2, g_to_node2, resilience_outf2)
+    resilience_results2 = resilience_analysis_of_LTEE_genomes(LTEE_strain_to_knockouts, G2, g_to_node2, reps=100)
+    ## write results to file.
+    resilience_results2.to_csv(resilience_outf2)
+    
+    ## calculate randomized resilience of genomes, set of all genes in REL606.
+    ## for Zitnik network.
+    all_genes_randomized_outf1 = "../results/resilience/Zitnik_PPI_all_genes_randomized_resilience.csv"
+    all_genes_randomized_resilience1 = resilience_randomized_over_gene_set(LTEE_strain_to_knockouts, G1, g_to_node1, REL606_genes, reps=100)
+    all_genes_randomized_resilience1.to_csv(all_genes_randomized_outf1)
+    ## for Cong network.
+    all_genes_randomized_outf2 = "../results/resilience/Cong_PPI_all_genes_randomized_resilience.csv"
+    all_genes_randomized_resilience2 = resilience_randomized_over_gene_set(LTEE_strain_to_knockouts, G2, g_to_node2, REL606_genes, reps=100)
+    all_genes_randomized_resilience2.to_csv(all_genes_randomized_outf2)
 
-    ## for testing.
-    test_outf = "../results/resilience/for_testing_only.csv"
-    resilience_analysis_of_LTEE_genomes(G2, g_to_node2, test_outf,reps=1)
+    ## calculate randomized resilience of genomes,
+    ## using the set of all genes KO'ed in BOTH the LTEE metagenomics data
+    ## and the LTEE genomics data.
+    LTEE_genomics_KO_genes = set()
+    for clone_KOset in LTEE_strain_to_knockouts.values():
+        LTEE_genomics_KO_genes.update(clone_KOset)
+    LTEE_metagenomics_KO_genes = get_LTEE_metagenomics_knockouts()
+    all_LTEE_KO_genes = set.union(LTEE_metagenomics_KO_genes,LTEE_genomics_KO_genes)
 
-main()
+    ## for Zitnik network.
+    acrosspops_randomized_outf1 = "../results/resilience/Zitnik_PPI_across_pops_randomized_resilience.csv"
+    acrosspops_randomized_resilience1 = resilience_randomized_over_gene_set(LTEE_strain_to_knockouts, G1, g_to_node1, all_LTEE_KO_genes, reps=100)
+    acrosspops_randomized_resilience1.to_csv(acrosspops_randomized_outf1)
+    ## for Cong network.
+    acrosspops_randomized_outf2 = "../results/resilience/Cong_PPI_across_pops_randomized_resilience.csv"
+    acrosspops_randomized_resilience2 = resilience_randomized_over_gene_set(LTEE_strain_to_knockouts, G2, g_to_node2, all_LTEE_KO_genes, reps=100)
+    acrosspops_randomized_resilience2.to_csv(acrosspops_randomized_outf2)
+
+    ## calculate randomized resilience of genomes,
+    ## using the set of within population KO mutations.
+    LTEE_strain_to_pop =  make_LTEE_strain_to_pop_dict(LTEE_knockouts_df)
+    ## include the set of KOs in the genomics with the set of KOs in the metagenomics
+    ## for each population.
+    LTEE_pop_to_KO = make_LTEE_pop_to_KO_dict(LTEE_strain_to_knockouts,LTEE_strain_to_pop)
+    ## for Zitnik network.
+    withinpop_randomized_outf1 = "../results/resilience/Zitnik_PPI_within_pops_randomized_resilience.csv"
+    withinpop_randomized_resilience1 = resilience_randomized_within_LTEE_pops(LTEE_strain_to_knockouts, LTEE_strain_to_pop, G1, g_to_node1, LTEE_pop_to_KO, reps=100)
+    withinpop_randomized_resilience1.to_csv(withinpop_randomized_outf1)
+    ## for Cong network.
+    withinpop_randomized_outf2 = "../results/resilience/Cong_PPI_within_pops_randomized_resilience.csv"
+    withinpop_randomized_resilience2 = resilience_randomized_within_LTEE_pops(LTEE_strain_to_knockouts, LTEE_strain_to_pop, G2, g_to_node2, LTEE_pop_to_KO, reps=100)
+    withinpop_randomized_resilience2.to_csv(withinpop_randomized_outf2)
+
+
+if __name__ == "__main__":
+    main()
