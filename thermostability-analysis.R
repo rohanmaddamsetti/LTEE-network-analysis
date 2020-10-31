@@ -1,5 +1,8 @@
 ## thermostability-analysis.R by Rohan Maddamsetti.
 
+## IMPORTANT TODO: See if I can recapitulate the correlations
+## in Figure 1 of Drummond and Wilke (2008) using LTEE hypermutator data.
+
 ## get functions for dealing with LTEE metagenomics data.
 source("../../LTEE-purifying-selection/src/metagenomics-library.R")
 
@@ -198,6 +201,9 @@ cor.test(LTEE.hypermut.proteome.vis.comp.df$evolutionary_rate,
 ## again, a negative correlation here with contact density. but why?
 cor.test(LTEE.hypermut.proteome.vis.comp.df$contact_density,
          LTEE.hypermut.proteome.vis.comp.df$density)
+## see PNAS paper: Protein misinteraction avoidance causes
+## highly expressed proteins to evolve slowly
+
 
 ## super strong negative correlation with PPI when
 ## looking at hypermutator data.
@@ -300,7 +306,7 @@ cor.test(hypermut.thermo.df$melting_temperature_Celsius,
          hypermut.thermo.df$density)
 
 ########################################################################
-## Do mRNA and protein abundances prediction evolutionary rates in the LTEE and in nature?
+## Do mRNA and protein abundances predict evolutionary rates in the LTEE and in nature?
 ## Import RNA and protein abundance data from Caglar et al. (2017).
 ## make sure to check abundances during BOTH exponential and stationary phase.
 Caglar.samples <- read.csv("../results/thermostability/glucose-Caglar2017-REL606-data/glucose-Caglar2017-S1.csv", as.is=TRUE, header=TRUE) %>%
@@ -489,7 +495,6 @@ cor.test(hypermut.PPI.zitnik$DegreeCentrality, hypermut.PPI.zitnik$density)
 ## This last one is not significant.
 cor.test(hypermut.PPI.zitnik$IsArticulationPoint, hypermut.PPI.zitnik$density)
 
-
 ## now look at Cong network.
 cor.test(nonmut.PPI.cong$Pagerank, nonmut.PPI.cong$density)
 cor.test(nonmut.PPI.cong$HubScore, nonmut.PPI.cong$density) ## NS
@@ -584,6 +589,43 @@ cor.test(hypermut.KO.PPI.cong$DegreeCentrality, hypermut.KO.PPI.cong$density)
 
 cor.test(hypermut.KO.PPI.cong$IsArticulationPoint, hypermut.KO.PPI.cong$density)
 
+##################################
+## what are the essential genes that are not even in the
+## PPI networks?
+
+## 541 essential genes in REL606, total.
+essential.not.in.cong <- essential.genes %>%
+    filter(!(Gene %in% cong.network.df$Gene)
+## 250 essential genes not in Cong network.
+essential.not.in.zitnik <- essential.genes %>%
+    filter(!(Gene %in% zitnik.network.df$Gene))
+## 56 essential genes not in Zitnik network.
+
+## these still show evidence of purifying selection in the LTEE.
+essential.not.cong.data <- gene.mutation.data %>%
+    filter(Gene %in% essential.not.in.cong$Gene)
+c.essential.not.cong <- calc.cumulative.muts(essential.not.cong.data)
+essential.not.cong.base.layer <- plot.base.layer(gene.mutation.data,
+                                        subset.size=length(unique(essential.not.in.cong$Gene)))
+essential.not.cong.STIMS.fig <- essential.not.cong.base.layer %>%
+    add.cumulative.mut.layer(c.essential.not.cong, my.color="black")
+ggsave("../results/thermostability/essential-not-cong-STIMS.pdf")
+
+
+## these still show evidence of purifying selection in the LTEE.
+essential.not.zitnik.data <- gene.mutation.data %>%
+    filter(Gene %in% essential.not.in.zitnik$Gene)
+c.essential.not.zitnik <- calc.cumulative.muts(essential.not.zitnik.data)
+essential.not.zitnik.base.layer <- plot.base.layer(gene.mutation.data,
+                                        subset.size=length(unique(essential.not.in.zitnik$Gene)))
+essential.not.zitnik.STIMS.fig <- essential.not.zitnik.base.layer %>%
+    add.cumulative.mut.layer(c.essential.not.zitnik, my.color="black")
+ggsave("../results/thermostability/essential-not-zitnik-STIMS.pdf")
+
+## IMPORTANT TODO: Use STIMS approach, to resample essential genes within
+## the PPI network. HYPOTHESIS: the essential genes OUTSIDE of the PPI network
+## are actually under significantly stronger purifying selection that those
+## essential genes within the PPI network!
 
 #######################################################################
 ## METABOLIC ENZYME ANALYSIS.
@@ -689,6 +731,7 @@ missing.essential <- REL606.genes.with.essential.annotation %>%
     filter(Couce.essential==TRUE) %>%
     filter(!(Gene %in% relevant.proteome.vis.df$Gene))
 
+#####################################################################################
 ## examine distribution of abundance, evolutionary_rate, contact_density, PPI_degree,
 ## dosage tolerance, between essential and non-essential genes.
 ## my hypothesis is that essential genes in REL606 should have two peaks, at
@@ -740,5 +783,162 @@ write.csv(annotated.Couce.essential,file="../results/resilience/annotated-Couce-
 ## rank them by the area under the curve of their protein
 ## abundance over time?
 
-
 ## TODO: go more in depth with these analyses.
+
+
+
+############################################################################
+## E. COLI MELTOME ATLAS DATA ANALYSIS
+
+## TODO: put this stuff in a more sensible place in this script.
+
+## These data were written out by filter-meltome-atlas.R.
+## Run that script in order to generate '../results/thermostability/Ecoli-meltome.csv'
+Ecoli.meltome <- read.csv("../results/thermostability/Ecoli-meltome.csv") %>%
+    rename(Gene = gene_name) %>%
+    select(run_name, Gene, meltPoint) %>%
+    distinct() %>%
+    left_join(REL606.genes) %>%
+    filter(!is.na(locus_tag))
+
+nonmut.density.meltome <- Ecoli.meltome %>%
+    left_join(nonmut.density) %>%
+    ## turn NAs into zeros.
+    mutate(mut.count = replace(mut.count, is.na(mut.count), 0)) %>%
+    mutate(density = replace(density, is.na(density), 0))
+
+hypermut.density.meltome <- Ecoli.meltome %>%
+    left_join(hypermut.density) %>%
+    ## turn NAs into zeros.
+    mutate(mut.count = replace(mut.count, is.na(mut.count), 0)) %>%
+    mutate(density = replace(density, is.na(density), 0))
+
+nonmut.meltome.plot <- ggplot(nonmut.density.meltome,
+                                 aes(x=density,y=meltPoint)) +
+    geom_point() +
+    theme_classic() +
+    facet_wrap(run_name ~ .) +
+    geom_smooth()
+
+hypermut.meltome.plot <- ggplot(hypermut.density.meltome,
+                                 aes(x=density,y=meltPoint)) +
+    geom_point() +
+    theme_classic() +
+    facet_wrap(run_name ~ .) +
+    geom_smooth()
+
+nonmut.meltome.plot
+hypermut.meltome.plot
+
+nonmelters <- Ecoli.meltome %>% filter(is.na(meltPoint)) %>%
+    select(-run_name) %>% distinct() %>%
+    ungroup()
+## are non-melters under purifying selection?
+## let's use STIMS.
+nonmelter.mut.data <- gene.mutation.data %>%
+    filter(Gene %in% nonmelters$Gene)
+c.nonmelters <- calc.cumulative.muts(nonmelter.mut.data)
+nonmelter.base.layer <- plot.base.layer(gene.mutation.data,
+                                        subset.size=length(unique(nonmelters$Gene)))
+
+nonmelter.STIMS.fig <- nonmelter.base.layer %>%
+    add.cumulative.mut.layer(c.nonmelters, my.color="black")
+ggsave("../results/thermostability/nonmelters-STIMS.pdf")
+
+## unlike what I expected: more mutations than average in Ara+3,
+## and in Ara-1?
+
+hypermut.density.meltome2 <- hypermut.density.meltome %>%
+    mutate(is.nonmelter = ifelse(Gene %in% nonmelters$Gene,TRUE, FALSE)) %>%
+    mutate(is.essential = ifelse(Gene %in% essential.genes$Gene,TRUE, FALSE))
+
+nonmelter.vs.melter.hist <- ggplot(hypermut.density.meltome2,
+                                   aes(x=density,fill=is.nonmelter)) +
+    geom_histogram()
+
+g1 <- filter(hypermut.density.meltome2,is.nonmelter==TRUE)$density
+g2 <- filter(hypermut.density.meltome2,is.nonmelter==FALSE)$density
+mean(g1) ## on average, nonmelters have a higher mean.
+mean(g2)
+## statistically significant.
+wilcox.test(g1,g2)
+
+## Is there an association between essentiality and being a nonmelter?
+## let's use a contingency test.
+essentiality.nonmelter.data <- REL606.genes %>%
+    mutate(is.nonmelter = ifelse(Gene %in% nonmelters$Gene,TRUE, FALSE)) %>%
+    mutate(is.essential = ifelse(Gene %in% essential.genes$Gene,TRUE, FALSE))
+x1 <- nrow(filter(essentiality.nonmelter.data,is.nonmelter & is.essential))
+x2 <- nrow(filter(essentiality.nonmelter.data,is.nonmelter & !is.essential))
+x3 <- nrow(filter(essentiality.nonmelter.data,!is.nonmelter & is.essential))
+x4 <- nrow(filter(essentiality.nonmelter.data,!is.nonmelter & !is.essential))
+
+## p = 0.0028. positive association between being a nonmelter and essentiality.
+fisher.test(matrix(c(x1,x2,x3,x4),2))
+
+## what if we remove ribosomal proteins?
+essen.nonmelt2 <- essentiality.nonmelter.data %>%
+    filter(!str_detect(product,"ribosomal"))
+
+y1 <- nrow(filter(essen.nonmelt2,is.nonmelter & is.essential))
+y2 <- nrow(filter(essen.nonmelt2,is.nonmelter & !is.essential))
+y3 <- nrow(filter(essen.nonmelt2,!is.nonmelter & is.essential))
+y4 <- nrow(filter(essen.nonmelt2,!is.nonmelter & !is.essential))
+## p = 0.1. association goes away when we remove ribosomal proteins.
+fisher.test(matrix(c(y1,y2,y3,y4),2))
+
+## what if we remove hypothetical proteins?
+essen.nonmelt3 <- essen.nonmelt2 %>%
+    filter(!str_detect(product,"hypothetical"))
+
+z1 <- nrow(filter(essen.nonmelt3,is.nonmelter & is.essential))
+z2 <- nrow(filter(essen.nonmelt3,is.nonmelter & !is.essential))
+z3 <- nrow(filter(essen.nonmelt3,!is.nonmelter & is.essential))
+z4 <- nrow(filter(essen.nonmelt3,!is.nonmelter & !is.essential))
+## p = 0.0376. significant. seems like hypothetical/unstructured proteins
+## in here.
+fisher.test(matrix(c(z1,z2,z3,z4),2))
+
+## do a STRING analysis of the nonmelters.
+## print out to file.
+write.csv(nonmelters,file="../results/thermostability/nonmelters.csv")
+## STRING shows that oxidative phosphorylation, and ribosome are
+## enriched KEGG pathways for non-melters.
+
+## plot essentiality against melting temperature.
+meltome.with.essentiality <- Ecoli.meltome %>%
+    ## for plotting, give non-melters a Tm = 100.
+    mutate(Tm = ifelse(is.na(meltPoint), 100, meltPoint)) %>%
+    mutate(is.essential = ifelse(Gene %in% essential.genes$Gene,TRUE, FALSE))
+
+## This plot is interesting: excluding non-melters,
+## essential genes have a slightly lower Tm, on average.
+essen.Tm.plot <- ggplot(meltome.with.essentiality,
+                        aes(x=Tm,fill=is.essential)) +
+    geom_histogram()
+
+## Now compare mRNA and protein abundance at each timepoint to
+## Tm.
+meltome.with.abundance <- meltome.with.essentiality %>%
+    left_join(Caglar.summary)
+
+## exclude non-melters for now.
+correlate.meltPoint.with.timepoint <- function(Tm.Caglar) {
+    for (t in sort(unique(Tm.Caglar$growthTime_hr))) {
+        my.data <- Tm.Caglar %>%
+            filter(growthTime_hr == t)
+        
+        mRNA.result <- cor.test(my.data$mRNA.mean, my.data$meltPoint)
+        Protein.result <- cor.test(my.data$Protein.mean, my.data$meltPoint)
+        print(paste("TIME:",t,'hrs'))
+        print("mRNA abundance correlation with meltPoint:")
+        print(mRNA.result)
+        print("Protein abundance correlation with meltPoint:")
+        print(Protein.result)
+    }
+}
+
+## IMPORTANT RESULT: melting temperature, excluding non-melters,
+## is negatively correlated with protein and RNA abundance,
+## especially during growth phase, but also during starvation.
+correlate.meltPoint.with.timepoint(meltome.with.abundance)
