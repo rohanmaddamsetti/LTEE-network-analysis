@@ -6,6 +6,9 @@
 ## get functions for dealing with LTEE metagenomics data.
 source("../../LTEE-purifying-selection/src/metagenomics-library.R")
 
+####################
+## DATA PREPROCESSING
+
 ## get the lengths of all genes in REL606.
 ## This excludes genes in repetitive regions of the genome.
 ## See Section 4.3.1
@@ -45,6 +48,9 @@ gene.mutation.data <- read.csv(
     inner_join(REL606.genes) %>%
     filter(Gene!='intergenic')
 
+#############################
+## BEGINNING OF DATA ANALYSIS
+
 ## ask about melting temperature of essential genes from Couce data set,
 ## versus those with no mutations.
 ## Get essential and near-essential genes reported in
@@ -74,19 +80,35 @@ no.mutation.genes <- REL606.genes %>%
     filter(!(str_detect(LTEE.genomics.mutated.genestr,Gene))) %>%
     arrange(desc(gene_length))
 
-## Look at genes that only have dS.
 all.mutation.density <- calc.gene.mutation.density(
     gene.mutation.data,
     c("missense", "sv", "synonymous", "noncoding", "indel", "nonsense")) %>%
     rename(all.mut.count = mut.count) %>%
     rename(all.mut.density = density)
+
+## look at dN density.
+dN.density <- calc.gene.mutation.density(
+    gene.mutation.data,c("nonsynonymous")) %>%
+    rename(dS.mut.count = mut.count) %>%
+    rename(dS.mut.density = density)
+
+## look at dS density.
+dS.density <- calc.gene.mutation.density(
+    gene.mutation.data,c("synonymous")) %>%
+    rename(dS.mut.count = mut.count) %>%
+    rename(dS.mut.density = density)
+
+## all except dS density.
 all.except.dS.density <- calc.gene.mutation.density(
     gene.mutation.data,c("sv", "indel", "nonsense", "missense")) %>%
     rename(all.except.dS.mut.count = mut.count) %>%
     rename(all.except.dS.mut.density = density)
+
 ## combine these into one dataframe.
 gene.mutation.densities <- REL606.genes %>%
     full_join(all.mutation.density) %>%
+    full_join(dN.density) %>%
+    full_join(dS.density) %>%
     full_join(all.except.dS.density)
 #### CRITICAL STEP: replace NAs with zeros.
 #### We need to keep track of genes that haven't been hit by any mutations
