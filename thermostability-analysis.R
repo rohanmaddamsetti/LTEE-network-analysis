@@ -887,39 +887,3 @@ correlate.meltPoint.with.timepoint <- function(Tm.Caglar) {
 correlate.meltPoint.with.timepoint(meltome.with.abundance)
 ## IMPORTANT TODO: make a figure for this fascinating result!
 
-########################################################
-## No evidence of purifying selection on chaperones as a whole.
-## This set of 36 proteins fits the background model.
-
-chaperone.df <- read.csv("../results/thermostability/REL606-chaperones.csv")
-
-chaperone.mut.data <- gene.mutation.data %>%
-    filter(Gene %in% chaperone.df$Gene)
-
-c.chaperones <- calc.cumulative.muts(chaperone.mut.data)
-
-chaperone.base.layer <- plot.base.layer(
-    gene.mutation.data,
-    subset.size=length(unique(chaperone.df$Gene)))
-
-## plot of chaperone analysis
-chaperone.fig <- chaperone.base.layer %>% 
-    add.cumulative.mut.layer(c.chaperones, my.color="black")
-ggsave("../results/thermostability/figures/chaperones.pdf", chaperone.fig)
-
-## what about just:
-## HSP70 (DnaK/DnaJ/GrpE) and the HSP60 chaperonin system (GroEL/GroES)?
-hsp70.60 <- chaperone.df %>% filter(Gene %in% c('dnaK','dnaJ','grpE','groEL','groES'))
-hsp70.60.mut.data <- gene.mutation.data %>%
-    filter(Gene %in% hsp70.60$Gene)
-c.hsp70.60 <- calc.cumulative.muts(hsp70.60.mut.data)
-hsp70.60.base.layer <- plot.base.layer(
-    gene.mutation.data,
-    subset.size=length(unique(hsp70.60$Gene)))
-
-## plot of HSP70-60 analysis.
-hsp70.60.fig <- hsp70.60.base.layer %>% 
-    add.cumulative.mut.layer(c.hsp70.60, my.color="black")
-ggsave("../results/thermostability/figures/hsp70-60.pdf", hsp70.60.fig)
-## nothing really. but interesting dynamics per population. check out
-## what the star-spangled banner shows.
