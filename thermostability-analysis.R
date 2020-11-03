@@ -51,42 +51,69 @@ gene.mutation.data <- read.csv(
 ########################################################################
 ## calculate densities of mutations per gene.
 ## This is used for filtering data.
+calc.gene.mutation.densities <- function(gene.mutation.data) {
+    all.mutation.density <- calc.gene.mutation.density(
+        gene.mutation.data,
+        c("missense", "sv", "synonymous", "noncoding", "indel", "nonsense")) %>%
+        rename(all.mut.count = mut.count) %>%
+        rename(all.mut.density = density)
+    
+    ## look at dN density.
+    dN.density <- calc.gene.mutation.density(
+        gene.mutation.data,c("nonsynonymous")) %>%
+        rename(dN.mut.count = mut.count) %>%
+        rename(dN.mut.density = density)
+    
+    ## look at dS density.
+    dS.density <- calc.gene.mutation.density(
+        gene.mutation.data,c("synonymous")) %>%
+        rename(dS.mut.count = mut.count) %>%
+        rename(dS.mut.density = density)
+    
+    ## all except dS density.
+    all.except.dS.density <- calc.gene.mutation.density(
+        gene.mutation.data,c("sv", "indel", "nonsense", "missense")) %>%
+        rename(all.except.dS.mut.count = mut.count) %>%
+        rename(all.except.dS.mut.density = density)
 
-all.mutation.density <- calc.gene.mutation.density(
-    gene.mutation.data,
-    c("missense", "sv", "synonymous", "noncoding", "indel", "nonsense")) %>%
-    rename(all.mut.count = mut.count) %>%
-    rename(all.mut.density = density)
+    ## knockout (KO) density.
+    KO.density <- calc.gene.mutation.density(
+        gene.mutation.data,c("sv", "indel", "nonsense")) %>%
+        rename(KO.mut.count = mut.count) %>%
+        rename(KO.mut.density = density)
+    
+    ## combine these into one dataframe.
+    gene.mutation.densities <- REL606.genes %>%
+        full_join(all.mutation.density) %>%
+        full_join(dN.density) %>%
+        full_join(dS.density) %>%
+        full_join(all.except.dS.density) %>%
+        full_join(KO.density) %>%
+        tbl_df() %>%
+        ## CRITICAL STEP: replace NAs with zeros.
+        ## We need to keep track of genes that haven't been hit by any mutations
+        ## in a given mutation class (sv, indels, dN, etc.)
+        replace_na(list(all.mut.count = 0, all.mut.density = 0,
+                        dN.mut.count = 0, dN.mut.density = 0,
+                        dS.mut.count = 0, dS.mut.density = 0,
+                        all.except.dS.mut.count = 0, all.except.dS.mut.density = 0,
+                        KO.mut.count = 0, KO.density = 0))
+    
+    return(gene.mutation.densities)
+}
 
-## look at dN density.
-dN.density <- calc.gene.mutation.density(
-    gene.mutation.data,c("nonsynonymous")) %>%
-    rename(dS.mut.count = mut.count) %>%
-    rename(dS.mut.density = density)
+gene.mutation.densities <- calc.gene.mutation.densities(gene.mutation.data)
 
-## look at dS density.
-dS.density <- calc.gene.mutation.density(
-    gene.mutation.data,c("synonymous")) %>%
-    rename(dS.mut.count = mut.count) %>%
-    rename(dS.mut.density = density)
+## calculate mutation densities for genes, but separately for
+## non-mutators and hyper-mutators.
 
-## all except dS density.
-all.except.dS.density <- calc.gene.mutation.density(
-    gene.mutation.data,c("sv", "indel", "nonsense", "missense")) %>%
-    rename(all.except.dS.mut.count = mut.count) %>%
-    rename(all.except.dS.mut.density = density)
+nonmut.mutation.densities <- gene.mutation.data %>%
+    filter(Population %in% nonmutator.pops) %>%
+    calc.gene.mutation.densities()
 
-## combine these into one dataframe.
-gene.mutation.densities <- REL606.genes %>%
-    full_join(all.mutation.density) %>%
-    full_join(dN.density) %>%
-    full_join(dS.density) %>%
-    full_join(all.except.dS.density)
-#### CRITICAL STEP: replace NAs with zeros.
-#### We need to keep track of genes that haven't been hit by any mutations
-#### in a given mutation class (sv, indels, dN, etc.)
-gene.mutation.densities[is.na(gene.mutation.densities)] <- 0
-gene.mutation.densities <- tbl_df(gene.mutation.densities)
+hypermut.mutation.densities <- gene.mutation.data %>%
+    filter(Population %in% hypermutator.pops) %>%
+    calc.gene.mutation.densities()
 
 ########################################################################
 ## Get essential and near-essential genes reported in
@@ -125,86 +152,6 @@ only.dS.allowed.genes <- gene.mutation.densities %>%
     ## to remove false positives.
     filter(!(str_detect(LTEE.genomics.mutated.genestr,Gene))) %>%
     arrange(desc(gene_length))
-
-### calculate mutation densities per gene. used in data filtering steps.
-
-all.mutation.density <- calc.gene.mutation.density(
-    gene.mutation.data,
-    c("missense", "sv", "synonymous", "noncoding", "indel", "nonsense")) %>%
-    rename(all.mut.count = mut.count) %>%
-    rename(all.mut.density = density)
-
-## look at dN density.
-dN.density <- calc.gene.mutation.density(
-    gene.mutation.data,c("nonsynonymous")) %>%
-    rename(dS.mut.count = mut.count) %>%
-    rename(dS.mut.density = density)
-
-## look at dS density.
-dS.density <- calc.gene.mutation.density(
-    gene.mutation.data,c("synonymous")) %>%
-    rename(dS.mut.count = mut.count) %>%
-    rename(dS.mut.density = density)
-
-## all except dS density.
-all.except.dS.density <- calc.gene.mutation.density(
-    gene.mutation.data,c("sv", "indel", "nonsense", "missense")) %>%
-    rename(all.except.dS.mut.count = mut.count) %>%
-    rename(all.except.dS.mut.density = density)
-
-## combine these into one dataframe.
-gene.mutation.densities <- REL606.genes %>%
-    full_join(all.mutation.density) %>%
-    full_join(dN.density) %>%
-    full_join(dS.density) %>%
-    full_join(all.except.dS.density)
-#### CRITICAL STEP: replace NAs with zeros.
-#### We need to keep track of genes that haven't been hit by any mutations
-#### in a given mutation class (sv, indels, dN, etc.)
-gene.mutation.densities[is.na(gene.mutation.densities)] <- 0
-gene.mutation.densities <- tbl_df(gene.mutation.densities)
-
-## calculate mutation densities for genes, but separately for
-## non-mutators and hyper-mutators.
-
-nonmut.gene.mutation.data <- filter(gene.mutation.data,
-                                    Population %in% nonmutator.pops)
-nonmut.density <- calc.gene.mutation.density(
-    nonmut.gene.mutation.data,
-    c("missense","sv", "indel","noncoding","nonsense"))
-nonmut.density[is.na(nonmut.density)] <- 0
-nonmut.density <- tbl_df(nonmut.density) %>%
-    ## want to keep locus_tag for comparison to Caglar data.
-    left_join(select(REL606.genes,Gene, locus_tag))
-
-## do the same thing, but just using hypermutator data.
-hypermut.gene.mutation.data <- filter(gene.mutation.data,
-                                    Population %in% hypermutator.pops)
-hypermut.density <- calc.gene.mutation.density(
-    hypermut.gene.mutation.data,
-    c("missense","sv", "indel","noncoding","nonsense"))
-hypermut.density[is.na(hypermut.density)] <- 0
-hypermut.density <- tbl_df(hypermut.density) %>%
-    ## want to keep locus_tag for comparison to Caglar data.
-    left_join(select(REL606.genes,Gene, locus_tag))
-
-## calculate knockout (KO) mutation densities for genes, separately
-## for non-mutators and hypermutators.
-nonmut.KO.density <- calc.gene.mutation.density(
-    nonmut.gene.mutation.data,
-    c("sv", "indel","nonsense"))
-nonmut.KO.density[is.na(nonmut.KO.density)] <- 0
-nonmut.KO.density <- tbl_df(nonmut.KO.density) %>%
-    ## want to keep locus_tag for comparison to Caglar data.
-    left_join(select(REL606.genes,Gene, locus_tag))
-
-hypermut.KO.density <- calc.gene.mutation.density(
-    hypermut.gene.mutation.data,
-    c("sv", "indel","nonsense"))
-hypermut.KO.density[is.na(hypermut.KO.density)] <- 0
-hypermut.KO.density <- tbl_df(hypermut.KO.density) %>%
-    ## want to keep locus_tag for comparison to Caglar data.
-    left_join(select(REL606.genes,Gene, locus_tag))
 
 ########################################################################
 ## Do mRNA and protein abundances predict evolutionary rates in the LTEE and in nature?
@@ -249,62 +196,124 @@ Caglar.summary <- full.Caglar.data %>%
 
 ## Now compare mRNA and protein abundance at each timepoint to
 ## mutation density in non-mutators and hypermutators.
-nonmut.density.Caglar <- nonmut.density %>% left_join(Caglar.summary)
-hypermut.density.Caglar <- hypermut.density %>% left_join(Caglar.summary)
+## use an inner join to exclude any genes with no protein/RNA data.
+nonmut.density.Caglar <- inner_join(nonmut.mutation.densities, Caglar.summary)
+hypermut.density.Caglar <- inner_join(hypermut.mutation.densities, Caglar.summary)
 
 correlate.mut.density.with.timepoint <- function(density.Caglar) {
-    for (t in sort(unique(density.Caglar$growthTime_hr))) {
-        my.data <- density.Caglar %>%
-            filter(growthTime_hr == t)
+
+    print.correlations.given.timepoint <- function(my.data) {
+        my.t <- unique(my.data$growthTime_hr)
+        mRNA.result <- cor.test(my.data$mRNA.mean, my.data$all.mut.density)
+        Protein.result <- cor.test(my.data$Protein.mean, my.data$all.mut.density)
         
-        mRNA.result <- cor.test(my.data$mRNA.mean, my.data$density)
-        Protein.result <- cor.test(my.data$Protein.mean, my.data$density)
-        print(paste("TIME:",t,'hrs'))
+        print(paste("TIME:", my.t, 'hrs'))
         print("mRNA abundance correlation with mut density:")
         print(mRNA.result)
         print("Protein abundance correlation with mut density:")
         print(Protein.result)
     }
+
+    density.Caglar %>%
+        split(.$growthTime_hr) %>%
+        map(.f = print.correlations.given.timepoint)        
 }
 
-## no correlation in mutation density and mRNA or protein abundance in
-## non-mutators.
+## positive correlation in mutation density and mRNA,
+## but no correlation with mutation density and  protein abundance
+## for non-mutators.
 correlate.mut.density.with.timepoint(nonmut.density.Caglar)
 ## HIGHLY SIGNIFICANT anti-correlations with mutation density with
 ## both mRNA and protein abundances in REL606 in all timepoints!
 correlate.mut.density.with.timepoint(hypermut.density.Caglar)
 
-plot.mut.density.RNA.protein.anticorrelations <- function(density.Caglar) {
-    for (t in sort(unique(density.Caglar$growthTime_hr))) {
-        my.data <- density.Caglar %>%
-            filter(growthTime_hr == t)
-        
-        mRNA.plot <- my.data %>%
-            ggplot(aes(x=mRNA.mean,y=density)) +
-            geom_point() +
-            ##geom_smooth() +
-            geom_smooth(method='lm', formula= y~x) +
-            theme_classic()
-        
-        mRNA.fname <- paste0("../results/thermostability/figures/mRNA-",
-                             as.character(t), "-hr-rate-correlation.pdf")
-        ggsave(mRNA.fname, mRNA.plot)
-        
-        Protein.plot <- my.data %>%
-            ggplot(aes(x=Protein.mean,y=density)) +
-            geom_point() +
-            ##geom_smooth() +
-            geom_smooth(method='lm', formula= y~x) +
-            theme_classic()
-        
-        Protein.fname <- paste0("../results/thermostability/figures/Protein-",
-                                as.character(t), "-hr-rate-correlation.pdf")
-        ggsave(Protein.fname, Protein.plot)
-    }
+plot.mut.density.mRNA.anticorrelation <- function(my.data) {
+    ## This is a helper function to plot a single small panel for the full figure.
+    my.t <- unique(my.data$growthTime_hr)
+    time.title = paste0(as.character(my.t), "h")
+
+    ## if the correlation is not significant, then the regression line is gray.
+    mRNA.result <- cor.test(my.data$mRNA.mean, my.data$all.mut.density)
+    my.color <- ifelse(mRNA.result$p.value < 0.05, "blue", "light gray")
+    
+    mRNA.plot <- my.data %>%
+        ggplot(aes(x = mRNA.mean, y = all.mut.density)) +
+        geom_point(color = "violet", alpha = 0.5) +
+        geom_smooth(method = 'lm', formula = y~x, color = my.color) +
+        theme_classic() +
+        coord_cartesian(xlim = c(0, 15)) +
+        ggtitle(time.title)
+
+    ## use some conditional statements to label x-axis for the
+    ## bottom center panel (168 hr) and to label y-axis for the
+    ## left center panel (6 hr).
+    my.xlabel <- ifelse(my.t == 168, "mRNA","")
+    my.ylabel <- ifelse(my.t == 6, "Mutation density","")
+    
+    mRNA.plot <- mRNA.plot +
+        xlab(my.xlabel) +
+        ylab(my.ylabel)
+    return(mRNA.plot)
 }
 
-## Make figures for anticorrelations with hypermutator data.
-plot.mut.density.RNA.protein.anticorrelations(hypermut.density.Caglar)
+plot.mut.density.protein.anticorrelation <- function(my.data) {
+    ## This is a helper function to plot a single panel for larger figures.
+    my.t <- unique(my.data$growthTime_hr)
+    time.title = paste0(as.character(my.t), "h")
+
+    ## if the correlation is not significant, then the regression line is gray.
+    Protein.result <- cor.test(my.data$Protein.mean, my.data$all.mut.density)
+    my.color <- ifelse(Protein.result$p.value < 0.05, "blue", "light gray")
+    
+    Protein.plot <- my.data %>%
+        ggplot(aes(x = Protein.mean, y = all.mut.density)) +
+        geom_point(color = "light green", alpha = 0.5) +
+        geom_smooth(method = 'lm', formula = y~x, color = my.color) +
+        theme_classic() +
+        coord_cartesian(xlim = c(0, 15)) +
+        ggtitle(time.title) +
+        ylab("") ## no need for ylabel since the mRNA subfigure will be on the left.
+
+    ## use a conditional statement to label x-axis for the
+    ## bottom center panel (168 hr).
+    my.xlabel <- ifelse(my.t == 168, "Protein","")
+    Protein.plot <- Protein.plot +
+        xlab(my.xlabel)
+    
+    return(Protein.plot)
+}
+
+make.mut.density.RNA.protein.expression.figure <- function(density.Caglar) {
+    ## makes a figure that combines all 18 panels.
+    ## generate a list of smaller panels, then pass
+    ## to cowplot::plot_grid using do.call().
+    
+    mRNA.panels <- density.Caglar %>%
+        split(.$growthTime_hr) %>%
+        map(.f = plot.mut.density.mRNA.anticorrelation)
+    
+    protein.panels <- density.Caglar %>%
+        split(.$growthTime_hr) %>%
+        map(.f = plot.mut.density.protein.anticorrelation)
+
+    ## fill in some parameters for plot_grid using partial function application,
+    ## and save the specialized versions.
+    plot_subfigure <- partial(.f = plot_grid, nrow = 3)
+    ## use do.call to unroll the panels as arguments for plot_grid.
+
+    ## make two 3x3 subfigures for the mRNA and protein correlations.
+    mRNA.plots <- do.call(plot_subfigure, mRNA.panels)
+    protein.plots <- do.call(plot_subfigure, protein.panels)
+
+    big.fig <- plot_grid(mRNA.plots, protein.plots)
+    return(big.fig)
+}
+
+Fig1 <- make.mut.density.RNA.protein.expression.figure(hypermut.density.Caglar)
+S1Fig <- make.mut.density.RNA.protein.expression.figure(nonmut.density.Caglar)
+
+ggsave("../results/thermostability/figures/Fig1.pdf", Fig1, height = 4, width = 9)
+ggsave("../results/thermostability/figures/S1Fig.pdf", S1Fig, height = 4, width = 9)
 
 ########################################################
 
