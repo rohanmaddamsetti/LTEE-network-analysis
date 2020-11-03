@@ -369,7 +369,7 @@ cor.test(hypermut.PPI.zitnik$DegreeCentrality, hypermut.PPI.zitnik$density)
 cor.test(hypermut.PPI.zitnik$IsArticulationPoint, hypermut.PPI.zitnik$density)
 
 ## now look at Cong network.
-cor.test(nonmut.PPI.cong$Pagerank, nonmut.PPI.cong$density)
+cor.test(nonmut.PPI.cong$Pagerank, nonmut.PPI.cong$density) ## significant
 cor.test(nonmut.PPI.cong$HubScore, nonmut.PPI.cong$density) ## NS
 cor.test(nonmut.PPI.cong$AuthorityScore, nonmut.PPI.cong$density) ## NS
 cor.test(nonmut.PPI.cong$ClosenessCentrality, nonmut.PPI.cong$density) ## NS
