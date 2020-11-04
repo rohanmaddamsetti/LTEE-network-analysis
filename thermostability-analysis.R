@@ -60,7 +60,7 @@ calc.gene.mutation.densities <- function(gene.mutation.data) {
     
     ## look at dN density.
     dN.density <- calc.gene.mutation.density(
-        gene.mutation.data,c("nonsynonymous")) %>%
+        gene.mutation.data,c("missense")) %>%
         rename(dN.mut.count = mut.count) %>%
         rename(dN.mut.density = density)
     
@@ -97,7 +97,7 @@ calc.gene.mutation.densities <- function(gene.mutation.data) {
                         dN.mut.count = 0, dN.mut.density = 0,
                         dS.mut.count = 0, dS.mut.density = 0,
                         all.except.dS.mut.count = 0, all.except.dS.mut.density = 0,
-                        KO.mut.count = 0, KO.density = 0))
+                        KO.mut.count = 0, KO.mut.density = 0))
     
     return(gene.mutation.densities)
 }
@@ -228,7 +228,7 @@ correlate.mut.density.with.timepoint(nonmut.density.Caglar)
 correlate.mut.density.with.timepoint(hypermut.density.Caglar)
 
 plot.mut.density.mRNA.anticorrelation <- function(my.data) {
-    ## This is a helper function to plot a single small panel for the full figure.
+    ## This is a helper function to plot an mRNA panel for the full figure.
     my.t <- unique(my.data$growthTime_hr)
     time.title = paste0(as.character(my.t), "h")
 
@@ -257,7 +257,7 @@ plot.mut.density.mRNA.anticorrelation <- function(my.data) {
 }
 
 plot.mut.density.protein.anticorrelation <- function(my.data) {
-    ## This is a helper function to plot a single panel for larger figures.
+    ## This is a helper function to plot a protein panel for the full figure.
     my.t <- unique(my.data$growthTime_hr)
     time.title = paste0(as.character(my.t), "h")
 
@@ -323,189 +323,293 @@ zitnik.network.df <- read.csv("../results/thermostability/Zitnik_network_statist
     
 cong.network.df <- read.csv("../results/thermostability/Cong_network_statistics.csv",as.is=TRUE,header=TRUE) %>% inner_join(REL606.genes)
 
-nonmut.PPI.zitnik <- zitnik.network.df %>% left_join(nonmut.density) %>%
-    ## turn NAs to 0s.
-    mutate(mut.count=ifelse(is.na(mut.count),0,mut.count)) %>%
-    mutate(density=ifelse(is.na(density),0,density))
+nonmut.PPI.zitnik <- zitnik.network.df %>%
+    left_join(nonmut.mutation.densities)
 
-hypermut.PPI.zitnik <- zitnik.network.df %>% left_join(hypermut.density) %>%
-    ## turn NAs to 0s.
-    mutate(mut.count=ifelse(is.na(mut.count),0,mut.count)) %>%
-    mutate(density=ifelse(is.na(density),0,density))
+hypermut.PPI.zitnik <- zitnik.network.df %>%
+left_join(hypermut.mutation.densities)
 
-nonmut.PPI.cong <- cong.network.df %>% left_join(nonmut.density) %>%
-    ## turn NAs to 0s.
-    mutate(mut.count=ifelse(is.na(mut.count),0,mut.count)) %>%
-    mutate(density=ifelse(is.na(density),0,density))
+nonmut.PPI.cong <- cong.network.df %>%
+    left_join(nonmut.mutation.densities)
 
-hypermut.PPI.cong <- cong.network.df %>% left_join(hypermut.density) %>%
-    ## turn NAs to 0s.
-    mutate(mut.count=ifelse(is.na(mut.count),0,mut.count)) %>%
-    mutate(density=ifelse(is.na(density),0,density))
+hypermut.PPI.cong <- cong.network.df %>%
+    left_join(hypermut.mutation.densities)
 
 ## look at Zitnik network.
 
 ## all are significant.
-cor.test(nonmut.PPI.zitnik$Pagerank, nonmut.PPI.zitnik$density)
-cor.test(nonmut.PPI.zitnik$HubScore, nonmut.PPI.zitnik$density)
-cor.test(nonmut.PPI.zitnik$AuthorityScore, nonmut.PPI.zitnik$density)
-cor.test(nonmut.PPI.zitnik$ClosenessCentrality, nonmut.PPI.zitnik$density)
-cor.test(nonmut.PPI.zitnik$BetweenessCentrality, nonmut.PPI.zitnik$density)
-cor.test(nonmut.PPI.zitnik$EigenvectorCentrality, nonmut.PPI.zitnik$density)
-cor.test(nonmut.PPI.zitnik$Degree, nonmut.PPI.zitnik$density)
-cor.test(nonmut.PPI.zitnik$DegreeCentrality, nonmut.PPI.zitnik$density)
-cor.test(nonmut.PPI.zitnik$IsArticulationPoint, nonmut.PPI.zitnik$density)
+cor.test(nonmut.PPI.zitnik$Pagerank, nonmut.PPI.zitnik$all.mut.density)
+cor.test(nonmut.PPI.zitnik$HubScore, nonmut.PPI.zitnik$all.mut.density)
+cor.test(nonmut.PPI.zitnik$AuthorityScore, nonmut.PPI.zitnik$all.mut.density)
+cor.test(nonmut.PPI.zitnik$ClosenessCentrality, nonmut.PPI.zitnik$all.mut.density)
+cor.test(nonmut.PPI.zitnik$BetweenessCentrality, nonmut.PPI.zitnik$all.mut.density)
+cor.test(nonmut.PPI.zitnik$EigenvectorCentrality, nonmut.PPI.zitnik$all.mut.density)
+cor.test(nonmut.PPI.zitnik$Degree, nonmut.PPI.zitnik$all.mut.density)
+cor.test(nonmut.PPI.zitnik$DegreeCentrality, nonmut.PPI.zitnik$all.mut.density)
+cor.test(nonmut.PPI.zitnik$IsArticulationPoint, nonmut.PPI.zitnik$all.mut.density)
 
 ## These ones are significant.
-cor.test(hypermut.PPI.zitnik$Pagerank, hypermut.PPI.zitnik$density)
-cor.test(hypermut.PPI.zitnik$HubScore, hypermut.PPI.zitnik$density)
-cor.test(hypermut.PPI.zitnik$AuthorityScore, hypermut.PPI.zitnik$density)
-cor.test(hypermut.PPI.zitnik$ClosenessCentrality, hypermut.PPI.zitnik$density)
-cor.test(hypermut.PPI.zitnik$BetweenessCentrality, hypermut.PPI.zitnik$density)
-cor.test(hypermut.PPI.zitnik$EigenvectorCentrality, hypermut.PPI.zitnik$density)
-cor.test(hypermut.PPI.zitnik$Degree, hypermut.PPI.zitnik$density)
-cor.test(hypermut.PPI.zitnik$DegreeCentrality, hypermut.PPI.zitnik$density)
+cor.test(hypermut.PPI.zitnik$Pagerank, hypermut.PPI.zitnik$all.mut.density)
+cor.test(hypermut.PPI.zitnik$HubScore, hypermut.PPI.zitnik$all.mut.density)
+cor.test(hypermut.PPI.zitnik$AuthorityScore, hypermut.PPI.zitnik$all.mut.density)
+cor.test(hypermut.PPI.zitnik$ClosenessCentrality, hypermut.PPI.zitnik$all.mut.density)
+cor.test(hypermut.PPI.zitnik$BetweenessCentrality, hypermut.PPI.zitnik$all.mut.density)
+cor.test(hypermut.PPI.zitnik$EigenvectorCentrality, hypermut.PPI.zitnik$all.mut.density)
+cor.test(hypermut.PPI.zitnik$Degree, hypermut.PPI.zitnik$all.mut.density)
+cor.test(hypermut.PPI.zitnik$DegreeCentrality, hypermut.PPI.zitnik$all.mut.density)
 ## This last one is not significant.
-cor.test(hypermut.PPI.zitnik$IsArticulationPoint, hypermut.PPI.zitnik$density)
+cor.test(hypermut.PPI.zitnik$IsArticulationPoint, hypermut.PPI.zitnik$all.mut.density)
 
 ## now look at Cong network.
-cor.test(nonmut.PPI.cong$Pagerank, nonmut.PPI.cong$density) ## significant
-cor.test(nonmut.PPI.cong$HubScore, nonmut.PPI.cong$density) ## NS
-cor.test(nonmut.PPI.cong$AuthorityScore, nonmut.PPI.cong$density) ## NS
-cor.test(nonmut.PPI.cong$ClosenessCentrality, nonmut.PPI.cong$density) ## NS
-cor.test(nonmut.PPI.cong$BetweenessCentrality, nonmut.PPI.cong$density) ## NS
-cor.test(nonmut.PPI.cong$EigenvectorCentrality, nonmut.PPI.cong$density) ## NS
-cor.test(nonmut.PPI.cong$Degree, nonmut.PPI.cong$density) ## significant
-cor.test(nonmut.PPI.cong$DegreeCentrality, nonmut.PPI.cong$density) ## significant
-cor.test(nonmut.PPI.cong$IsArticulationPoint, nonmut.PPI.cong$density) ## NS
+cor.test(nonmut.PPI.cong$Pagerank, nonmut.PPI.cong$all.mut.density) ## significant
+cor.test(nonmut.PPI.cong$HubScore, nonmut.PPI.cong$all.mut.density) ## NS
+cor.test(nonmut.PPI.cong$AuthorityScore, nonmut.PPI.cong$all.mut.density) ## NS
+cor.test(nonmut.PPI.cong$ClosenessCentrality, nonmut.PPI.cong$all.mut.density) ## NS
+cor.test(nonmut.PPI.cong$BetweenessCentrality, nonmut.PPI.cong$all.mut.density) ## NS
+cor.test(nonmut.PPI.cong$EigenvectorCentrality, nonmut.PPI.cong$all.mut.density) ## NS
+cor.test(nonmut.PPI.cong$Degree, nonmut.PPI.cong$all.mut.density) ## significant
+cor.test(nonmut.PPI.cong$DegreeCentrality, nonmut.PPI.cong$all.mut.density) ## significant
+cor.test(nonmut.PPI.cong$IsArticulationPoint, nonmut.PPI.cong$all.mut.density) ## NS
 
 
-cor.test(hypermut.PPI.cong$Pagerank, hypermut.PPI.cong$density) ## NS
-cor.test(hypermut.PPI.cong$HubScore, hypermut.PPI.cong$density) ## significant
-cor.test(hypermut.PPI.cong$AuthorityScore, hypermut.PPI.cong$density) ## sig
-cor.test(hypermut.PPI.cong$ClosenessCentrality, hypermut.PPI.cong$density) #sig
-cor.test(hypermut.PPI.cong$BetweenessCentrality, hypermut.PPI.cong$density) ## NS
-cor.test(hypermut.PPI.cong$EigenvectorCentrality, hypermut.PPI.cong$density) ## sig
-cor.test(hypermut.PPI.cong$Degree, hypermut.PPI.cong$density) ## significant
-cor.test(hypermut.PPI.cong$DegreeCentrality, hypermut.PPI.cong$density) ## significant
+cor.test(hypermut.PPI.cong$Pagerank, hypermut.PPI.cong$all.mut.density) ## NS
+cor.test(hypermut.PPI.cong$HubScore, hypermut.PPI.cong$all.mut.density) ## significant
+cor.test(hypermut.PPI.cong$AuthorityScore, hypermut.PPI.cong$all.mut.density) ## sig
+cor.test(hypermut.PPI.cong$ClosenessCentrality, hypermut.PPI.cong$all.mut.density) #sig
+cor.test(hypermut.PPI.cong$BetweenessCentrality, hypermut.PPI.cong$all.mut.density) ## NS
+cor.test(hypermut.PPI.cong$EigenvectorCentrality, hypermut.PPI.cong$all.mut.density) ## sig
+cor.test(hypermut.PPI.cong$Degree, hypermut.PPI.cong$all.mut.density) ## significant
+cor.test(hypermut.PPI.cong$DegreeCentrality, hypermut.PPI.cong$all.mut.density) ## sig
+cor.test(hypermut.PPI.cong$IsArticulationPoint, hypermut.PPI.cong$all.mut.density) ## NS
 
-cor.test(hypermut.PPI.cong$IsArticulationPoint, hypermut.PPI.cong$density) ## NS
+## Summarize these results by plotting mutation density against degree distribution
+## for both networks, and both non-mutators and hyper-mutators. These results are
+## consistent throughout, and even the non-significant correlations show the same,
+## consistent trends seen for degree distribution.
 
-##################################
-## what are the essential genes that are not even in the
-## PPI networks?
+make.mut.density.PPI.degree.panel <- function(PPI.data, my.color="gray") {
+    ## This is a helper function that plots a single panel.
+    PPI.panel <- PPI.data %>%
+        ggplot(aes(x = Degree, y = all.mut.density)) +
+        geom_point(color = my.color, alpha = 0.2) +
+        geom_smooth(method = 'lm', formula = y~x) +
+        theme_classic() +
+        ylab("Mutation density")
+    return(PPI.panel)
+}
 
-## 541 essential genes in REL606, total.
+make.mut.density.PPI.degree.figure <- function(nonmut.PPI.zitnik, nonmut.PPI.cong,
+                                               hypermut.PPI.zitnik, hypermut.PPI.cong) {
+    
+    panelA <- make.mut.density.PPI.degree.panel(nonmut.PPI.zitnik, "lightsteelblue") +
+        ggtitle("Non-mutators")
+    panelB <- make.mut.density.PPI.degree.panel(hypermut.PPI.zitnik, "lightsteelblue") +
+        ggtitle("Hypermutators")
+    panelC <- make.mut.density.PPI.degree.panel(nonmut.PPI.cong, "moccasin") +
+        ggtitle("Non-mutators")
+    panelD <- make.mut.density.PPI.degree.panel(hypermut.PPI.cong, "moccasin") +
+        ggtitle("Hypermutators")
+    
+    fig <- plot_grid(panelA, panelB, panelC, panelD, nrow = 2,
+                        labels = c('A', 'B', 'C', 'D'))
+    return(fig)
+}
+
+PPI.figure <- make.mut.density.PPI.degree.figure(nonmut.PPI.zitnik, nonmut.PPI.cong,
+                                                 hypermut.PPI.zitnik, hypermut.PPI.cong)
+ggsave("../results/thermostability/figures/PPI-figure.pdf", PPI.figure, width=4, height=4)
+
+##################################################################################
+## HYPOTHESIS to test with STIMS: the essential genes OUTSIDE of the PPI network
+## are actually under stronger purifying selection that those
+## essential genes within the PPI network.
+##################################################################################
+## There are 541 essential.genes in REL606.
+## IMPORTANT: use locus_tag-- and NOT Gene-- when filtering,
+## so that IDs correctly match across datasets.
+
+cong.and.essential <- essential.genes %>%
+    filter(locus_tag %in% cong.network.df$locus_tag)
+## 291 essential genes in Cong network.
+
+zitnik.and.essential <- essential.genes %>%
+    filter(locus_tag %in% zitnik.network.df$locus_tag)
+## 485 essential genes in Zitnik network.
+
+## now get the essential genes that are outside of the PPI networks.
 essential.not.in.cong <- essential.genes %>%
-    filter(!(Gene %in% cong.network.df$Gene))
+    filter(!(locus_tag %in% cong.network.df$locus_tag))
 ## 250 essential genes not in Cong network.
 essential.not.in.zitnik <- essential.genes %>%
-    filter(!(Gene %in% zitnik.network.df$Gene))
+    filter(!(locus_tag %in% zitnik.network.df$locus_tag))
 ## 56 essential genes not in Zitnik network.
 
-## these still show evidence of purifying selection in the LTEE.
+
+## First, run STIMS on essential genes in the Cong PPI dataset.
+cong.and.essential.data <- gene.mutation.data %>%
+    filter(locus_tag %in% cong.and.essential$locus_tag)
+c.cong.and.essential <- calc.cumulative.muts(cong.and.essential.data)
+cong.and.essential.base.layer <- plot.base.layer(
+    gene.mutation.data,
+    subset.size=length(unique(cong.and.essential$locus_tag)))
+
+cong.and.essential.STIMS.fig <- cong.and.essential.base.layer %>%
+    add.cumulative.mut.layer(c.cong.and.essential, my.color="black")
+ggsave("../results/thermostability/figures/cong-and-essential-STIMS.pdf")
+
+## Run STIMS on essential genes in the Zitnik PPI dataset.
+zitnik.and.essential.data <- gene.mutation.data %>%
+    filter(locus_tag %in% zitnik.and.essential$locus_tag)
+c.zitnik.and.essential <- calc.cumulative.muts(zitnik.and.essential.data)
+zitnik.and.essential.base.layer <- plot.base.layer(
+    gene.mutation.data,
+    subset.size=length(unique(zitnik.and.essential$locus_tag)))
+
+zitnik.and.essential.STIMS.fig <- zitnik.and.essential.base.layer %>%
+    add.cumulative.mut.layer(c.zitnik.and.essential, my.color="black")
+ggsave("../results/thermostability/figures/zitnik-and-essential-STIMS.pdf")
+
+## For comparison, look at selection on essential genes
+## that are outside of the PPI networks.
+
+## these also show evidence of purifying selection in the LTEE.
 essential.not.cong.data <- gene.mutation.data %>%
-    filter(Gene %in% essential.not.in.cong$Gene)
+    filter(locus_tag %in% essential.not.in.cong$locus_tag)
 c.essential.not.cong <- calc.cumulative.muts(essential.not.cong.data)
 essential.not.cong.base.layer <- plot.base.layer(gene.mutation.data,
-                                        subset.size=length(unique(essential.not.in.cong$Gene)))
+                                        subset.size=length(unique(essential.not.in.cong$locus_tag)))
 essential.not.cong.STIMS.fig <- essential.not.cong.base.layer %>%
     add.cumulative.mut.layer(c.essential.not.cong, my.color="black")
-ggsave("../results/thermostability/essential-not-cong-STIMS.pdf")
+ggsave("../results/thermostability/figures/essential-not-cong-STIMS.pdf")
 
-
-## these still show evidence of purifying selection in the LTEE.
+## these also show evidence of purifying selection in the LTEE.
 essential.not.zitnik.data <- gene.mutation.data %>%
-    filter(Gene %in% essential.not.in.zitnik$Gene)
+    filter(locus_tag %in% essential.not.in.zitnik$locus_tag)
 c.essential.not.zitnik <- calc.cumulative.muts(essential.not.zitnik.data)
 essential.not.zitnik.base.layer <- plot.base.layer(gene.mutation.data,
-                                        subset.size=length(unique(essential.not.in.zitnik$Gene)))
+                                        subset.size=length(unique(essential.not.in.zitnik$locus_tag)))
 essential.not.zitnik.STIMS.fig <- essential.not.zitnik.base.layer %>%
     add.cumulative.mut.layer(c.essential.not.zitnik, my.color="black")
-ggsave("../results/thermostability/essential-not-zitnik-STIMS.pdf")
-
-## IMPORTANT TODO: Use STIMS approach, to resample essential genes within
-## the PPI network. HYPOTHESIS: the essential genes OUTSIDE of the PPI network
-## are actually under significantly stronger purifying selection that those
-## essential genes within the PPI network!
+ggsave("../results/thermostability/figures/essential-not-zitnik-STIMS.pdf")
 
 ################################################################################
-## Analyze data from the ProteomeVis database (the data specific to E. coli).
-##########################################################################
+## Analyze E. coli data from the ProteomeVis database.
+################################################################################
 ## python ProteomeVis-to-REL606.py produces the table we need to join with REL606.genes.
 REL606.to.ProteomeVis.df <- read.csv("../results/thermostability/REL606-to-ProteomeVis.csv",
                                      as.is=TRUE, header=TRUE)
 
 ## Import relevant E. coli ProteomeVis data. See Razban et al. (2018) in Bioinformatics:
-## "ProteomeVis: a web app for exploration of protein properties from structure to sequence evolution across organisms’ proteomes"
+## "ProteomeVis: a web app for exploration of protein properties from structure to sequence
+## evolution across organisms’ proteomes"
 
 ## available protein data. 1262 E. coli proteins here.
 proteome.vis.inspect.df <- read.csv("../results/thermostability/Ecoli-ProteomeVis-data/Ecoli-proteomevis_inspect.csv", as.is=TRUE, header=TRUE)
 proteome.vis.chain.df <- read.csv("../results/thermostability/Ecoli-ProteomeVis-data/Ecoli-proteomevis_chain.csv", as.is=TRUE, header=TRUE)
-proteome.vis.df <- full_join(proteome.vis.chain.df,proteome.vis.inspect.df) %>%
+
+proteome.vis.df <- full_join(proteome.vis.chain.df, proteome.vis.inspect.df) %>%
     left_join(REL606.to.ProteomeVis.df) %>%
     filter(!(is.na(Gene))) ## 1237 genes pass filters. 
 
-## just looking at nonmut data, skipping dS.
-LTEE.nonmut.proteome.vis.comp.df <- inner_join(proteome.vis.df,nonmut.density)
+nonmut.proteome.vis.comp.df <- inner_join(proteome.vis.df,nonmut.mutation.densities)
+hypermut.proteome.vis.comp.df <- inner_join(proteome.vis.df,hypermut.mutation.densities)
 
 ## significant positive correlation with abundant proteins.
-cor.test(LTEE.nonmut.proteome.vis.comp.df$abundance,
-         LTEE.nonmut.proteome.vis.comp.df$density)
+cor.test(nonmut.proteome.vis.comp.df$abundance,
+         nonmut.proteome.vis.comp.df$all.mut.density)
 
 ### significant negative correlation between evolutionary rates in nature
 ### and rates in the LTEE, as reported in Maddamsetti et al. (2017).
-cor.test(LTEE.nonmut.proteome.vis.comp.df$evolutionary_rate,
-         LTEE.nonmut.proteome.vis.comp.df$density)
+cor.test(nonmut.proteome.vis.comp.df$evolutionary_rate,
+         nonmut.proteome.vis.comp.df$all.mut.density)
 
-## negative correlation here with contact density, but why?
-cor.test(LTEE.nonmut.proteome.vis.comp.df$contact_density,
-         LTEE.nonmut.proteome.vis.comp.df$density)
+## no correlation with contact density.
+cor.test(nonmut.proteome.vis.comp.df$contact_density,
+         nonmut.proteome.vis.comp.df$all.mut.density)
 
-## no correlation with PPI when only looking at non-mutator data. only when
-## looking at hypermutator data.
-cor.test(LTEE.nonmut.proteome.vis.comp.df$PPI_degree,
-         LTEE.nonmut.proteome.vis.comp.df$density)
+## no correlation with these PPI when looking at non-mutator data.
+cor.test(nonmut.proteome.vis.comp.df$PPI_degree,
+         nonmut.proteome.vis.comp.df$all.mut.density)
 ####################
-## just looking at hypermut data, skipping dS.
-LTEE.hypermut.proteome.vis.comp.df <- inner_join(proteome.vis.df,hypermut.density)
 
 ## no correlation with abundant proteins.
-cor.test(LTEE.hypermut.proteome.vis.comp.df$abundance,
-         LTEE.hypermut.proteome.vis.comp.df$density)
+cor.test(hypermut.proteome.vis.comp.df$abundance,
+         hypermut.proteome.vis.comp.df$all.mut.density)
 
-### no correlation between evolutionary rates in nature
+### positive correlation between evolutionary rates in nature
 ### and rates in hypermutators.
-cor.test(LTEE.hypermut.proteome.vis.comp.df$evolutionary_rate,
-         LTEE.hypermut.proteome.vis.comp.df$density)
+cor.test(hypermut.proteome.vis.comp.df$evolutionary_rate,
+         hypermut.proteome.vis.comp.df$all.mut.density)
 
-## again, a negative correlation here with contact density. but why?
-cor.test(LTEE.hypermut.proteome.vis.comp.df$contact_density,
-         LTEE.hypermut.proteome.vis.comp.df$density)
+## no correlation with contact density.
+cor.test(hypermut.proteome.vis.comp.df$contact_density,
+         hypermut.proteome.vis.comp.df$all.mut.density)
+
 ## see PNAS paper: Protein misinteraction avoidance causes
 ## highly expressed proteins to evolve slowly
 
+## also see PNAS paper: Cellular crowding imposes global
+## constraints on the chemistry and evolution of proteomes
 
 ## super strong negative correlation with PPI when
 ## looking at hypermutator data.
-cor.test(LTEE.hypermut.proteome.vis.comp.df$PPI_degree,
-         LTEE.hypermut.proteome.vis.comp.df$density)
+cor.test(hypermut.proteome.vis.comp.df$PPI_degree,
+         hypermut.proteome.vis.comp.df$all.mut.density)
 
-####################
-## using all LTEE data.
-LTEE.proteome.vis.comp.df <- inner_join(proteome.vis.df, gene.mutation.densities)
 
-## significant correlation between rate and abundance as reported in Razban et al. 2018
-## and other papers.
-cor.test(LTEE.proteome.vis.comp.df$abundance,
-         LTEE.proteome.vis.comp.df$evolutionary_rate)
+## Let's make a figure to summarize these findings.
+make.ProteomeVis.correlations.figure <- function(nonmut.proteome.vis.comp.df,
+                                                 hypermut.proteome.vis.comp.df) {
+    ## top subfigure of 4 panels,
+    ## bottom subfigure of 4 panels.
+    ## generate a list of panels, then pass
+    ## to cowplot::plot_grid using do.call().
+
+    nonmut.p1 <- ggplot(nonmut.proteome.vis.comp.df)
+
+    
+    nonmut.panels <- nonmut.proteome.vis.comp.df %>%
+        split(.$growthTime_hr) %>%
+        map(.f = plot.mut.density.mRNA.anticorrelation)
+    
+    hypermut.panels.panels <- density.Caglar %>%
+        split(.$growthTime_hr) %>%
+        map(.f = plot.mut.density.protein.anticorrelation)
+
+    ## fill in some parameters for plot_grid using partial function application,
+    ## and save the specialized versions.
+    plot_subfigure <- partial(.f = plot_grid, nrow = 1)
+    ## use do.call to unroll the panels as arguments for plot_grid.
+
+    ## make two 3x3 subfigures for the mRNA and protein correlations.
+    mRNA.plots <- do.call(plot_subfigure, mRNA.panels)
+    protein.plots <- do.call(plot_subfigure, protein.panels)
+
+    big.fig <- plot_grid(mRNA.plots, protein.plots)
+    return(big.fig)
+}
+
+ProteomeVisFig <- make.ProteomeVis.correlations.figure(nonmut.proteome.vis.comp.df,
+                                                       hypermut.proteome.vis.comp.df)
 
 #######################################################################
 ## METABOLIC ENZYME ANALYSIS.
 ########################################################
 
+## Some analyses in this vein have already been published in:
+## Metabolic Determinants of Enzyme Evolution in a Genome-Scale Bacterial Metabolic Network
+## by Jose Aguilar-Rodriguez and Andreas Wagner.
+
 ## Only Ara-1 and Ara+6 show evidence of purifying selection on
 ## superessential metabolic enzymes. Why only these two? No idea why.
+
+## In short, there looks like there is idiosyncratic purifying selection on
+## core metabolic networks (superessential reactions and specialist enzymes)
+## in the LTEE. Results depend on the population, and are not consistent across
+## populations.
+
+## Report these findings in the main text, but keep it brief, and put all STIMS
+## figures into the Supplement.
 
 ## examine superessential metabolic reactions reported by Barve and Wagner (2012).
 superessential.rxns.df <- read.csv("../results/thermostability/Barve2012-S6-superessential.csv")
@@ -544,7 +648,7 @@ superessential.pvals <- calc.traj.pvals(gene.mutation.data, unique(superessentia
 ##12 Ara+6       9933 0.993
 
 ################################################################
-## look at generalist and specialist enzymes in Nam et al. (2012)
+## look at specialist and generalist enzymes in Nam et al. (2012):
 ## Network context and selection in the evolution of enzyme specificity.
 
 ## 1157 genes.
@@ -579,7 +683,7 @@ generalist.fig <- generalist.base.layer %>% ## null for generalists
     add.cumulative.mut.layer(c.generalists, my.color="black")
 ggsave("../results/thermostability/figures/generalist.pdf", generalist.fig)
 
-#############################
+################################################################################
 ## ask about melting temperature of essential genes from Couce data set,
 ## versus those with no mutations.
 
@@ -609,24 +713,24 @@ hypermut.thermo.df <- Razban2019.df %>% inner_join(hypermut.density)
 
 ## significant negative correlation with non-mutators.
 cor.test(nonmut.thermo.df$evolutionary_rate_seq_identity,
-         nonmut.thermo.df$density)
+         nonmut.thermo.df$all.mut.density)
 ## really significant POSITIVE correlation with hypermutators!
 cor.test(hypermut.thermo.df$evolutionary_rate_seq_identity,
-         hypermut.thermo.df$density)
+         hypermut.thermo.df$all.mut.density)
 
 ## positive correlation with abundance in non-mutators.
 cor.test(nonmut.thermo.df$abundance_absolute_counts,
-         nonmut.thermo.df$density)
+         nonmut.thermo.df$all.mut.density)
 ## no correlation with abundance in hypermutators.
 cor.test(hypermut.thermo.df$abundance_absolute_counts,
-         hypermut.thermo.df$density)
+         hypermut.thermo.df$all.mut.density)
 
 ## positive correlation with melting temperature in non-mutators.
 cor.test(nonmut.thermo.df$melting_temperature_Celsius,
-         nonmut.thermo.df$density)
+         nonmut.thermo.df$all.mut.density)
 ## no correlation with melting temperature in hypermutators.
 cor.test(hypermut.thermo.df$melting_temperature_Celsius,
-         hypermut.thermo.df$density)
+         hypermut.thermo.df$all.mut.density)
 
 ############################################################
 ## compare melting temperature and abundance for
@@ -647,27 +751,27 @@ hypermut.essential.thermo.df <- right_join(essential.genes,hypermut.thermo.df) %
 
 ## negative correlation between conservation and mutation density.
 cor.test(nonmut.essential.thermo.df$evolutionary_rate_seq_identity,
-         nonmut.essential.thermo.df$density)
+         nonmut.essential.thermo.df$all.mut.density)
 
 ## negative correlation between conservation and mutation density.
 cor.test(hypermut.essential.thermo.df$evolutionary_rate_seq_identity,
-         hypermut.essential.thermo.df$density)
+         hypermut.essential.thermo.df$all.mut.density)
 
 ## positive correlation between abundance and mutation density
 cor.test(nonmut.essential.thermo.df$abundance_absolute_counts,
-         nonmut.essential.thermo.df$density)
+         nonmut.essential.thermo.df$all.mut.density)
 
 ## no correlation between abundance and mutation density
 cor.test(hypermut.thermo.df$abundance_absolute_counts,
-         hypermut.thermo.df$density)
+         hypermut.thermo.df$all.mut.density)
 
 ## positive correlation between melting temperature and mutation density
 cor.test(nonmut.thermo.df$melting_temperature_Celsius,
-         nonmut.thermo.df$density)
+         nonmut.thermo.df$all.mut.density)
 
 ## no correlation between melting temperature and mutation density
 cor.test(hypermut.thermo.df$melting_temperature_Celsius,
-         hypermut.thermo.df$density)
+         hypermut.thermo.df$all.mut.density)
 
 ############################################################################
 ## E. COLI MELTOME ATLAS DATA ANALYSIS
@@ -738,8 +842,8 @@ nonmelter.vs.melter.hist <- ggplot(hypermut.density.meltome2,
                                    aes(x=density,fill=is.nonmelter)) +
     geom_histogram()
 
-g1 <- filter(hypermut.density.meltome2,is.nonmelter==TRUE)$density
-g2 <- filter(hypermut.density.meltome2,is.nonmelter==FALSE)$density
+g1 <- filter(hypermut.density.meltome2,is.nonmelter==TRUE)$all.mut.density
+g2 <- filter(hypermut.density.meltome2,is.nonmelter==FALSE)$all.mut.density
 mean(g1) ## on average, nonmelters have a higher mean.
 mean(g2)
 ## statistically significant.
