@@ -495,6 +495,7 @@ ggsave("../results/thermostability/figures/essential-not-zitnik-STIMS.pdf")
 ################################################################################
 ## Analyze E. coli data from the ProteomeVis database.
 ################################################################################
+
 ## python ProteomeVis-to-REL606.py produces the table we need to join with REL606.genes.
 REL606.to.ProteomeVis.df <- read.csv("../results/thermostability/REL606-to-ProteomeVis.csv",
                                      as.is=TRUE, header=TRUE)
@@ -503,45 +504,41 @@ REL606.to.ProteomeVis.df <- read.csv("../results/thermostability/REL606-to-Prote
 ## "ProteomeVis: a web app for exploration of protein properties from structure to sequence
 ## evolution across organisms’ proteomes"
 
+## IMPORTANT: the metadata in proteomevis_inspect comes from github:
+## https://github.com/rrazban/proteomevis/tree/master/proteomevis
+## HOWEVER, the data was downloaded from:
+## http://proteomevis.chem.harvard.edu.
+## DO NOT USE THE proteomevis_chain.csv TABLE AVAILBLE ON GITHUB!
+## Those data are totally inconsistent with the data found on the webserver.
+## I notified the authors, so hopefully those inconsistencies will be fixed eventually.
+
 ## available protein data. 1262 E. coli proteins here.
-proteome.vis.inspect.df <- read.csv("../results/thermostability/Ecoli-ProteomeVis-data/Ecoli-proteomevis_inspect.csv", as.is=TRUE, header=TRUE)
-proteome.vis.chain.df <- read.csv("../results/thermostability/Ecoli-ProteomeVis-data/Ecoli-proteomevis_chain.csv", as.is=TRUE, header=TRUE)
+proteome.vis.inspect.df <- read.csv("../results/thermostability/Ecoli-proteomevis_inspect.csv", as.is=TRUE, header=TRUE)
+proteome.vis.download.df <- read.csv("../data/ProteomeVis-data/NODES_ecoli_TM_0.00-0.00_SID_0.00-0.00_20201104_2235.csv", as.is=TRUE, header=TRUE) %>%
+    select(-id) ## drop the id column as this is just an index.
 
-proteome.vis.df <- full_join(proteome.vis.chain.df, proteome.vis.inspect.df) %>%
+proteome.vis.df <- full_join(proteome.vis.inspect.df, proteome.vis.download.df) %>%
     left_join(REL606.to.ProteomeVis.df) %>%
-    filter(!(is.na(Gene))) ## 1237 genes pass filters. 
+    filter(!(is.na(Gene))) %>% ## 1259 genes pass this filter.
+    ## remove outliers with few residues in contact.
+    ## 1255 proteins left after filtering.
+    filter(contact_density > 4) 
 
-nonmut.proteome.vis.comp.df <- inner_join(proteome.vis.df,nonmut.mutation.densities)
-hypermut.proteome.vis.comp.df <- inner_join(proteome.vis.df,hypermut.mutation.densities)
+nonmut.proteome.vis.comp.df <- proteome.vis.df %>%
+    left_join(nonmut.mutation.densities)
+    
+hypermut.proteome.vis.comp.df <- proteome.vis.df %>%
+    left_join(hypermut.mutation.densities)
 
-## significant positive correlation with abundant proteins.
-cor.test(nonmut.proteome.vis.comp.df$abundance,
-         nonmut.proteome.vis.comp.df$all.mut.density)
-
-### significant negative correlation between evolutionary rates in nature
-### and rates in the LTEE, as reported in Maddamsetti et al. (2017).
-cor.test(nonmut.proteome.vis.comp.df$evolutionary_rate,
-         nonmut.proteome.vis.comp.df$all.mut.density)
-
-## no correlation with contact density.
+## negative correlation with contact density in non-mutators.
 cor.test(nonmut.proteome.vis.comp.df$contact_density,
          nonmut.proteome.vis.comp.df$all.mut.density)
 
-## no correlation with these PPI when looking at non-mutator data.
+## positive correction with PPI when looking at non-mutator data.
 cor.test(nonmut.proteome.vis.comp.df$PPI_degree,
          nonmut.proteome.vis.comp.df$all.mut.density)
-####################
 
-## no correlation with abundant proteins.
-cor.test(hypermut.proteome.vis.comp.df$abundance,
-         hypermut.proteome.vis.comp.df$all.mut.density)
-
-### positive correlation between evolutionary rates in nature
-### and rates in hypermutators.
-cor.test(hypermut.proteome.vis.comp.df$evolutionary_rate,
-         hypermut.proteome.vis.comp.df$all.mut.density)
-
-## no correlation with contact density.
+##  negative correlation with contact density in hypermutators.
 cor.test(hypermut.proteome.vis.comp.df$contact_density,
          hypermut.proteome.vis.comp.df$all.mut.density)
 
@@ -551,46 +548,42 @@ cor.test(hypermut.proteome.vis.comp.df$contact_density,
 ## also see PNAS paper: Cellular crowding imposes global
 ## constraints on the chemistry and evolution of proteomes
 
-## super strong negative correlation with PPI when
+## negative correlation with PPI when
 ## looking at hypermutator data.
 cor.test(hypermut.proteome.vis.comp.df$PPI_degree,
          hypermut.proteome.vis.comp.df$all.mut.density)
 
-
 ## Let's make a figure to summarize these findings.
-make.ProteomeVis.correlations.figure <- function(nonmut.proteome.vis.comp.df,
+make.ProteomeVis.contact.density.figure <- function(nonmut.proteome.vis.comp.df,
                                                  hypermut.proteome.vis.comp.df) {
-    ## top subfigure of 4 panels,
-    ## bottom subfigure of 4 panels.
-    ## generate a list of panels, then pass
-    ## to cowplot::plot_grid using do.call().
 
-    nonmut.p1 <- ggplot(nonmut.proteome.vis.comp.df)
-
+    add.formatting <- function(my.plot) {
+        formatted.plot <- my.plot +
+            geom_point(color = "gray", alpha = 0.2) +
+            geom_smooth(method = 'lm', formula = y~x) +
+            theme_classic() +
+            ylab("Mutation density") +
+            xlab("Contact density") 
+        return(formatted.plot)
+    }
     
-    nonmut.panels <- nonmut.proteome.vis.comp.df %>%
-        split(.$growthTime_hr) %>%
-        map(.f = plot.mut.density.mRNA.anticorrelation)
+    nonmut.plot <- ggplot(nonmut.proteome.vis.comp.df,
+                        aes(x = contact_density, y = all.mut.density)) %>%
+        add.formatting() + 
+        ggtitle("Non-mutators")
     
-    hypermut.panels.panels <- density.Caglar %>%
-        split(.$growthTime_hr) %>%
-        map(.f = plot.mut.density.protein.anticorrelation)
+    hypermut.plot <- ggplot(hypermut.proteome.vis.comp.df,
+                          aes(x = contact_density, y = all.mut.density)) %>%
+        add.formatting() + 
+        ggtitle("Hypermutators")
 
-    ## fill in some parameters for plot_grid using partial function application,
-    ## and save the specialized versions.
-    plot_subfigure <- partial(.f = plot_grid, nrow = 1)
-    ## use do.call to unroll the panels as arguments for plot_grid.
-
-    ## make two 3x3 subfigures for the mRNA and protein correlations.
-    mRNA.plots <- do.call(plot_subfigure, mRNA.panels)
-    protein.plots <- do.call(plot_subfigure, protein.panels)
-
-    big.fig <- plot_grid(mRNA.plots, protein.plots)
-    return(big.fig)
+    fig <- plot_grid(nonmut.plot, hypermut.plot)
+    return(fig)
 }
 
-ProteomeVisFig <- make.ProteomeVis.correlations.figure(nonmut.proteome.vis.comp.df,
+ProteomeVisFig <- make.ProteomeVis.contact.density.figure(nonmut.proteome.vis.comp.df,
                                                        hypermut.proteome.vis.comp.df)
+ggsave("../results/thermostability/figures/ProteomeVisFig.pdf", ProteomeVisFig, width=4, height=2)
 
 #######################################################################
 ## METABOLIC ENZYME ANALYSIS.

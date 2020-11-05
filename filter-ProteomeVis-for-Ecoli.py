@@ -4,21 +4,20 @@
 filter-ProteomeVis-for-Ecoli.py by Rohan Maddamsetti. 
 
 This script filters the data in ../data/ProteomeVis-data
+(This will be just one file: pr)
 for the rows that are relevant for E. coli (species == 1),
-and then writes to ../results/thermostability/Ecoli-ProteomeVis-data.
+and then writes to ../results/thermostability.
 
 '''
 
 import os
 
-outputdir = "../results/thermostability/Ecoli-ProteomeVis-data"
+outputdir = "../results/thermostability"
 inputdir = "../data/ProteomeVis-data"
-inputfiles = [x for x in os.listdir(inputdir) if x.startswith('proteomevis')]
+inputfiles = [x for x in os.listdir(inputdir) if x.startswith("proteomevis_inspect")]
 
 for f in inputfiles:
-    if ("edge" in f) or ("chain" in f):
-        species_field = 1
-    elif ("inspect" in f):
+    if ("inspect" in f):
         species_field = -1
     else:
         continue
