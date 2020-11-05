@@ -1,8 +1,5 @@
 ## thermostability-analysis.R by Rohan Maddamsetti.
 
-## IMPORTANT TODO: See if I can recapitulate the correlations
-## in Figure 1 of Drummond and Wilke (2008) using LTEE hypermutator data.
-
 ## get functions for dealing with LTEE metagenomics data.
 source("metagenomics-library.R")
 
@@ -677,32 +674,17 @@ generalist.fig <- generalist.base.layer %>% ## null for generalists
 ggsave("../results/thermostability/figures/generalist.pdf", generalist.fig)
 
 ################################################################################
-## ask about melting temperature of essential genes from Couce data set,
-## versus those with no mutations.
+## LEUENBERGER E. COLI PROTEOME THERMOSTABILITY DATA ANALYSIS.
 
-
-## Import thermostability data for the E. coli proteome, from Leuenberger et al. (2017)
-## in Science. 757 proteins here.
-LeuenbergerS3.df <- read.csv("../results/thermostability/Ecoli-Leuenberger-data/Ecoli-Leuenberger_Table-S3.csv",as.is=TRUE, header=TRUE) %>%
-    select(Tm.Protein,Length,Protein_ID,Protinfo,is.disordered,Protein.Abundance,
-           Essential,Synthesis.Rate,Synthesis.Rate..Min.,T.90..Unfolded) %>%
-    distinct() %>% ## examine proteins rather than peptides/domains.
-    ## set uniprot column to be compatible with ProteomeViz
-    rename(uniprot = Protein_ID) %>%
-    left_join(proteome.vis.df)
-
-## IMPORTANT TODO: NOT ALL OF THESE GENES MAP TO ProteomeViz!
-## I will have to find a separate solution to match these to REL606 genes.
-Leuentest <- LeuenbergerS3.df %>% filter(!(is.na(Gene)))
-## only 442 out of 757 are in ProteomeViz.
-
-## as another solution, use the supplementary data from Razban (2019).
+## Use the supplementary data from Razban (2019) in MBE,
+## which uses and reanalyzes the thermostability (Tm) data from the E. coli proteome
+## from Leuenberger et al. (2017) in Science.
 ## get 577 genes with abundance, Tm, and evolutionary rates.
 Razban2019.df <- read.csv("../results/thermostability/Ecoli-Razban2019.csv") %>%
     left_join(REL606.genes)
 
-nonmut.thermo.df <- Razban2019.df %>% inner_join(nonmut.density)
-hypermut.thermo.df <- Razban2019.df %>% inner_join(hypermut.density)
+nonmut.thermo.df <- Razban2019.df %>% inner_join(nonmut.mutation.densities)
+hypermut.thermo.df <- Razban2019.df %>% inner_join(hypermut.mutation.densities)
 
 ## significant negative correlation with non-mutators.
 cor.test(nonmut.thermo.df$evolutionary_rate_seq_identity,
@@ -711,68 +693,19 @@ cor.test(nonmut.thermo.df$evolutionary_rate_seq_identity,
 cor.test(hypermut.thermo.df$evolutionary_rate_seq_identity,
          hypermut.thermo.df$all.mut.density)
 
-## positive correlation with abundance in non-mutators.
-cor.test(nonmut.thermo.df$abundance_absolute_counts,
-         nonmut.thermo.df$all.mut.density)
-## no correlation with abundance in hypermutators.
-cor.test(hypermut.thermo.df$abundance_absolute_counts,
-         hypermut.thermo.df$all.mut.density)
-
-## positive correlation with melting temperature in non-mutators.
+## no correlation with melting temperature in non-mutators.
 cor.test(nonmut.thermo.df$melting_temperature_Celsius,
          nonmut.thermo.df$all.mut.density)
-## no correlation with melting temperature in hypermutators.
-cor.test(hypermut.thermo.df$melting_temperature_Celsius,
-         hypermut.thermo.df$all.mut.density)
-
-############################################################
-## compare melting temperature and abundance for
-## essential genes in REL606 and genes with no dS in LTEE.
-
-## IMPORTANT TODO: ask whether results depend on including or excluding
-## essential genes that are under selection.
-
-nonmut.essential.thermo.df <- right_join(essential.genes,nonmut.thermo.df) %>%
-    ## turn NAs to 0s.
-    mutate(mut.count=ifelse(is.na(mut.count),0,mut.count)) %>%
-    mutate(density=ifelse(is.na(density),0,density))
-
-hypermut.essential.thermo.df <- right_join(essential.genes,hypermut.thermo.df) %>%
-        ## turn NAs to 0s.
-    mutate(mut.count=ifelse(is.na(mut.count),0,mut.count)) %>%
-    mutate(density=ifelse(is.na(density),0,density))
-
-## negative correlation between conservation and mutation density.
-cor.test(nonmut.essential.thermo.df$evolutionary_rate_seq_identity,
-         nonmut.essential.thermo.df$all.mut.density)
-
-## negative correlation between conservation and mutation density.
-cor.test(hypermut.essential.thermo.df$evolutionary_rate_seq_identity,
-         hypermut.essential.thermo.df$all.mut.density)
-
-## positive correlation between abundance and mutation density
-cor.test(nonmut.essential.thermo.df$abundance_absolute_counts,
-         nonmut.essential.thermo.df$all.mut.density)
-
-## no correlation between abundance and mutation density
-cor.test(hypermut.thermo.df$abundance_absolute_counts,
-         hypermut.thermo.df$all.mut.density)
-
-## positive correlation between melting temperature and mutation density
-cor.test(nonmut.thermo.df$melting_temperature_Celsius,
-         nonmut.thermo.df$all.mut.density)
-
-## no correlation between melting temperature and mutation density
+## marginally insignificant negative correlation
+## with melting temperature in hypermutators.
 cor.test(hypermut.thermo.df$melting_temperature_Celsius,
          hypermut.thermo.df$all.mut.density)
 
 ############################################################################
 ## E. COLI MELTOME ATLAS DATA ANALYSIS
 
-## TODO: put this stuff in a more sensible place in this script.
-
 ## These data were written out by filter-meltome-atlas.R.
-## Run that script in order to generate '../results/thermostability/Ecoli-meltome.csv'
+## Run that script in order to generate '../results/thermostability/Ecoli-meltome.csv'.
 Ecoli.meltome <- read.csv("../results/thermostability/Ecoli-meltome.csv") %>%
     rename(Gene = gene_name) %>%
     select(run_name, Gene, meltPoint) %>%
@@ -781,58 +714,72 @@ Ecoli.meltome <- read.csv("../results/thermostability/Ecoli-meltome.csv") %>%
     filter(!is.na(locus_tag))
 
 nonmut.density.meltome <- Ecoli.meltome %>%
-    left_join(nonmut.density) %>%
+    left_join(nonmut.mutation.densities) %>%
     ## turn NAs into zeros.
-    mutate(mut.count = replace(mut.count, is.na(mut.count), 0)) %>%
-    mutate(density = replace(density, is.na(density), 0))
+    mutate(all.mut.count = replace(all.mut.count, is.na(all.mut.count), 0)) %>%
+    mutate(all.mut.density = replace(all.mut.density, is.na(all.mut.density), 0)) %>%
+    ## for plotting, give non-melters a Tm = 100.
+    mutate(Tm = ifelse(is.na(meltPoint), 100, meltPoint))
+
 
 hypermut.density.meltome <- Ecoli.meltome %>%
-    left_join(hypermut.density) %>%
+    left_join(hypermut.mutation.densities) %>%
     ## turn NAs into zeros.
-    mutate(mut.count = replace(mut.count, is.na(mut.count), 0)) %>%
-    mutate(density = replace(density, is.na(density), 0))
+    mutate(all.mut.count = replace(all.mut.count, is.na(all.mut.count), 0)) %>%
+    mutate(all.mut.density = replace(all.mut.density, is.na(all.mut.density), 0)) %>%
+## for plotting, give non-melters a Tm = 100.
+    mutate(Tm = ifelse(is.na(meltPoint), 100, meltPoint))
 
-nonmut.meltome.plot <- ggplot(nonmut.density.meltome,
-                                 aes(x=density,y=meltPoint)) +
-    geom_point() +
-    theme_classic() +
-    facet_wrap(run_name ~ .) +
-    geom_smooth()
+## IMPORTANT: non-melting proteins are ignored in the correlation analysis.
+
+## analyse data from the different kinds of runs separately.
+nonmut.density.meltome.cell.data <- nonmut.density.meltome %>%
+    filter(run_name == "Escherichia coli cells")
+
+nonmut.density.meltome.lysate.data <- nonmut.density.meltome %>%
+    filter(run_name == "Escherichia coli lysate")
+
+hypermut.density.meltome.cell.data <- hypermut.density.meltome %>%
+    filter(run_name == "Escherichia coli cells")
+
+hypermut.density.meltome.lysate.data <- hypermut.density.meltome %>%
+    filter(run_name == "Escherichia coli lysate")
+
+## no correlation between melting point and mutation density in non-mutators.
+cor.test(nonmut.density.meltome.cell.data$Tm,
+         nonmut.density.meltome.cell.data$all.mut.density)
+
+cor.test(nonmut.density.meltome.lysate.data$Tm,
+         nonmut.density.meltome.lysate.data$all.mut.density)
+
+## weak correlation between melting point and mutation density in the cell data.
+cor.test(hypermut.density.meltome.cell.data$Tm,
+         hypermut.density.meltome.cell.data$all.mut.density)
+
+## positive correlation between melting point and mutation density in lysate data
+cor.test(hypermut.density.meltome.lysate.data$Tm,
+         hypermut.density.meltome.lysate.data$all.mut.density)
 
 hypermut.meltome.plot <- ggplot(hypermut.density.meltome,
-                                 aes(x=density,y=meltPoint)) +
-    geom_point() +
+                                 aes(x=all.mut.density,y=Tm)) +
+    geom_point(color = "light gray", alpha = 0.2) +
     theme_classic() +
-    facet_wrap(run_name ~ .) +
-    geom_smooth()
+    geom_smooth(method = 'lm', formula = y~x) +
+    facet_wrap(run_name ~ .)
 
-nonmut.meltome.plot
 hypermut.meltome.plot
 
 nonmelters <- Ecoli.meltome %>% filter(is.na(meltPoint)) %>%
     select(-run_name) %>% distinct() %>%
     ungroup()
-## are non-melters under purifying selection?
-## let's use STIMS.
-nonmelter.mut.data <- gene.mutation.data %>%
-    filter(Gene %in% nonmelters$Gene)
-c.nonmelters <- calc.cumulative.muts(nonmelter.mut.data)
-nonmelter.base.layer <- plot.base.layer(gene.mutation.data,
-                                        subset.size=length(unique(nonmelters$Gene)))
 
-nonmelter.STIMS.fig <- nonmelter.base.layer %>%
-    add.cumulative.mut.layer(c.nonmelters, my.color="black")
-ggsave("../results/thermostability/nonmelters-STIMS.pdf")
-
-## unlike what I expected: more mutations than average in Ara+3,
-## and in Ara-1?
 
 hypermut.density.meltome2 <- hypermut.density.meltome %>%
     mutate(is.nonmelter = ifelse(Gene %in% nonmelters$Gene,TRUE, FALSE)) %>%
     mutate(is.essential = ifelse(Gene %in% essential.genes$Gene,TRUE, FALSE))
 
 nonmelter.vs.melter.hist <- ggplot(hypermut.density.meltome2,
-                                   aes(x=density,fill=is.nonmelter)) +
+                                   aes(x = all.mut.density,fill = is.nonmelter)) +
     geom_histogram()
 
 g1 <- filter(hypermut.density.meltome2,is.nonmelter==TRUE)$all.mut.density
@@ -841,42 +788,6 @@ mean(g1) ## on average, nonmelters have a higher mean.
 mean(g2)
 ## statistically significant.
 wilcox.test(g1,g2)
-
-## Is there an association between essentiality and being a nonmelter?
-## let's use a contingency test.
-essentiality.nonmelter.data <- REL606.genes %>%
-    mutate(is.nonmelter = ifelse(Gene %in% nonmelters$Gene,TRUE, FALSE)) %>%
-    mutate(is.essential = ifelse(Gene %in% essential.genes$Gene,TRUE, FALSE))
-x1 <- nrow(filter(essentiality.nonmelter.data,is.nonmelter & is.essential))
-x2 <- nrow(filter(essentiality.nonmelter.data,is.nonmelter & !is.essential))
-x3 <- nrow(filter(essentiality.nonmelter.data,!is.nonmelter & is.essential))
-x4 <- nrow(filter(essentiality.nonmelter.data,!is.nonmelter & !is.essential))
-
-## p = 0.0028. positive association between being a nonmelter and essentiality.
-fisher.test(matrix(c(x1,x2,x3,x4),2))
-
-## what if we remove ribosomal proteins?
-essen.nonmelt2 <- essentiality.nonmelter.data %>%
-    filter(!str_detect(product,"ribosomal"))
-
-y1 <- nrow(filter(essen.nonmelt2,is.nonmelter & is.essential))
-y2 <- nrow(filter(essen.nonmelt2,is.nonmelter & !is.essential))
-y3 <- nrow(filter(essen.nonmelt2,!is.nonmelter & is.essential))
-y4 <- nrow(filter(essen.nonmelt2,!is.nonmelter & !is.essential))
-## p = 0.1. association goes away when we remove ribosomal proteins.
-fisher.test(matrix(c(y1,y2,y3,y4),2))
-
-## what if we remove hypothetical proteins?
-essen.nonmelt3 <- essen.nonmelt2 %>%
-    filter(!str_detect(product,"hypothetical"))
-
-z1 <- nrow(filter(essen.nonmelt3,is.nonmelter & is.essential))
-z2 <- nrow(filter(essen.nonmelt3,is.nonmelter & !is.essential))
-z3 <- nrow(filter(essen.nonmelt3,!is.nonmelter & is.essential))
-z4 <- nrow(filter(essen.nonmelt3,!is.nonmelter & !is.essential))
-## p = 0.0376. significant. seems like hypothetical/unstructured proteins
-## in here.
-fisher.test(matrix(c(z1,z2,z3,z4),2))
 
 ## do a STRING analysis of the nonmelters.
 ## print out to file.
@@ -887,7 +798,7 @@ write.csv(nonmelters,file="../results/thermostability/nonmelters.csv")
 ## plot essentiality against melting temperature.
 meltome.with.essentiality <- Ecoli.meltome %>%
     ## for plotting, give non-melters a Tm = 100.
-    mutate(Tm = ifelse(is.na(meltPoint), 100, meltPoint)) %>%
+    ##mutate(Tm = ifelse(is.na(meltPoint), 100, meltPoint)) %>%
     mutate(is.essential = ifelse(Gene %in% essential.genes$Gene,TRUE, FALSE))
 
 ## This plot is interesting: excluding non-melters,
@@ -917,9 +828,109 @@ correlate.meltPoint.with.timepoint <- function(Tm.Caglar) {
     }
 }
 
+## IMPORTANT TODO: I should break down these plots by the run_type:
+## either whole cell or lysate (look up the original paper to see what this means).
+
 ## IMPORTANT RESULT: melting temperature, excluding non-melters,
 ## is negatively correlated with protein and RNA abundance,
 ## especially during growth phase, but also during starvation.
 correlate.meltPoint.with.timepoint(meltome.with.abundance)
 ## IMPORTANT TODO: make a figure for this fascinating result!
 
+## does the melting temp distribution change over the cell cycle?
+
+
+## make a figure of protein melting point against mRNA and protein abundance over time
+## in REL606.
+
+plot.Tm.mRNA.anticorrelation <- function(my.data) {
+    ## This is a helper function to plot an mRNA panel for the full figure.
+    my.t <- unique(my.data$growthTime_hr)
+    time.title = paste0(as.character(my.t), "h")
+
+    ## if the correlation is not significant, then the regression line is gray.
+    mRNA.result <- cor.test(my.data$mRNA.mean, my.data$meltPoint)
+    my.color <- ifelse(mRNA.result$p.value < 0.05, "blue", "light gray")
+    
+    mRNA.plot <- my.data %>%
+        ggplot(aes(x = mRNA.mean, y = meltPoint)) +
+        geom_point(color = "light blue", alpha = 0.5, size = 0.2) +
+        geom_smooth(method = 'lm', formula = y~x, color = my.color) +
+        theme_classic() +
+        coord_cartesian(xlim = c(0, 15)) +
+        ggtitle(time.title)
+
+    ## use some conditional statements to label x-axis for the
+    ## bottom center panel (168 hr) and to label y-axis for the
+    ## left center panel (6 hr).
+    my.xlabel <- ifelse(my.t == 168, "mRNA","")
+    my.ylabel <- ifelse(my.t == 6, "Melting point","")
+    
+    mRNA.plot <- mRNA.plot +
+        xlab(my.xlabel) +
+        ylab(my.ylabel)
+    return(mRNA.plot)
+}
+
+plot.Tm.protein.anticorrelation <- function(my.data) {
+    ## This is a helper function to plot a protein panel for the full figure.
+    my.t <- unique(my.data$growthTime_hr)
+    time.title = paste0(as.character(my.t), "h")
+
+    ## if the correlation is not significant, then the regression line is gray.
+    Protein.result <- cor.test(my.data$Protein.mean, my.data$meltPoint)
+    my.color <- ifelse(Protein.result$p.value < 0.05, "blue", "light gray")
+    
+    Protein.plot <- my.data %>%
+        ggplot(aes(x = Protein.mean, y = meltPoint)) +
+        geom_point(color = "moccasin", alpha = 0.5, size = 0.2) +
+        geom_smooth(method = 'lm', formula = y~x, color = my.color) +
+        theme_classic() +
+        coord_cartesian(xlim = c(0, 15)) +
+        ggtitle(time.title) +
+        ylab("") ## no need for ylabel since the mRNA subfigure will be on the left.
+
+    ## use a conditional statement to label x-axis for the
+    ## bottom center panel (168 hr).
+    my.xlabel <- ifelse(my.t == 168, "Protein","")
+    Protein.plot <- Protein.plot +
+        xlab(my.xlabel)
+    
+    return(Protein.plot)
+}
+
+make.Tm.RNA.protein.expression.figure <- function(Tm.Caglar) {
+    ## makes a figure that combines all 18 panels.
+    ## generate a list of smaller panels, then pass
+    ## to cowplot::plot_grid using do.call().
+    
+    mRNA.panels <- Tm.Caglar %>%
+        split(.$growthTime_hr) %>%
+        map(.f = plot.Tm.mRNA.anticorrelation)
+    
+    protein.panels <- Tm.Caglar %>%
+        split(.$growthTime_hr) %>%
+        map(.f = plot.Tm.protein.anticorrelation)
+
+    ## fill in some parameters for plot_grid using partial function application,
+    ## and save the specialized versions.
+    plot_subfigure <- partial(.f = plot_grid, nrow = 3)
+    ## use do.call to unroll the panels as arguments for plot_grid.
+
+    ## make two 3x3 subfigures for the mRNA and protein correlations.
+    mRNA.plots <- do.call(plot_subfigure, mRNA.panels)
+    protein.plots <- do.call(plot_subfigure, protein.panels)
+
+    big.fig <- plot_grid(mRNA.plots, protein.plots)
+    return(big.fig)
+}
+
+TmOverTime.Fig <- make.Tm.RNA.protein.expression.figure(meltome.with.abundance)
+ggsave("../results/thermostability/figures/TmOverTime.pdf", TmOverTime.Fig,
+       height = 4, width = 9)
+
+## TODO: for a more appropriate comparison, remake the mut.density figure,
+## omitting the 488 non-melter proteins, and on the same proteins plotted in this
+## figure.
+
+## TODO: Is there a way to examine non-melters here, too?
