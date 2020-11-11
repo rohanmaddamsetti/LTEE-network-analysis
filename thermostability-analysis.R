@@ -299,39 +299,45 @@ hypermut.PPI.cong <- cong.network.df %>%
 ## look at Zitnik network.
 
 ## all are significant.
+cor.test(nonmut.PPI.zitnik$Degree, nonmut.PPI.zitnik$all.mut.density)
+cor.test(nonmut.PPI.zitnik$DegreeCentrality, nonmut.PPI.zitnik$all.mut.density)
+
 cor.test(nonmut.PPI.zitnik$Pagerank, nonmut.PPI.zitnik$all.mut.density)
 cor.test(nonmut.PPI.zitnik$HubScore, nonmut.PPI.zitnik$all.mut.density)
 cor.test(nonmut.PPI.zitnik$AuthorityScore, nonmut.PPI.zitnik$all.mut.density)
 cor.test(nonmut.PPI.zitnik$ClosenessCentrality, nonmut.PPI.zitnik$all.mut.density)
 cor.test(nonmut.PPI.zitnik$BetweenessCentrality, nonmut.PPI.zitnik$all.mut.density)
 cor.test(nonmut.PPI.zitnik$EigenvectorCentrality, nonmut.PPI.zitnik$all.mut.density)
-cor.test(nonmut.PPI.zitnik$Degree, nonmut.PPI.zitnik$all.mut.density)
-cor.test(nonmut.PPI.zitnik$DegreeCentrality, nonmut.PPI.zitnik$all.mut.density)
 cor.test(nonmut.PPI.zitnik$IsArticulationPoint, nonmut.PPI.zitnik$all.mut.density)
 
 ## These ones are significant.
+cor.test(hypermut.PPI.zitnik$Degree, hypermut.PPI.zitnik$all.mut.density)
+cor.test(hypermut.PPI.zitnik$DegreeCentrality, hypermut.PPI.zitnik$all.mut.density)
+
 cor.test(hypermut.PPI.zitnik$Pagerank, hypermut.PPI.zitnik$all.mut.density)
 cor.test(hypermut.PPI.zitnik$HubScore, hypermut.PPI.zitnik$all.mut.density)
 cor.test(hypermut.PPI.zitnik$AuthorityScore, hypermut.PPI.zitnik$all.mut.density)
 cor.test(hypermut.PPI.zitnik$ClosenessCentrality, hypermut.PPI.zitnik$all.mut.density)
 cor.test(hypermut.PPI.zitnik$BetweenessCentrality, hypermut.PPI.zitnik$all.mut.density)
 cor.test(hypermut.PPI.zitnik$EigenvectorCentrality, hypermut.PPI.zitnik$all.mut.density)
-cor.test(hypermut.PPI.zitnik$Degree, hypermut.PPI.zitnik$all.mut.density)
-cor.test(hypermut.PPI.zitnik$DegreeCentrality, hypermut.PPI.zitnik$all.mut.density)
 ## This last one is not significant.
 cor.test(hypermut.PPI.zitnik$IsArticulationPoint, hypermut.PPI.zitnik$all.mut.density)
 
 ## now look at Cong network.
+cor.test(nonmut.PPI.cong$Degree, nonmut.PPI.cong$all.mut.density) ## significant
+cor.test(nonmut.PPI.cong$DegreeCentrality, nonmut.PPI.cong$all.mut.density) ## significant
+
 cor.test(nonmut.PPI.cong$Pagerank, nonmut.PPI.cong$all.mut.density) ## significant
 cor.test(nonmut.PPI.cong$HubScore, nonmut.PPI.cong$all.mut.density) ## NS
 cor.test(nonmut.PPI.cong$AuthorityScore, nonmut.PPI.cong$all.mut.density) ## NS
 cor.test(nonmut.PPI.cong$ClosenessCentrality, nonmut.PPI.cong$all.mut.density) ## NS
 cor.test(nonmut.PPI.cong$BetweenessCentrality, nonmut.PPI.cong$all.mut.density) ## NS
 cor.test(nonmut.PPI.cong$EigenvectorCentrality, nonmut.PPI.cong$all.mut.density) ## NS
-cor.test(nonmut.PPI.cong$Degree, nonmut.PPI.cong$all.mut.density) ## significant
-cor.test(nonmut.PPI.cong$DegreeCentrality, nonmut.PPI.cong$all.mut.density) ## significant
 cor.test(nonmut.PPI.cong$IsArticulationPoint, nonmut.PPI.cong$all.mut.density) ## NS
 
+
+cor.test(hypermut.PPI.cong$Degree, hypermut.PPI.cong$all.mut.density) ## significant
+cor.test(hypermut.PPI.cong$DegreeCentrality, hypermut.PPI.cong$all.mut.density) ## ditto
 
 cor.test(hypermut.PPI.cong$Pagerank, hypermut.PPI.cong$all.mut.density) ## NS
 cor.test(hypermut.PPI.cong$HubScore, hypermut.PPI.cong$all.mut.density) ## significant
@@ -339,8 +345,6 @@ cor.test(hypermut.PPI.cong$AuthorityScore, hypermut.PPI.cong$all.mut.density) ##
 cor.test(hypermut.PPI.cong$ClosenessCentrality, hypermut.PPI.cong$all.mut.density) #sig
 cor.test(hypermut.PPI.cong$BetweenessCentrality, hypermut.PPI.cong$all.mut.density) ## NS
 cor.test(hypermut.PPI.cong$EigenvectorCentrality, hypermut.PPI.cong$all.mut.density) ## sig
-cor.test(hypermut.PPI.cong$Degree, hypermut.PPI.cong$all.mut.density) ## significant
-cor.test(hypermut.PPI.cong$DegreeCentrality, hypermut.PPI.cong$all.mut.density) ## sig
 cor.test(hypermut.PPI.cong$IsArticulationPoint, hypermut.PPI.cong$all.mut.density) ## NS
 
 ## Summarize these results by plotting mutation density against degree distribution
@@ -439,13 +443,6 @@ cor.test(nonmut.proteome.vis.comp.df$contact_density,
 ##  negative correlation with contact density in hypermutators.
 cor.test(hypermut.proteome.vis.comp.df$contact_density,
          hypermut.proteome.vis.comp.df$all.mut.density)
-
-## see PNAS paper: Protein misinteraction avoidance causes
-## highly expressed proteins to evolve slowly
-
-## also see PNAS paper: Cellular crowding imposes global
-## constraints on the chemistry and evolution of proteomes
-
 
 ## Let's make a figure to summarize these findings.
 make.ProteomeVis.contact.density.figure <- function(nonmut.proteome.vis.comp.df,
@@ -589,12 +586,6 @@ mean(h2)
 ## This is statistically significant.
 wilcox.test(h1,h2)
 
-
-## Now compare mRNA and protein abundance at each timepoint to
-## Tm.
-meltome.with.abundance <- Ecoli.meltome %>%
-    left_join(Caglar.summary)
-
 ## exclude non-melters for now.
 correlate.meltPoint.with.timepoint <- function(meltPoint.Caglar) {
     for (t in sort(unique(meltPoint.Caglar$growthTime_hr))) {
@@ -611,16 +602,14 @@ correlate.meltPoint.with.timepoint <- function(meltPoint.Caglar) {
     }
 }
 
+## Now compare mRNA and protein abundance at each timepoint to
+## Tm.
+meltome.with.abundance <- Ecoli.meltome %>%
+    left_join(Caglar.summary)
 ## IMPORTANT RESULT: melting temperature, excluding non-melters,
 ## is negatively correlated with protein and RNA abundance,
 ## especially during growth phase, but also during starvation.
 correlate.meltPoint.with.timepoint(meltome.with.abundance)
-## IMPORTANT TODO: make a figure for this fascinating result!
-
-## does the melting temp distribution change over the cell cycle?
-
-## make a figure of protein melting point against mRNA and protein abundance over time
-## in REL606.
 
 plot.meltPoint.mRNA.anticorrelation <- function(my.data) {
     ## This is a helper function to plot an mRNA panel for the full figure.
@@ -651,7 +640,7 @@ plot.meltPoint.mRNA.anticorrelation <- function(my.data) {
     
     ## use more conditional statements to only label y-axis categories
     ## for plots on the left-hand side of the big figure.
-    do.not.label.yaxis <- ifelse(!(my.t %in% c(3,6,48)),TRUE,FALSE)
+    do.not.label.yaxis <- TRUE #ifelse(!(my.t %in% c(3,6,48)),TRUE,FALSE)
     if (do.not.label.yaxis) {
         mRNA.plot <- mRNA.plot + theme(axis.text.y = element_blank())
     }
@@ -717,3 +706,11 @@ meltPointOverTime.Fig <- make.meltPoint.RNA.protein.expression.figure(meltome.wi
 ggsave("../results/thermostability/figures/meltPointOverTime.pdf",
        meltPointOverTime.Fig,
        height = 4, width = 9)
+
+## Put both figures for the meltome analysis together for Figure 3.
+
+Fig3 <- plot_grid(hypermut.meltome.plot,
+                  meltPointOverTime.Fig,
+                  labels = c('A','B'), ncol = 1)
+save_plot("../results/thermostability/figures/Fig3.pdf",
+       Fig3, base_height = 7, base_width = 9)
