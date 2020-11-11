@@ -41,7 +41,8 @@ gene.mutation.data <- read.csv(
     header=TRUE,as.is=TRUE) %>%
     mutate(Generation=t0/10000) %>%
     ## This for changing the ordering of populations in plots.
-    mutate(Population=factor(Population,levels=c(nonmutator.pops,hypermutator.pops))) %>%
+    mutate(Population=factor(Population,
+                             levels=c(nonmutator.pops,hypermutator.pops))) %>%
     inner_join(REL606.genes) %>%
     filter(Gene!='intergenic')
 
@@ -362,11 +363,13 @@ make.mut.density.PPI.degree.panel <- function(PPI.data, my.color="gray") {
 make.mut.density.PPI.degree.figure <- function(nonmut.PPI.zitnik, nonmut.PPI.cong,
                                                hypermut.PPI.zitnik, hypermut.PPI.cong) {
     
-    panelA <- make.mut.density.PPI.degree.panel(nonmut.PPI.zitnik, "lightsteelblue") +
+    panelA <- make.mut.density.PPI.degree.panel(nonmut.PPI.zitnik,
+                                                "lightsteelblue") +
         ggtitle("Nonmutators")
     panelB <- make.mut.density.PPI.degree.panel(nonmut.PPI.cong, "moccasin") +
         ggtitle("Nonmutators")
-        panelC <- make.mut.density.PPI.degree.panel(hypermut.PPI.zitnik, "lightsteelblue") +
+    panelC <- make.mut.density.PPI.degree.panel(hypermut.PPI.zitnik,
+                                                "lightsteelblue") +
         ggtitle("Hypermutators")
     panelD <- make.mut.density.PPI.degree.panel(hypermut.PPI.cong, "moccasin") +
         ggtitle("Hypermutators")
@@ -376,9 +379,12 @@ make.mut.density.PPI.degree.figure <- function(nonmut.PPI.zitnik, nonmut.PPI.con
     return(fig)
 }
 
-PPI.figure <- make.mut.density.PPI.degree.figure(nonmut.PPI.zitnik, nonmut.PPI.cong,
-                                                 hypermut.PPI.zitnik, hypermut.PPI.cong)
-ggsave("../results/thermostability/figures/PPI-figure.pdf", PPI.figure, width=4, height=4)
+PPI.figure <- make.mut.density.PPI.degree.figure(nonmut.PPI.zitnik,
+                                                 nonmut.PPI.cong,
+                                                 hypermut.PPI.zitnik,
+                                                 hypermut.PPI.cong)
+ggsave("../results/thermostability/figures/PPI-figure.pdf",
+       PPI.figure, width=4, height=4)
 
 ################################################################################
 ## Analyze E. coli data from the ProteomeVis database.
@@ -387,17 +393,17 @@ ggsave("../results/thermostability/figures/PPI-figure.pdf", PPI.figure, width=4,
 ## python ProteomeVis-to-REL606.py produces the table we need to join with REL606.genes.
 REL606.to.ProteomeVis.df <- read.csv("../results/thermostability/REL606-to-ProteomeVis.csv", as.is = TRUE, header = TRUE)
 
-## Import relevant E. coli ProteomeVis data. See Razban et al. (2018) in Bioinformatics:
-## "ProteomeVis: a web app for exploration of protein properties from structure to sequence
-## evolution across organisms’ proteomes"
+## Import relevant E. coli ProteomeVis data.
+## See Razban et al. (2018) in Bioinformatics:
+## "ProteomeVis: a web app for exploration of protein properties
+## from structure to sequence evolution across organisms’ proteomes"
 
 ## IMPORTANT: the metadata in proteomevis_inspect comes from github:
 ## https://github.com/rrazban/proteomevis/tree/master/proteomevis
 ## HOWEVER, the data was downloaded from:
 ## http://proteomevis.chem.harvard.edu.
-## DO NOT USE THE proteomevis_chain.csv TABLE AVAILBLE ON GITHUB!
-## Those data are totally inconsistent with the data found on the webserver.
-## I notified the authors, so hopefully those inconsistencies will be fixed eventually.
+## DO NOT USE THE proteomevis_chain.csv TABLE CURRENTLY AVAILBLE ON GITHUB!
+## Those data are log10 transformed from the actual values that I want!
 
 ## available protein data. 1262 E. coli proteins here.
 proteome.vis.inspect.df <- read.csv("../results/thermostability/Ecoli-proteomevis_inspect.csv", as.is = TRUE, header = TRUE)
@@ -473,53 +479,6 @@ ProteomeVisFig <- make.ProteomeVis.contact.density.figure(nonmut.proteome.vis.co
                                                        hypermut.proteome.vis.comp.df)
 ggsave("../results/thermostability/figures/ProteomeVisFig.pdf", ProteomeVisFig, width=4, height=2)
 
-################################################################################
-## RAZBAN-LEUENBERGER E. COLI PROTEOME THERMOSTABILITY DATA ANALYSIS.
-
-## Use the supplementary data from Razban (2019) in MBE,
-## which uses and reanalyzes the thermostability (Tm) data from the E. coli proteome
-## from Leuenberger et al. (2017) in Science.
-## get 577 genes with abundance, Tm, and evolutionary rates.
-Razban2019.df <- read.csv("../results/thermostability/Ecoli-Razban2019.csv") %>%
-    left_join(REL606.genes)
-
-nonmut.thermo.df <- Razban2019.df %>% inner_join(nonmut.mutation.densities)
-hypermut.thermo.df <- Razban2019.df %>% inner_join(hypermut.mutation.densities)
-
-## significant negative correlation with nonmutators.
-cor.test(nonmut.thermo.df$evolutionary_rate_seq_identity,
-         nonmut.thermo.df$all.mut.density)
-## really significant POSITIVE correlation with hypermutators!
-cor.test(hypermut.thermo.df$evolutionary_rate_seq_identity,
-         hypermut.thermo.df$all.mut.density)
-
-## no correlation with melting temperature in nonmutators.
-cor.test(nonmut.thermo.df$melting_temperature_Celsius,
-         nonmut.thermo.df$all.mut.density)
-## marginally insignificant negative correlation
-## with melting temperature in hypermutators.
-cor.test(hypermut.thermo.df$melting_temperature_Celsius,
-         hypermut.thermo.df$all.mut.density)
-
-## make a figure to summarize these results.
-
-panelA <- ggplot(nonmut.thermo.df, aes(x = evolutionary_rate_seq_identity,
-                                       y = all.mut.density)) +
-    geom_point(color = "gray", alpha = 0.2) +
-    geom_smooth() +
-    theme_classic() +
-    ylab("Mutation density") +
-    xlab("Evolutionary rate") 
-
-panelB <- ggplot(hypermut.thermo.df, aes(x = evolutionary_rate_seq_identity,
-                                       y = all.mut.density)) +
-    geom_point(color = "gray", alpha = 0.2) +
-    geom_smooth() +
-    theme_classic() +
-    ylab("Mutation density") +
-    xlab("Evolutionary rate") 
-
-
 ############################################################################
 ## E. COLI MELTOME ATLAS DATA ANALYSIS
 
@@ -577,7 +536,10 @@ Ecoli.meltome <- read.csv("../results/thermostability/Ecoli-meltome.csv") %>%
 ## This should be a supplementary figure, if this strategies is used for other plots.
 meltome.tertile.plot <- ggplot(Ecoli.meltome,
                                aes(x = meltPoint, fill = Tm.category)) +
+    xlab("Melting point") + ylab("Count") +
     geom_histogram(bins=100) + theme_classic() + guides(fill = FALSE)
+ggsave("../results/thermostability/figures/meltome-tertiles.pdf",
+       meltome.tertile.plot, height=3, width = 3)
 
 ## examine the nonmelter proteins.
 nonmelters <- Ecoli.meltome %>% filter(is.na(meltPoint)) %>%
@@ -618,13 +580,15 @@ hypermut.meltome.plot <- ggplot(hypermut.density.meltome,
 ggsave("../results/thermostability/figures/Tm-hypermut-mut-density.pdf",
        hypermut.meltome.plot, height=2.5, width=6)
 
-## on average, nonmelters have a higher mutation density.
-g1 <- filter(hypermut.density.meltome, Tm.category == "nonmelter")$all.mut.density
-g2 <- filter(hypermut.density.meltome, Tm.category != "nonmelter")$all.mut.density
-mean(g1)
-mean(g2)
+## on average, nonmelters have a higher mutation density in the hypermutators.
+## there is no such pattern in the nonmutators.
+h1 <- filter(hypermut.density.meltome, Tm.category == "nonmelter")$all.mut.density
+h2 <- filter(hypermut.density.meltome, Tm.category != "nonmelter")$all.mut.density
+mean(h1)
+mean(h2)
 ## This is statistically significant.
-wilcox.test(g1,g2)
+wilcox.test(h1,h2)
+
 
 ## Now compare mRNA and protein abundance at each timepoint to
 ## Tm.
@@ -750,97 +714,6 @@ make.meltPoint.RNA.protein.expression.figure <- function(meltPoint.Caglar) {
 }
 
 meltPointOverTime.Fig <- make.meltPoint.RNA.protein.expression.figure(meltome.with.abundance)
-ggsave("../results/thermostability/figures/meltPointOverTime.pdf", meltPointOverTime.Fig,
+ggsave("../results/thermostability/figures/meltPointOverTime.pdf",
+       meltPointOverTime.Fig,
        height = 4, width = 9)
-
-#######################################################################
-## METABOLIC ENZYME ANALYSIS.
-########################################################
-
-## Some analyses in this vein have already been published in:
-## Metabolic Determinants of Enzyme Evolution in a Genome-Scale Bacterial Metabolic Network
-## by Jose Aguilar-Rodriguez and Andreas Wagner.
-
-## Only Ara-1 and Ara+6 show evidence of purifying selection on
-## superessential metabolic enzymes. Why only these two? No idea why.
-
-## In short, there looks like there is idiosyncratic purifying selection on
-## core metabolic networks (superessential reactions and specialist enzymes)
-## in the LTEE. Results depend on the population, and are not consistent across
-## populations.
-
-## Report these findings in the main text, but keep it brief, and put all STIMS
-## figures into the Supplement.
-
-## examine superessential metabolic reactions reported by Barve and Wagner (2012).
-superessential.rxns.df <- read.csv("../results/thermostability/Barve2012-S6-superessential.csv")
-
-superessential.mut.data <- gene.mutation.data %>%
-    filter(Gene %in% superessential.rxns.df$Gene)
-
-c.superessential <- calc.cumulative.muts(superessential.mut.data)
-
-superessential.base.layer <- plot.base.layer(
-    gene.mutation.data,
-    subset.size=length(unique(superessential.rxns.df$Gene)))
-
-## plot of superessential metabolic enzymes analysis
-superessential.fig <- superessential.base.layer %>% 
-    add.cumulative.mut.layer(c.superessential, my.color="black")
-ggsave("../results/thermostability/figures/superessential.pdf", superessential.fig)
-
-## calculate formal p-values.
-superessential.pvals <- calc.traj.pvals(gene.mutation.data, unique(superessential.rxns.df$Gene))
-## results:
-## A tibble: 12 x 3
-##   Population count p.val
-##   <fct>      <int> <dbl>
-## 1 Ara-5       6363 0.636
-## 2 Ara-6       9150 0.915
-## 3 Ara+1       8365 0.836
-## 4 Ara+2       6800 0.68 
-## 5 Ara+4       8913 0.891
-## 6 Ara+5       1892 0.189
-## 7 Ara-1       9999 1.00 
-## 8 Ara-2       6484 0.648
-## 9 Ara-3       6178 0.618
-##10 Ara-4       8766 0.877
-##11 Ara+3       5669 0.567
-##12 Ara+6       9933 0.993
-
-################################################################
-## look at specialist and generalist enzymes in Nam et al. (2012):
-## Network context and selection in the evolution of enzyme specificity.
-
-## 1157 genes.
-Nam.df <- read.csv("../results/thermostability/Nam2012_Database_S1.csv") %>%
-    left_join(REL606.genes) %>% filter(!is.na(Gene))
-
-specialist.enzymes <- Nam.df %>% filter(Class=="Spec.")
-generalist.enzymes <- Nam.df %>% filter(Class=="Gen.")
-
-specialist.mut.data <- gene.mutation.data %>%
-    filter(Gene %in% specialist.enzymes$Gene)
-c.specialists <- calc.cumulative.muts(specialist.mut.data)
-
-generalist.mut.data <- gene.mutation.data %>%
-    filter(Gene %in% generalist.enzymes$Gene)
-c.generalists <- calc.cumulative.muts(generalist.mut.data)
-
-specialist.base.layer <- plot.base.layer(
-    gene.mutation.data,
-    subset.size=length(unique(specialist.enzymes$Gene)))
-
-generalist.base.layer <- plot.base.layer(
-    gene.mutation.data,
-    subset.size=length(unique(generalist.enzymes$Gene)))
-
-## specialist fig.
-specialist.fig <- specialist.base.layer %>% ## null for specialists
-    add.cumulative.mut.layer(c.specialists, my.color="black")
-ggsave("../results/thermostability/figures/specialist.pdf", specialist.fig)
-
-generalist.fig <- generalist.base.layer %>% ## null for generalists
-    add.cumulative.mut.layer(c.generalists, my.color="black")
-ggsave("../results/thermostability/figures/generalist.pdf", generalist.fig)
-

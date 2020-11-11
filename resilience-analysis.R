@@ -172,3 +172,99 @@ ggsave("../results/resilience/cong-randomized-all.pdf", cong.randomized.all.plot
 ## although more simulation runs are needed, these results suggest purifying selection on
 ## which genes are affected by KO mutations in each population,
 ## as resilience falls more slowly in the real data, than in the simulated data.
+
+#######################################################################
+## METABOLIC ENZYME ANALYSIS.
+########################################################
+
+## Some analyses in this vein have already been published in:
+## Metabolic Determinants of Enzyme Evolution in a Genome-Scale Bacterial Metabolic Network
+## by Jose Aguilar-Rodriguez and Andreas Wagner.
+
+## Only Ara-1 and Ara+6 show evidence of purifying selection on
+## superessential metabolic enzymes. Why only these two? No idea why.
+
+## In short, there looks like there is idiosyncratic purifying selection on
+## core metabolic networks (superessential reactions and specialist enzymes)
+## in the LTEE. Results depend on the population, and are not consistent across
+## populations.
+
+## Report these findings in the main text, but keep it brief, and put all STIMS
+## figures into the Supplement.
+
+## examine superessential metabolic reactions reported by Barve and Wagner (2012).
+superessential.rxns.df <- read.csv("../results/thermostability/Barve2012-S6-superessential.csv")
+
+superessential.mut.data <- gene.mutation.data %>%
+    filter(Gene %in% superessential.rxns.df$Gene)
+
+c.superessential <- calc.cumulative.muts(superessential.mut.data)
+
+superessential.base.layer <- plot.base.layer(
+    gene.mutation.data,
+    subset.size=length(unique(superessential.rxns.df$Gene)))
+
+## plot of superessential metabolic enzymes analysis
+superessential.fig <- superessential.base.layer %>% 
+    add.cumulative.mut.layer(c.superessential, my.color="black")
+ggsave("../results/thermostability/figures/superessential.pdf", superessential.fig)
+
+## calculate formal p-values.
+superessential.pvals <- calc.traj.pvals(gene.mutation.data, unique(superessential.rxns.df$Gene))
+## results:
+## A tibble: 12 x 3
+##   Population count p.val
+##   <fct>      <int> <dbl>
+## 1 Ara-5       6363 0.636
+## 2 Ara-6       9150 0.915
+## 3 Ara+1       8365 0.836
+## 4 Ara+2       6800 0.68 
+## 5 Ara+4       8913 0.891
+## 6 Ara+5       1892 0.189
+## 7 Ara-1       9999 1.00 
+## 8 Ara-2       6484 0.648
+## 9 Ara-3       6178 0.618
+##10 Ara-4       8766 0.877
+##11 Ara+3       5669 0.567
+##12 Ara+6       9933 0.993
+
+################################################################
+## look at specialist and generalist enzymes in Nam et al. (2012):
+## Network context and selection in the evolution of enzyme specificity.
+
+## 1157 genes.
+Nam.df <- read.csv("../results/thermostability/Nam2012_Database_S1.csv") %>%
+    left_join(REL606.genes) %>% filter(!is.na(Gene))
+
+specialist.enzymes <- Nam.df %>% filter(Class=="Spec.")
+generalist.enzymes <- Nam.df %>% filter(Class=="Gen.")
+
+specialist.mut.data <- gene.mutation.data %>%
+    filter(Gene %in% specialist.enzymes$Gene)
+c.specialists <- calc.cumulative.muts(specialist.mut.data)
+
+generalist.mut.data <- gene.mutation.data %>%
+    filter(Gene %in% generalist.enzymes$Gene)
+c.generalists <- calc.cumulative.muts(generalist.mut.data)
+
+specialist.base.layer <- plot.base.layer(
+    gene.mutation.data,
+    subset.size=length(unique(specialist.enzymes$Gene)))
+
+generalist.base.layer <- plot.base.layer(
+    gene.mutation.data,
+    subset.size=length(unique(generalist.enzymes$Gene)))
+
+## specialist fig.
+specialist.fig <- specialist.base.layer %>% ## null for specialists
+    add.cumulative.mut.layer(c.specialists, my.color="black")
+ggsave("../results/thermostability/figures/specialist.pdf", specialist.fig)
+
+generalist.fig <- generalist.base.layer %>% ## null for generalists
+    add.cumulative.mut.layer(c.generalists, my.color="black")
+ggsave("../results/thermostability/figures/generalist.pdf", generalist.fig)
+
+######### TODO: Do network resilience analysis on the E. coli metabolic network.
+## can I come up with a good explanation for the idiosyncratic patterns
+## of purifying selection on these sets of metabolic enzymes, across LTEE
+## populations?
