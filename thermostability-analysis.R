@@ -232,7 +232,8 @@ plot.mut.density.protein.anticorrelation <- function(my.data) {
         geom_point(color = "light green", alpha = 0.5) +
         geom_smooth(method = 'lm', formula = y~x, color = my.color) +
         theme_classic() +
-        coord_cartesian(xlim = c(0, 15)) +
+        coord_cartesian(xlim = c(0, 10)) +
+        scale_x_continuous(breaks=c(0,5,10)) +
         ggtitle(time.title) +
         ylab("") ## no need for ylabel since the mRNA subfigure will be on the left.
 
@@ -572,7 +573,7 @@ hypermut.meltome.plot <- ggplot(hypermut.density.meltome,
     stat_density_ridges(quantile_lines = TRUE, color = "white", fill = "dark gray") +
     theme_classic() +
     xlab("Mutation density") +
-    ylab("Tm category")
+    ylab(bquote(T[m]~" category"))
 
 ggsave("../results/thermostability/figures/Tm-hypermut-mut-density.pdf",
        hypermut.meltome.plot, height=2.5, width=6)
@@ -632,7 +633,14 @@ plot.meltPoint.mRNA.anticorrelation <- function(my.data) {
     ## bottom center panel (168 hr) and to label y-axis for the
     ## left center panel (6 hr).
     my.xlabel <- ifelse(my.t == 168, "mRNA","")
-    my.ylabel <- ifelse(my.t == 6, "Tm category","")
+    ## have to use the full if else statement when using bquote
+    ## because ifelse() is a vectorized construct than can't take
+    ## language objects.
+    if(my.t == 6) {
+        my.ylabel <- bquote(T[m]~" category")
+    } else {
+        my.ylabel <- ""
+    }
     
     mRNA.plot <- mRNA.plot +
         xlab(my.xlabel) +
@@ -663,6 +671,7 @@ plot.meltPoint.protein.anticorrelation <- function(my.data) {
         stat_density_ridges(quantile_lines = TRUE, fill = my.fill) +
         theme_classic() +
         coord_cartesian(xlim = c(0, 10)) +
+        scale_x_continuous(breaks=c(0,5,10)) +
         ggtitle(time.title) +
         ylab("") ## no need for ylabel since the mRNA subfigure will be on the left.
 
@@ -709,8 +718,10 @@ ggsave("../results/thermostability/figures/meltPointOverTime.pdf",
 
 ## Put both figures for the meltome analysis together for Figure 3.
 
-Fig3 <- plot_grid(hypermut.meltome.plot,
+Fig3 <- plot_grid(plot_grid(hypermut.meltome.plot,NULL),
                   meltPointOverTime.Fig,
-                  labels = c('A','B'), ncol = 1)
-save_plot("../results/thermostability/figures/Fig3.pdf",
-       Fig3, base_height = 7, base_width = 9)
+                  labels = c('A','B'), ncol = 1,
+                  rel_heights = c(1, 2))
+                  
+ggsave("../results/thermostability/figures/Fig3.pdf",
+       Fig3, height = 6, width = 7)
