@@ -551,7 +551,7 @@ def resilience_randomized_over_gene_set(LTEE_strain_to_KO_dict, G, g_to_node, KO
         randomized_resilience.append(my_resilience)
     strain_col = ['REL606'] + clone_col
     resilience_col = [REL606_resilience] + randomized_resilience
-    resilience_results = pd.DataFrame.from_dict({'strain': strain_col, 'randomized_resilience': resilience_col})
+    resilience_results = pd.DataFrame.from_dict({'strain': strain_col, 'resilience': resilience_col})
     return resilience_results
 
 def get_LTEE_metagenomics_knockouts():
@@ -619,7 +619,7 @@ def resilience_randomized_within_LTEE_pops(LTEE_strain_to_KO_dict, LTEE_strain_t
         randomized_resilience.append(my_resilience)
     strain_col = ['REL606'] + clone_col
     resilience_col = [REL606_resilience] + randomized_resilience
-    resilience_results = pd.DataFrame.from_dict({'strain': strain_col, 'randomized_resilience': resilience_col})
+    resilience_results = pd.DataFrame.from_dict({'strain': strain_col, 'resilience': resilience_col})
     return resilience_results
 
 def make_LTEE_strain_to_pop_dict(LTEE_knockout_muts):
