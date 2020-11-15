@@ -39,33 +39,6 @@ read.network.resilience.df <- function(path, LTEE.genome.metadata) {
     return(resilience.df)
 }
 
-make.resilience.plot <- function(resilience.df) {
-    p <- ggplot(resilience.df,
-                aes(x=Generation,
-                    y=resilience,
-                    color=population)) +
-        facet_wrap(.~population,nrow=4) +
-        geom_smooth(method="lm") +
-        theme_classic() + geom_point() + guides(color=FALSE) +
-        ylab("Network resilience")
-    return(p)
-}
-
-make.Cong.resilience.plot <- function(resilience.df) {
-    p <- make.resilience.plot(resilience.df) +
-        ## IMPORTANT: axes need to be consistent when comparing plots.
-        ylim(0.15,0.18)
-    return(p)
-}
-
-make.Zitnik.resilience.plot <- function(resilience.df) {
-    p <- make.resilience.plot(resilience.df) +
-        ## IMPORTANT: axes need to be consistent when comparing plots.
-        ylim(0.40,0.414)
-    return(p)
-
-}
-
 make.big.resilience.plot <- function(big.resilience.df, plot.legend=FALSE) {
     ## plot data and randomized data on the same figure.
     p <- ggplot(big.resilience.df,
@@ -169,16 +142,6 @@ zitnik.randomized.within.lm <- calc.regression.and.correlations(zitnik.randomize
 zitnik.randomized.across.lm <- calc.regression.and.correlations(zitnik.randomized.across)
 zitnik.randomized.all.lm <- calc.regression.and.correlations(zitnik.randomized.all)
 
-zitnik.resilience.plot <- make.Zitnik.resilience.plot(zitnik.network.resilience.df)
-zitnik.randomized.within.plot <- make.Zitnik.resilience.plot(zitnik.randomized.within)
-zitnik.randomized.across.plot <- make.Zitnik.resilience.plot(zitnik.randomized.across)
-zitnik.randomized.all.plot <- make.Zitnik.resilience.plot(zitnik.randomized.all)
-
-ggsave("../results/resilience/zitnik-resilience.pdf", zitnik.resilience.plot)
-ggsave("../results/resilience/zitnik-randomized-within.pdf", zitnik.randomized.within.plot)
-ggsave("../results/resilience/zitnik-randomized-across.pdf", zitnik.randomized.across.plot)
-ggsave("../results/resilience/zitnik-randomized-all.pdf", zitnik.randomized.all.plot)
-
 ## Now, Cong PPI resilience analysis.
 cong.network.resilience.df <- read.network.resilience.df(
     "../results/resilience/Cong_PPI_LTEE_genome_resilience.csv",
@@ -216,17 +179,6 @@ cong.regression <- calc.regression.and.correlations(cong.network.resilience.df)
 cong.randomized.within.lm <- calc.regression.and.correlations(cong.randomized.within)
 cong.randomized.across.lm <- calc.regression.and.correlations(cong.randomized.across)
 cong.randomized.all.lm <- calc.regression.and.correlations(cong.randomized.all)
-
-cong.resilience.plot <- make.Cong.resilience.plot(cong.network.resilience.df)
-cong.randomized.within.plot <- make.Cong.resilience.plot(cong.randomized.within)
-cong.randomized.across.plot <- make.Cong.resilience.plot(cong.randomized.across)
-cong.randomized.all.plot <- make.Cong.resilience.plot(cong.randomized.all)
-
-ggsave("../results/resilience/cong-resilience.pdf", cong.resilience.plot)
-ggsave("../results/resilience/cong-randomized-within.pdf", cong.randomized.within.plot)
-ggsave("../results/resilience/cong-randomized-across.pdf", cong.randomized.across.plot)
-ggsave("../results/resilience/cong-randomized-all.pdf", cong.randomized.all.plot)
-
 
 ## although more simulation runs are needed, these results suggest purifying selection on
 ## which genes are affected by KO mutations in each population,
