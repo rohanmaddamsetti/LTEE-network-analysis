@@ -49,7 +49,8 @@ make.big.resilience.plot <- function(big.resilience.df, plot.legend=FALSE) {
         theme_classic() +
         geom_point(alpha = 0.2, size = 0.5) +
         geom_smooth(alpha = 0.2, method = "lm") +
-        ylab("Network resilience")
+        ylab("Network resilience") +
+        theme(legend.position="bottom")
     if (!plot.legend) {
         p <- p + guides(color=FALSE)
     }
@@ -73,16 +74,75 @@ make.big.Zitnik.resilience.plot <- function(big.resilience.df) {
 
 }
 
-calc.regression.and.correlations <- function(resilience.df) {
-    ## TODO: fix the y-intercept at the ancestral REL606 resilience.
-
-    ## these two correlations should be the same, within numerical error.
-    print(cor.test(resilience.df$time, resilience.df$log.resilience))
+calc.grand.correlation <- function(resilience.df) {
     print(cor.test(resilience.df$time, resilience.df$resilience))
-    my.regression <- lm(data=resilience.df, log.resilience~time)
-    return(my.regression)
 }
 
+calc.resilience.regression.df <- function(resilience.df) {
+    ## returns a dataframe with the linear regression coefficients
+    ## per population as a column.
+
+    calc.resilience.slope.per.pop.df <- function(pop.df) {
+        ## get the ancestral resilience.
+        REL606.df <- pop.df %>%
+            filter(Generation == 0)
+        ancestral.resilience <- unique(REL606.df$resilience)
+        ## fix the y-intercept at the ancestral REL606 resilience.
+        my.regression <- lm(data=pop.df, I(resilience - ancestral.resilience) ~ 0 + Generation)
+        resilience.coefficient <- my.regression$coefficients[[1]]
+        pop.df.with.slope <- pop.df %>%
+            select(population, timeseries) %>%
+            mutate(resilience.slope = resilience.coefficient) %>%
+            distinct()
+        return(pop.df.with.slope)
+    }
+
+    summary.df <- resilience.df %>%
+        split(.$population) %>%
+        map_dfr(.f = calc.resilience.slope.per.pop.df)
+    return(summary.df)
+}
+
+regression.slope.test <- function(full.slope.df, null.comp.string) {
+
+    if (null.comp.string == "randomized_within") {
+        null.df <- full.slope.df %>%
+            filter(timeseries == "randomized_within")
+    } else if (null.comp.string == "randomized_across") {
+        null.df <- full.slope.df %>%
+            filter(timeseries == "randomized_across")
+    } else if (null.comp.string == "randomized_all") {
+        null.df <- full.slope.df %>%
+            filter(timeseries == "randomized_all")
+    } else {
+        print("ERROR: null.comp.string is not recognized.")
+        return(NULL)
+    }
+
+    data.df <- full.slope.df %>%
+        filter(timeseries == "actual_data")
+
+    ## a critical assumption of the statistical test is that entries of the pair of
+    ## vectors being compared correspond to matching populations.
+    ## this assertion checks this critical invariant.
+    stopifnot(data.df$population == null.df$population)
+
+    ## print out the data going into the test for error checking.
+    difference.vec <- data.df$resilience.slope - null.df$resilience.slope
+    print("DATA VECTOR:")
+    print(data.df$resilience.slope)
+    print("NULL VECTOR:")
+    print(null.df$resilience.slope)
+    print("DATA - NULL:")
+    print(difference.vec)
+
+    ## calculate Wilcoxon signed-rank test to do a nonparametric paired sample test.
+    wilcox.test(data.df$resilience.slope,
+                null.df$resilience.slope,
+                paired = TRUE, alternative = "greater")
+}
+
+##########################################################################
 ## Order nonmutator pops, then hypermutator pops by converting Population to
 ## factor type and setting the levels.
 nonmutator.pops <- c("Ara-5", "Ara-6", "Ara+1", "Ara+2", "Ara+4", "Ara+5")
@@ -137,10 +197,19 @@ big.zitnik.df <- zitnik.network.resilience.df %>%
 ## make the big plot for Zitnik data and randomized data.
 big.zitnik.plot <- make.big.Zitnik.resilience.plot(big.zitnik.df)
 
-zitnik.regression <- calc.regression.and.correlations(zitnik.network.resilience.df)
-zitnik.randomized.within.lm <- calc.regression.and.correlations(zitnik.randomized.within)
-zitnik.randomized.across.lm <- calc.regression.and.correlations(zitnik.randomized.across)
-zitnik.randomized.all.lm <- calc.regression.and.correlations(zitnik.randomized.all)
+zitnik.slope.df <- calc.resilience.regression.df(zitnik.network.resilience.df)
+zitnik.randomized.within.slope.df <- calc.resilience.regression.df(zitnik.randomized.within)
+zitnik.randomized.across.slope.df <- calc.resilience.regression.df(zitnik.randomized.across)
+zitnik.randomized.all.slope.df <- calc.resilience.regression.df(zitnik.randomized.all)
+
+full.zitnik.slope.df <- zitnik.slope.df %>%
+    full_join(zitnik.randomized.within.slope.df) %>%
+    full_join(zitnik.randomized.across.slope.df) %>%
+    full_join(zitnik.randomized.all.slope.df)
+
+regression.slope.test(full.zitnik.slope.df, "randomized_within")
+regression.slope.test(full.zitnik.slope.df, "randomized_across")
+regression.slope.test(full.zitnik.slope.df, "randomized_all")
 
 ## Now, Cong PPI resilience analysis.
 cong.network.resilience.df <- read.network.resilience.df(
@@ -171,14 +240,25 @@ big.cong.df <- cong.network.resilience.df %>%
 big.cong.plot <- make.big.Cong.resilience.plot(big.cong.df)
 Fig1.legend <- get_legend(make.big.resilience.plot(big.cong.df, plot.legend=TRUE))
 
-Fig1 <- plot_grid(big.zitnik.plot,big.cong.plot,Fig1.legend,
-                  labels=c('A','B',NULL),nrow=1, rel_widths=c(1,1,0.4))
-ggsave("../results/resilience/Fig1.pdf",height=6, width=12)
+Fig1 <- plot_grid(plot_grid(big.zitnik.plot,big.cong.plot,
+                            labels=c('A','B',NULL),nrow=1, rel_widths=c(1,1,0.4)),
+                  Fig1.legend,ncol=1, rel_heights=c(1,0.05))
+ggsave("../results/resilience/Fig1.pdf",height=7,width=6)
 
-cong.regression <- calc.regression.and.correlations(cong.network.resilience.df)
-cong.randomized.within.lm <- calc.regression.and.correlations(cong.randomized.within)
-cong.randomized.across.lm <- calc.regression.and.correlations(cong.randomized.across)
-cong.randomized.all.lm <- calc.regression.and.correlations(cong.randomized.all)
+cong.slope.df <- calc.resilience.regression.df(cong.network.resilience.df)
+cong.randomized.within.slope.df <- calc.resilience.regression.df(cong.randomized.within)
+cong.randomized.across.slope.df <- calc.resilience.regression.df(cong.randomized.across)
+cong.randomized.all.slope.df <- calc.resilience.regression.df(cong.randomized.all)
+
+full.cong.slope.df <- cong.slope.df %>%
+    full_join(cong.randomized.within.slope.df) %>%
+    full_join(cong.randomized.across.slope.df) %>%
+    full_join(cong.randomized.all.slope.df)
+
+regression.slope.test(full.cong.slope.df, "randomized_within")
+regression.slope.test(full.cong.slope.df, "randomized_across")
+regression.slope.test(full.cong.slope.df, "randomized_all")
+
 
 ## although more simulation runs are needed, these results suggest purifying selection on
 ## which genes are affected by KO mutations in each population,
