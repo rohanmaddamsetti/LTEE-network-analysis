@@ -1,15 +1,10 @@
 #!/usr/bin/env python
 
 '''
-snap-ppi-analysis.py by Rohan Maddamsetti.
+snap-ppi-resilience-analysis.py by Rohan Maddamsetti.
 
-This script does two tasks.
-
-A) calculate PPI network statistics using the SNAP library and write to file,
-in order to make comparisons with evolutionary rates in the LTEE.
-
-B) do resiliency analysis of PPI networks in the LTEE genomes published in
-   Tenaillon et al. (2016).
+This script does a resilience analysis of PPI networks in the LTEE genomes 
+published in Tenaillon et al. (2016).
 '''
 
 import snap
@@ -19,6 +14,7 @@ import random
 import numpy as np
 from scipy.integrate import simps
 import pandas as pd
+import gc
 
 
 def getREL606_column_set(col):
@@ -37,11 +33,6 @@ def getREL606_gene_set():
     return getREL606_column_set(0)
 
 
-def getREL606_blattner_set():
-    ''' return a set of all blattner ids in REL606.'''
-    return getREL606_column_set(2)
-
-
 def getREL606_column_dict(key_col,val_col):
     REL606_ID_file = "../results/REL606_IDs.csv"
     col_dict = {}
@@ -56,67 +47,16 @@ def getREL606_column_dict(key_col,val_col):
 def getREL606_blattner_to_gene_dict():
     return getREL606_column_dict(2,0)
 
-
-def getCongDataSet(f, col1, col2, col_val_filter=(None,None)):
-    '''
-    represent PPIs as a set of tuples of gene names.
-    col_val_filter is a tuple of the column (0-indexed int) 
-    and the value to filter on.
-    Use this flag to filter the coevolution findings on what has been
-    previously reported, as flagged in Supplementary Table S8 of 
-    Cong et al. (2019).
-    '''
-    pairs = set()
-    with open(f,"r") as fh:
-        for i,l in enumerate(fh):
-            if i == 0: continue ## skip header
-            l = l.strip()
-            ldata = l.split(',')
-            if col_val_filter[0] is not None:
-                if ldata[col_val_filter[0]] != col_val_filter[1]:
-                    continue
-            g1 = ldata[col1]
-            g2 = ldata[col2]
-            ## add gene pairs in alphabetical order.
-            if g1 < g2:
-                pairs.add((g1,g2))
-            else:
-                pairs.add((g2,g1))
-    return pairs
-
-
-def write_Cong_good_interactions(good_interaction_path):
-    ## import pairs from Qian Cong dataset.
-    cong_data_dir = "../results/thermostability/Ecoli-Cong-data/"
-    ## PDB interactions.
-    pdb_path = join(cong_data_dir,"S4-Ecoli-PDB-benchmark-set.csv")
-    pdb_set = getCongDataSet(pdb_path, col1=1, col2=4)
-    ## Ecocyc interactions.
-    ecocyc_path = join(cong_data_dir,"S5-Ecocyc-benchmark-set.csv")
-    ecocyc_set = getCongDataSet(ecocyc_path, col1=1, col2=4)
-    ## yeast two-hybrid interactions.
-    Y2H_path = join(cong_data_dir,"S6-Y2H-benchmark-set.csv")
-    Y2H_set = getCongDataSet(Y2H_path, col1=1, col2=4)
-    ## affinity purification mass-spec interactions.
-    APMS_path = join(cong_data_dir,"S7-APMS-benchmark-set.csv")
-    APMS_set = getCongDataSet(APMS_path, col1=1, col2=4)
-    ## coevolution interactions.
-    coevolution_path = join(cong_data_dir,"S8-Ecoli-PPI-by-coevolution.csv")
-    ## Note: we are filtering this for the 936 previously known interactions.
-    coevolution_set = getCongDataSet(coevolution_path, col1=6 , col2=7, col_val_filter=(5,"yes"))
-    ## high-confidence new interactions by coevolution.
-    high_conf_new_coevolution_path = join(cong_data_dir,"S10-Confident-novel-interactions-in-coevolution-screen.csv")
-    high_conf_new_coevolution_set = getCongDataSet(high_conf_new_coevolution_path, col1=2, col2=3)
-    ## 2683 edges in this set.
-    good_interaction_set = set.union(pdb_set, ecocyc_set, coevolution_set, high_conf_new_coevolution_set)
-    ## write out the good interactions to file.
-    with open(good_interaction_path,"w") as outfh:
-        good_interaction_list = sorted(list(good_interaction_set))
-        for p in good_interaction_list:
-            g1, g2 = p
-            outfh.write("\t".join([g1,g2])+"\n")
-    return
-
+def CopyGraph(G):
+    ## copy graph object into G2 so that we don't mess up G as a side-effect.
+    G2 = snap.TUNGraph.New(G.GetNodes(),G.GetEdges())
+    ## add nodes.
+    for n in G.Nodes():
+        G2.AddNode(n.GetId())
+    ## add edges.
+    for e in G.Edges():
+        G2.AddEdge(e.GetSrcNId(),e.GetDstNId())
+    return G2
 
 def create_graph_and_dicts(edgeFile, col1=0, col2=1, sep=None, nodeSet=None):
     ''' 
@@ -189,153 +129,6 @@ def create_graph_and_dicts(edgeFile, col1=0, col2=1, sep=None, nodeSet=None):
     return(graph_and_dictionaries)
 
 
-def calc_PageRank(Graph, node_to_g):
-    prot_to_PageRank = {}
-    PRankH = snap.TIntFltH()
-    snap.GetPageRank(Graph, PRankH)
-    for node in PRankH:
-        my_prot = node_to_g[node]
-        prot_to_PageRank[my_prot] = PRankH[node]
-    return prot_to_PageRank
-
-
-def calc_HubAndAuthorityScores(Graph, node_to_g):
-        ## calculate Hub and Authority scores for nodes in the graph.
-    prot_to_hub = {}
-    prot_to_authority = {}
-    NIdHubH = snap.TIntFltH()
-    NIdAuthH = snap.TIntFltH()
-    snap.GetHits(Graph, NIdHubH, NIdAuthH)
-    for node in NIdHubH:
-        my_prot = node_to_g[node]
-        prot_to_hub[my_prot] = NIdHubH[node]
-    for node in NIdAuthH:
-        my_prot = node_to_g[node]
-        prot_to_authority[my_prot] = NIdAuthH[node]
-    return (prot_to_hub, prot_to_authority)
-
-
-def calc_ClosenessCentrality(Graph, node_to_g):
-    prot_to_closeness_centrality = {}
-    for NI in Graph.Nodes():
-        my_prot = node_to_g[NI.GetId()]
-        CloseCentr = snap.GetClosenessCentr(Graph, NI.GetId())
-        prot_to_closeness_centrality[my_prot] = CloseCentr        
-    return prot_to_closeness_centrality
-
-
-def calc_BetweenessCentrality(Graph, node_to_g):
-    prot_to_betweeness_centrality = {}
-    Nodes = snap.TIntFltH()
-    Edges = snap.TIntPrFltH()
-    snap.GetBetweennessCentr(Graph, Nodes, Edges, 1.0)
-    for node in Nodes:
-        my_prot = node_to_g[node]
-        prot_to_betweeness_centrality[my_prot] = Nodes[node]
-    return prot_to_betweeness_centrality
-
-
-def calc_EigenvectorCentrality(Graph, node_to_g):
-    prot_to_eigenvector_centrality = {}
-    NIdEigenH = snap.TIntFltH()
-    snap.GetEigenVectorCentr(Graph, NIdEigenH)
-    for node in NIdEigenH:
-        my_prot = node_to_g[node]
-        prot_to_eigenvector_centrality[my_prot] = NIdEigenH[node] 
-    return prot_to_eigenvector_centrality
-
-
-def calc_Degrees(Graph, node_to_g):
-    prot_to_degree = {}
-    for NI in Graph.Nodes():
-        my_prot = node_to_g[NI.GetId()]
-        in_degree = NI.GetInDeg()
-        out_degree = NI.GetOutDeg()
-        assert in_degree == out_degree
-        prot_to_degree[my_prot] = in_degree
-    return prot_to_degree
-
-
-def calc_DegreeCentrality(Graph, node_to_g):
-    prot_to_degree_centrality = {}
-    for NI in Graph.Nodes():
-        my_prot = node_to_g[NI.GetId()]
-        ## degree centrality of the node
-        DegCentr = snap.GetDegreeCentr(Graph, NI.GetId())
-        prot_to_degree_centrality[my_prot] = DegCentr
-    return prot_to_degree_centrality
-
-
-def getArticulationPoints(Graph, node_to_g):
-    ''' A vertex in an undirected connected graph is an articulation point (or cut vertex)
- iff removing it (and edges through it) disconnects the graph.
- Articulation points represent vulnerabilities in a connected network –
- single points whose failure would split the network into 2 or more disconnected components.
- They are useful for designing reliable networks. '''
-    prot_to_articulation_points = {}
-    ArtNIdV = snap.TIntV()
-    snap.GetArtPoints(Graph, ArtNIdV)
-    for node in ArtNIdV:
-        my_prot = node_to_g[node]
-        prot_to_articulation_points[my_prot] = True
-    return prot_to_articulation_points
-
-
-def getStronglyConnectedComponents(Graph, node_to_g):
-    prot_to_SCcomponent = {}
-    Components = snap.TCnComV()
-    snap.GetSccs(Graph, Components)
-    for i, CnCom in enumerate(Components):
-        for node in CnCom:
-            my_prot = node_to_g[node]
-            prot_to_SCcomponent[my_prot] = i+1 ##1-index component membership.
-    return prot_to_SCcomponent
-
-
-def write_NetworkStatistics(Graph, node_to_g, outf, use_blattner=True):
-    ## make dictionaries of genes to network statistics.
-    p_to_pagerank = calc_PageRank(Graph, node_to_g)
-    p_to_hub, p_to_authority = calc_HubAndAuthorityScores(Graph, node_to_g)
-    p_to_closeness_centrality = calc_ClosenessCentrality(Graph, node_to_g)
-    p_to_betweeness_centrality = calc_BetweenessCentrality(Graph, node_to_g)
-    p_to_eigenvector_centrality = calc_EigenvectorCentrality(Graph, node_to_g)
-    p_to_degree = calc_Degrees(Graph, node_to_g)
-    p_to_degree_centrality = calc_DegreeCentrality(Graph, node_to_g)
-    p_to_articulation_points = getArticulationPoints(Graph, node_to_g)
-    p_to_SCcomponent = getStronglyConnectedComponents(Graph, node_to_g)
-    header = "Pagerank,HubScore,AuthorityScore,ClosenessCentrality,BetweenessCentrality,EigenvectorCentrality,Degree,DegreeCentrality,IsArticulationPoint,StronglyConnectedComponent"
-    if use_blattner: ## Zitnik data
-        header = "blattner," + header
-    else: ## Cong data
-        header = "Gene," + header
-
-    with open(outf,"w") as outfh:
-        outfh.write(header+"\n")
-        for _, p in node_to_g.items():
-            f1 = p
-            f2 = p_to_pagerank[p]
-            f3 = p_to_hub[p]
-            f4 = p_to_authority[p]
-            f5 = p_to_closeness_centrality[p]
-            f6 = p_to_betweeness_centrality[p]
-            f7 = p_to_eigenvector_centrality[p]
-            f8 = p_to_degree[p]
-            f9 = p_to_degree_centrality[p]
-            if p in p_to_articulation_points:
-                p_art = 1
-            else:
-                p_art = 0
-            f10 = p_art
-            if p in p_to_SCcomponent:
-                p_SC = p_to_SCcomponent[p]
-            else:
-                p_SC = -1
-            f11 = p_SC
-            row = ','.join([str(x) for x in [f1,f2,f3,f4,f5,f6,f7,f8,f9,f10,f11]])
-            outfh.write(row+"\n")
-    return
-
-
 def GraphComponentDistributionDict(G):
     ''' return a dict of cardinality : number of strongly-connected components 
     with that size in the graph G.'''
@@ -350,20 +143,22 @@ def ComponentDistributionEntropy(component_dict, N):
     component_dict: a dictionary of component size to number of components 
     with that size in the graph.
     N: the number of nodes in the original graph.
-     Output: (normalized) graph component entropy. See Zitnik et al. (2019) supplement for details.
+     Output: (normalized) graph component entropy. See Zitnik et al. (2019) 
+    supplement for details.
     '''
-
+    
     ## assert that the number of nodes in component_dict is consistent with N.
     node_num_check = sum([k*v for k,v in component_dict.items()])
     assert node_num_check == N
     
-    ## calculate the p*log(p) entries of the summation, where p = c/N,
-    ## such that c is the number of nodes in the component,
-    ## and p is the fraction of nodes in the component.
-    ## since multiple components have the same size, multiply by that number.
+    ''' calculate the p*log(p) entries of the summation, where p = c/N,
+    such that c is the number of nodes in the component,
+    and p is the fraction of nodes in the component.
+    since multiple components have the same size, multiply by that number.
+    '''
     H_components = [c_multiplicity * (c/N) * log(c/N) for c, c_multiplicity in component_dict.items()]
-    ## entropy is defined as H = -sum(p*log(p)).
-    ## normalize by log(N) per Zitnik et al. (2019).
+    ''' entropy is defined as H = -sum(p*log(p)).
+     normalize by log(N) per Zitnik et al. (2019). '''
     H = -sum(H_components)/log(N)
     return(H)
 
@@ -381,14 +176,8 @@ def GraphResilience(G):
     failure_rate_to_entropy = {0 : H_0}
     
     ## copy graph object into G2 so that we don't mess up G as a side-effect.
-    G2 = snap.TUNGraph.New(G.GetNodes(),G.GetEdges())
-    ## add nodes.
-    for n in G.Nodes():
-        G2.AddNode(n.GetId())
-    ## add edges.
-    for e in G.Edges():
-        G2.AddEdge(e.GetSrcNId(),e.GetDstNId())
-
+    G2 = CopyGraph(G)
+    
     ## seed random number generator.
     random.seed()
     ## iteratively remove edges from random nodes to fragment G2.
@@ -411,7 +200,9 @@ def GraphResilience(G):
         ## add entry to failure rate : component entropy dict.
         cur_ssc_dict = GraphComponentDistributionDict(G2)
         failure_rate_to_entropy[fail_rate_p] = ComponentDistributionEntropy(cur_ssc_dict, nodes)
-    
+
+    del G2 ## explicitly delete G2 from memory now that we don't need it.
+        
     ## calculate resilience for the graph.
     ## This is 1 - AUC of the interpolated function.
     ## Use Simpson's rule to approximate the integral.
@@ -490,7 +281,8 @@ def resilience_analysis_of_LTEE_genomes(LTEE_strain_to_KO_dict, G, g_to_node, re
             if (srcN not in knocked_out_nodes) and (dstN not in knocked_out_nodes):
                 G2.AddEdge(srcN, dstN)
         ## calculate this clone's resilience. default is 100 replicates.
-        my_resilience = np.mean([GraphResilience(G2) for x in range(reps)])
+        ## save memory by using a generator comprehension.
+        my_resilience = sum((GraphResilience(G2) for x in range(reps)))/float(reps)
         print(my_resilience)
         LTEE_strain_resilience.append(my_resilience)
     strain_col = ['REL606'] + clone_col
@@ -547,7 +339,8 @@ def resilience_randomized_over_gene_set(LTEE_strain_to_KO_dict, G, g_to_node, KO
             if (srcN not in knocked_out_nodes) and (dstN not in knocked_out_nodes):
                 G2.AddEdge(srcN, dstN)
         ## calculate this clone's resilience. default is 100 replicates.
-        my_resilience = np.mean([GraphResilience(G2) for x in range(reps)])
+        ## save memory by using a generator comprehension.
+        my_resilience = sum((GraphResilience(G2) for x in range(reps)))/float(reps)
         print(my_resilience)
         randomized_resilience.append(my_resilience)
     strain_col = ['REL606'] + clone_col
@@ -615,7 +408,8 @@ def resilience_randomized_within_LTEE_pops(LTEE_strain_to_KO_dict, LTEE_strain_t
             if (srcN not in knocked_out_nodes) and (dstN not in knocked_out_nodes):
                 G2.AddEdge(srcN, dstN)
         ## calculate this clone's resilience. default is 100 replicates.
-        my_resilience = np.mean([GraphResilience(G2) for x in range(reps)])
+        ## save memory by using a generator comprehension.
+        my_resilience = sum((GraphResilience(G2) for x in range(reps)))/float(reps)
         print(my_resilience)
         randomized_resilience.append(my_resilience)
     strain_col = ['REL606'] + clone_col
@@ -664,22 +458,18 @@ def main():
     blattner_to_gene_dict = getREL606_blattner_to_gene_dict()
     G1, g_to_node1, node_to_g1 = create_graph_and_dicts(K12_edge_file, nodeSet=blattner_to_gene_dict)
 
-    ## write out 2683 interactions in Cong dataset.
-    ## these are high-quality coevolution predictions, plus
-    ## coevolution interactions that are known, plus
-    ## gold standard interactions in PDB and Ecocyc.
-    good_edge_file = "../results/thermostability/Cong-good-interaction-set.tsv"
-    write_Cong_good_interactions(good_edge_file)
+    ''' take 2683 interactions from the Cong dataset.
+    these are high-quality coevolution predictions, plus
+    coevolution interactions that are known, plus
+    gold standard interactions in PDB and Ecocyc.
+    the information in this file is produced by
+    calc-ppi-network-statistics.py.
+    '''
+    good_edge_f = "../results/thermostability/Cong-good-interaction-set.tsv"
     REL606_genes = getREL606_gene_set()
     ## filter Cong PPI graph based on genes in REL606.
     ## 1191 nodes, 1787 edges in this graph.
-    G2, g_to_node2, node_to_g2 = create_graph_and_dicts(good_edge_file, nodeSet=REL606_genes)
-
-    ## write network statistics to file for analysis in thermostability-analysis.R.
-    G1file = "../results/thermostability/Zitnik_network_statistics.csv"
-    G2file = "../results/thermostability/Cong_network_statistics.csv"
-    ##write_NetworkStatistics(G1, node_to_g1, G1file)
-    ##write_NetworkStatistics(G2, node_to_g2, G2file, use_blattner=False)
+    G2, g_to_node2, node_to_g2 = create_graph_and_dicts(good_edge_f, nodeSet=REL606_genes)
 
     LTEE_knockouts_df = get_LTEE_genome_knockout_muts()
     LTEE_strain_to_knockouts = LTEE_strain_to_KO_genes(LTEE_knockouts_df)
@@ -687,6 +477,9 @@ def main():
     ## Run the resilience analysis, using the graph from Zitnik paper.
     resilience_outf1 = "../results/resilience/Zitnik_PPI_LTEE_genome_resilience.csv"
     resilience_results1 = resilience_analysis_of_LTEE_genomes(LTEE_strain_to_knockouts, G1, g_to_node1, reps=100)
+
+    '''
+
     resilience_results1.to_csv(resilience_outf1)
     ## Run the resilience analysis, using the graph from Cong paper.
     resilience_outf2 = "../results/resilience/Cong_PPI_LTEE_genome_resilience.csv"
@@ -737,6 +530,7 @@ def main():
     withinpop_randomized_resilience2 = resilience_randomized_within_LTEE_pops(LTEE_strain_to_knockouts, LTEE_strain_to_pop, G2, g_to_node2, LTEE_pop_to_KO)
     withinpop_randomized_resilience2.to_csv(withinpop_randomized_outf2)
 
+'''
 
 if __name__ == "__main__":
     main()
