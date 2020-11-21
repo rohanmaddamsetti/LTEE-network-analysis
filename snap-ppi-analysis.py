@@ -164,6 +164,7 @@ def create_graph_and_dicts(edgeFile, col1=0, col2=1, sep=None, nodeSet=None):
                 p2 = c2
             else:
                 raise AssertionError("variable nodeSet must be a set or dict")
+            
             if p1 not in gene_to_node:
                 p1_int = cur_unused_node_int
                 G.AddNode(p1_int)
@@ -652,7 +653,6 @@ def make_LTEE_pop_to_KO_dict(LTEE_strain_to_KO, LTEE_strain_to_pop):
         LTEE_pop_to_KOset[pop].update(clone_KOset)
     return LTEE_pop_to_KOset
 
-
 def main():
 
     ''' Import protein-protein interaction networks from:
@@ -697,11 +697,11 @@ def main():
     ## calculate randomized resilience of genomes, set of all genes in REL606.
     ## for Zitnik network.
     all_genes_randomized_outf1 = "../results/resilience/Zitnik_PPI_all_genes_randomized_resilience.csv"
-    all_genes_randomized_resilience1 = resilience_randomized_over_gene_set(LTEE_strain_to_knockouts, G1, g_to_node1, REL606_genes, reps=100)
+    all_genes_randomized_resilience1 = resilience_randomized_over_gene_set(LTEE_strain_to_knockouts, G1, g_to_node1, REL606_genes)
     all_genes_randomized_resilience1.to_csv(all_genes_randomized_outf1)
     ## for Cong network.
     all_genes_randomized_outf2 = "../results/resilience/Cong_PPI_all_genes_randomized_resilience.csv"
-    all_genes_randomized_resilience2 = resilience_randomized_over_gene_set(LTEE_strain_to_knockouts, G2, g_to_node2, REL606_genes, reps=100)
+    all_genes_randomized_resilience2 = resilience_randomized_over_gene_set(LTEE_strain_to_knockouts, G2, g_to_node2, REL606_genes)
     all_genes_randomized_resilience2.to_csv(all_genes_randomized_outf2)
 
     ## calculate randomized resilience of genomes,
@@ -715,11 +715,11 @@ def main():
 
     ## for Zitnik network.
     acrosspops_randomized_outf1 = "../results/resilience/Zitnik_PPI_across_pops_randomized_resilience.csv"
-    acrosspops_randomized_resilience1 = resilience_randomized_over_gene_set(LTEE_strain_to_knockouts, G1, g_to_node1, all_LTEE_KO_genes, reps=100)
+    acrosspops_randomized_resilience1 = resilience_randomized_over_gene_set(LTEE_strain_to_knockouts, G1, g_to_node1, all_LTEE_KO_genes)
     acrosspops_randomized_resilience1.to_csv(acrosspops_randomized_outf1)
     ## for Cong network.
     acrosspops_randomized_outf2 = "../results/resilience/Cong_PPI_across_pops_randomized_resilience.csv"
-    acrosspops_randomized_resilience2 = resilience_randomized_over_gene_set(LTEE_strain_to_knockouts, G2, g_to_node2, all_LTEE_KO_genes, reps=100)
+    acrosspops_randomized_resilience2 = resilience_randomized_over_gene_set(LTEE_strain_to_knockouts, G2, g_to_node2, all_LTEE_KO_genes)
     acrosspops_randomized_resilience2.to_csv(acrosspops_randomized_outf2)
 
     ## calculate randomized resilience of genomes,
@@ -730,11 +730,11 @@ def main():
     LTEE_pop_to_KO = make_LTEE_pop_to_KO_dict(LTEE_strain_to_knockouts,LTEE_strain_to_pop)
     ## for Zitnik network.
     withinpop_randomized_outf1 = "../results/resilience/Zitnik_PPI_within_pops_randomized_resilience.csv"
-    withinpop_randomized_resilience1 = resilience_randomized_within_LTEE_pops(LTEE_strain_to_knockouts, LTEE_strain_to_pop, G1, g_to_node1, LTEE_pop_to_KO, reps=100)
+    withinpop_randomized_resilience1 = resilience_randomized_within_LTEE_pops(LTEE_strain_to_knockouts, LTEE_strain_to_pop, G1, g_to_node1, LTEE_pop_to_KO)
     withinpop_randomized_resilience1.to_csv(withinpop_randomized_outf1)
     ## for Cong network.
     withinpop_randomized_outf2 = "../results/resilience/Cong_PPI_within_pops_randomized_resilience.csv"
-    withinpop_randomized_resilience2 = resilience_randomized_within_LTEE_pops(LTEE_strain_to_knockouts, LTEE_strain_to_pop, G2, g_to_node2, LTEE_pop_to_KO, reps=100)
+    withinpop_randomized_resilience2 = resilience_randomized_within_LTEE_pops(LTEE_strain_to_knockouts, LTEE_strain_to_pop, G2, g_to_node2, LTEE_pop_to_KO)
     withinpop_randomized_resilience2.to_csv(withinpop_randomized_outf2)
 
 
