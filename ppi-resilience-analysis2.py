@@ -1,7 +1,10 @@
 #!/usr/bin/env python
 
 '''
-snap-ppi-resilience-analysis.py by Rohan Maddamsetti.
+snap-ppi-resilience-analysis2.py by Rohan Maddamsetti.
+
+Re-design so that I can do multiple runs on the HPC,
+for bootstrapping, and then aggregrate results using a separate program.
 
 This script does a resilience analysis of PPI networks in the LTEE genomes 
 published in Tenaillon et al. (2016).
@@ -146,7 +149,7 @@ def ComponentDistributionEntropy(component_dict, N):
     supplement for details.
     '''
     
-    ## assert that the number of nodes in component_dict is consistent with N.
+    ## assert that the num of nodes in component_dict is consistent with N.
     node_num_check = sum([k*v for k,v in component_dict.items()])
     assert node_num_check == N
     
@@ -173,9 +176,13 @@ def GraphResilience(G):
     H_0 = ComponentDistributionEntropy(sscdict, nodes)
     ## initialize a dictionary from failure rate to entropy.
     failure_rate_to_entropy = {0 : H_0}
-    
-    ## copy graph object into G2 so that we don't mess up G as a side-effect.
-    G2 = CopyGraph(G)
+
+    ## make a subgraph G2 to quickly copy G.
+    NIdV = snap.TIntV()
+    for n in G.Nodes():
+        NId = n.GetId()
+        NIdV.Add(NId)
+    G2 = snap.GetSubGraph(G, NIdV)
     
     ## seed random number generator.
     random.seed()
@@ -254,8 +261,6 @@ def resilience_analysis_of_LTEE_genomes(LTEE_strain_to_KO_dict, G, g_to_node, re
 
     ## save memory by using a generator comprehension.
     REL606_resilience = sum((GraphResilience(G) for x in range(reps)))/float(reps)
-    print(REL606_resilience)
-    quit()
     
     clone_col = []
     LTEE_strain_resilience = []
@@ -266,20 +271,15 @@ def resilience_analysis_of_LTEE_genomes(LTEE_strain_to_KO_dict, G, g_to_node, re
         for x in knocked_out_genes:
             if x in g_to_node:
                 knocked_out_nodes.append(g_to_node[x])
-        ## copy starting graph G into G2 so that we don't mess up G as a side-effect.
-        ## when we do so, exclude the genes affected by knockout mutations.
-        G2 = snap.TUNGraph.New(G.GetNodes(),G.GetEdges())
-        ## add nodes.
+
+        ## make a subgraph G2 that omits KO'ed genes.
+        NIdV = snap.TIntV()
         for n in G.Nodes():
-            nId = n.GetId()
-            if nId not in knocked_out_nodes:
-                G2.AddNode(nId)
-        ## add edges.
-        for e in G.Edges():
-            srcN = e.GetSrcNId()
-            dstN = e.GetDstNId()
-            if (srcN not in knocked_out_nodes) and (dstN not in knocked_out_nodes):
-                G2.AddEdge(srcN, dstN)
+            NId = n.GetId()
+            if NId not in knocked_out_genes:
+                NIdV.Add(NId)
+        G2 = snap.GetSubGraph(G, NIdV)
+
         ## calculate this clone's resilience. default is 100 replicates.
         ## save memory by using a generator comprehension.
         my_resilience = sum((GraphResilience(G2) for x in range(reps)))/float(reps)
@@ -310,7 +310,7 @@ def resilience_randomized_over_gene_set(LTEE_strain_to_KO_dict, G, g_to_node, KO
     3) return a DataFrame with the timepoint (Generations), population,
     name, and resilience statistic.
     '''
-    REL606_resilience = np.mean([GraphResilience(G) for x in range(reps)])
+    REL606_resilience = sum((GraphResilience(G) for x in range(reps)))/float(reps)
     ## seed random number generator.
     random.seed()
     clone_col = []
@@ -324,20 +324,14 @@ def resilience_randomized_over_gene_set(LTEE_strain_to_KO_dict, G, g_to_node, KO
         for x in knocked_out_genes:
             if x in g_to_node:
                 knocked_out_nodes.append(g_to_node[x])
-        ## copy starting graph G into G2 so that we don't mess up G as a side-effect.
-        ## when we do so, exclude the genes affected by knockout mutations.
-        G2 = snap.TUNGraph.New(G.GetNodes(),G.GetEdges())
-        ## add nodes.
+        ## make a subgraph G2 that omits KO'ed genes.
+        NIdV = snap.TIntV()
         for n in G.Nodes():
-            nId = n.GetId()
-            if nId not in knocked_out_nodes:
-                G2.AddNode(nId)
-        ## add edges.
-        for e in G.Edges():
-            srcN = e.GetSrcNId()
-            dstN = e.GetDstNId()
-            if (srcN not in knocked_out_nodes) and (dstN not in knocked_out_nodes):
-                G2.AddEdge(srcN, dstN)
+            NId = n.GetId()
+            if NId not in knocked_out_genes:
+                NIdV.Add(NId)
+        G2 = snap.GetSubGraph(G, NIdV)
+        
         ## calculate this clone's resilience. default is 100 replicates.
         ## save memory by using a generator comprehension.
         my_resilience = sum((GraphResilience(G2) for x in range(reps)))/float(reps)
@@ -346,6 +340,8 @@ def resilience_randomized_over_gene_set(LTEE_strain_to_KO_dict, G, g_to_node, KO
     strain_col = ['REL606'] + clone_col
     resilience_col = [REL606_resilience] + randomized_resilience
     resilience_results = pd.DataFrame.from_dict({'strain': strain_col, 'resilience': resilience_col})
+
+    quit()
     return resilience_results
 
 def get_LTEE_metagenomics_knockouts():
@@ -377,7 +373,7 @@ def resilience_randomized_within_LTEE_pops(LTEE_strain_to_KO_dict, LTEE_strain_t
     3) return a DataFrame with the timepoint (Generations), population,
     name, and resilience statistic.
     '''
-    REL606_resilience = np.mean([GraphResilience(G) for x in range(reps)])
+    REL606_resilience = sum((GraphResilience(G) for x in range(reps)))/float(reps)
     ## seed random number generator.
     random.seed()
     clone_col = []
@@ -393,20 +389,15 @@ def resilience_randomized_within_LTEE_pops(LTEE_strain_to_KO_dict, LTEE_strain_t
         for x in knocked_out_genes:
             if x in g_to_node:
                 knocked_out_nodes.append(g_to_node[x])
-        ## copy starting graph G into G2 so that we don't mess up G as a side-effect.
-        ## when we do so, exclude the genes affected by knockout mutations.
-        G2 = snap.TUNGraph.New(G.GetNodes(),G.GetEdges())
-        ## add nodes.
+
+        ## make a subgraph G2 that omits KO'ed genes.
+        NIdV = snap.TIntV()
         for n in G.Nodes():
-            nId = n.GetId()
-            if nId not in knocked_out_nodes:
-                G2.AddNode(nId)
-        ## add edges.
-        for e in G.Edges():
-            srcN = e.GetSrcNId()
-            dstN = e.GetDstNId()
-            if (srcN not in knocked_out_nodes) and (dstN not in knocked_out_nodes):
-                G2.AddEdge(srcN, dstN)
+            NId = n.GetId()
+            if NId not in knocked_out_genes:
+                NIdV.Add(NId)
+        G2 = snap.GetSubGraph(G, NIdV)
+
         ## calculate this clone's resilience. default is 100 replicates.
         ## save memory by using a generator comprehension.
         my_resilience = sum((GraphResilience(G2) for x in range(reps)))/float(reps)
@@ -473,12 +464,11 @@ def main():
 
     LTEE_knockouts_df = get_LTEE_genome_knockout_muts()
     LTEE_strain_to_knockouts = LTEE_strain_to_KO_genes(LTEE_knockouts_df)
-    
+
+    '''
     ## Run the resilience analysis, using the graph from Zitnik paper.
     resilience_outf1 = "../results/resilience/Zitnik_PPI_LTEE_genome_resilience.csv"
     resilience_results1 = resilience_analysis_of_LTEE_genomes(LTEE_strain_to_knockouts, G1, g_to_node1, reps=100)
-
-    '''
 
     resilience_results1.to_csv(resilience_outf1)
     ## Run the resilience analysis, using the graph from Cong paper.
@@ -486,12 +476,17 @@ def main():
     resilience_results2 = resilience_analysis_of_LTEE_genomes(LTEE_strain_to_knockouts, G2, g_to_node2, reps=100)
     ## write results to file.
     resilience_results2.to_csv(resilience_outf2)
+
+    '''
     
     ## calculate randomized resilience of genomes, set of all genes in REL606.
     ## for Zitnik network.
     all_genes_randomized_outf1 = "../results/resilience/Zitnik_PPI_all_genes_randomized_resilience.csv"
     all_genes_randomized_resilience1 = resilience_randomized_over_gene_set(LTEE_strain_to_knockouts, G1, g_to_node1, REL606_genes)
+    '''
     all_genes_randomized_resilience1.to_csv(all_genes_randomized_outf1)
+    
+
     ## for Cong network.
     all_genes_randomized_outf2 = "../results/resilience/Cong_PPI_all_genes_randomized_resilience.csv"
     all_genes_randomized_resilience2 = resilience_randomized_over_gene_set(LTEE_strain_to_knockouts, G2, g_to_node2, REL606_genes)
