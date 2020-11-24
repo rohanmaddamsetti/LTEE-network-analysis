@@ -1,9 +1,5 @@
 ## resilience-analysis.R by Rohan Maddamsetti.
 
-## CRITICAL TODO: for a really fair comparison,
-## I should fix the y-intercept for the linear regressions to
-## the starting resilience value for REL606.
-
 ## CRITICAL TODO: As an additional control analysis,
 ## bootstrap resilience using KO mutations rather than genes, in some way.
 ## The idea here is that genes that are over-represented are probably under

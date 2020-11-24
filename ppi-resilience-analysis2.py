@@ -18,7 +18,6 @@ import numpy as np
 from scipy.integrate import simps
 import pandas as pd
 
-
 def getREL606_column_set(col):
     REL606_ID_file = "../results/REL606_IDs.csv"
     column_set = set()
@@ -49,16 +48,6 @@ def getREL606_column_dict(key_col,val_col):
 def getREL606_blattner_to_gene_dict():
     return getREL606_column_dict(2,0)
 
-def CopyGraph(G):
-    ## copy graph object into G2 so that we don't mess up G as a side-effect.
-    G2 = snap.TUNGraph.New(G.GetNodes(),G.GetEdges())
-    ## add nodes.
-    for n in G.Nodes():
-        G2.AddNode(n.GetId())
-    ## add edges.
-    for e in G.Edges():
-        G2.AddEdge(e.GetSrcNId(),e.GetDstNId())
-    return G2
 
 def create_graph_and_dicts(edgeFile, col1=0, col2=1, sep=None, nodeSet=None):
     ''' 
