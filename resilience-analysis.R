@@ -166,22 +166,22 @@ LTEE.genomes.KO.metadata <- read.csv(
 
 ## Now, Zitnik PPI resilience analysis.
 zitnik.network.resilience.df <- read.network.resilience.df(
-    "../results/resilience/Zitnik_PPI_LTEE_genome_resilience.csv",
+    "../results/resilience/first-run-results/Zitnik_PPI_LTEE_genome_resilience.csv",
     LTEE.genomes.KO.metadata) %>%
     mutate(timeseries = "actual_data")
 
 zitnik.randomized.within <- read.network.resilience.df(
-    "../results/resilience/Zitnik_PPI_within_pops_randomized_resilience.csv",
+    "../results/resilience/first-run-results/Zitnik_PPI_within_pops_randomized_resilience.csv",
     LTEE.genomes.KO.metadata) %>%
     mutate(timeseries = "randomized_within")
 
 zitnik.randomized.across <- read.network.resilience.df(
-    "../results/resilience/Zitnik_PPI_across_pops_randomized_resilience.csv",
+    "../results/resilience/first-run-results/Zitnik_PPI_across_pops_randomized_resilience.csv",
     LTEE.genomes.KO.metadata) %>%
     mutate(timeseries = "randomized_across")
 
 zitnik.randomized.all <- read.network.resilience.df(
-    "../results/resilience/Zitnik_PPI_all_genes_randomized_resilience.csv",
+    "../results/resilience/first-run-results/Zitnik_PPI_all_genes_randomized_resilience.csv",
     LTEE.genomes.KO.metadata) %>%
     mutate(timeseries = "randomized_all")
 
@@ -209,22 +209,22 @@ regression.slope.test(full.zitnik.slope.df, "randomized_all")
 
 ## Now, Cong PPI resilience analysis.
 cong.network.resilience.df <- read.network.resilience.df(
-    "../results/resilience/Cong_PPI_LTEE_genome_resilience.csv",
+    "../results/resilience/first-run-results/Cong_PPI_LTEE_genome_resilience.csv",
     LTEE.genomes.KO.metadata) %>%
     mutate(timeseries = "actual_data")
 
 cong.randomized.within <- read.network.resilience.df(
-    "../results/resilience/Cong_PPI_within_pops_randomized_resilience.csv",
+    "../results/resilience/first-run-results/Cong_PPI_within_pops_randomized_resilience.csv",
     LTEE.genomes.KO.metadata) %>%
     mutate(timeseries = "randomized_within")
 
 cong.randomized.across <- read.network.resilience.df(
-    "../results/resilience/Cong_PPI_across_pops_randomized_resilience.csv",
+    "../results/resilience/first-run-results/Cong_PPI_across_pops_randomized_resilience.csv",
     LTEE.genomes.KO.metadata) %>%
     mutate(timeseries = "randomized_across")
 
 cong.randomized.all <- read.network.resilience.df(
-    "../results/resilience/Cong_PPI_all_genes_randomized_resilience.csv",
+    "../results/resilience/first-run-results/Cong_PPI_all_genes_randomized_resilience.csv",
     LTEE.genomes.KO.metadata) %>%
     mutate(timeseries = "randomized_all")
 
@@ -239,7 +239,7 @@ Fig1.legend <- get_legend(make.big.resilience.plot(big.cong.df, plot.legend=TRUE
 Fig1 <- plot_grid(plot_grid(big.zitnik.plot,big.cong.plot,
                             labels=c('A','B',NULL),nrow=1, rel_widths=c(1,1,0.4)),
                   Fig1.legend,ncol=1, rel_heights=c(1,0.05))
-ggsave("../results/resilience/Fig1.pdf",height=7,width=6)
+ggsave("../results/resilience/figures/Fig1.pdf",height=7,width=6)
 
 cong.slope.df <- calc.resilience.regression.df(cong.network.resilience.df)
 cong.randomized.within.slope.df <- calc.resilience.regression.df(cong.randomized.within)
