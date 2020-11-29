@@ -1,7 +1,7 @@
 ## metabolic-enzymes.R by Rohan Maddamsetti
 
 source("metagenomics-library.R")
-
+library(UpSetR)
 ####################
 ## DATA PREPROCESSING
 
@@ -44,9 +44,6 @@ gene.mutation.data <- read.csv(
                              levels=c(nonmutator.pops,hypermutator.pops))) %>%
     inner_join(REL606.genes) %>%
     filter(Gene!='intergenic')
-
-KO.gene.mutation.data <- gene.mutation.data %>%
-    filter(Annotation %in% c("sv","indel","nonsense"))
 
 #######################################################################
 ## METABOLIC ENZYME ANALYSIS.
@@ -160,6 +157,32 @@ BiGG.core.fig <- BiGG.core.base.layer %>% ## null for BiGG core
     add.cumulative.mut.layer(c.BiGG.core, my.color="black")
 ggsave("../results/metabolic-enzymes/BiGG-core.pdf", BiGG.core.fig)
 
+################
+## Make an UpSet plot to examine set overlap.
+
+## Cite: Jake R Conway, Alexander Lex, Nils Gehlenborg UpSetR:
+## An R Package for the Visualization of Intersecting Sets and their
+## Properties doi: https://doi.org/10.1093/bioinformatics/btx364
+
+## The as.numeric() calls turn TRUE/FALSE to 1/0.
+REL606.UpSet.data <- REL606.genes %>%
+    mutate(`BiGG Core` = Gene %in% BiGG.core$Gene) %>%
+    mutate(`BiGG Core` = as.numeric(`BiGG Core`)) %>%
+    mutate(Superessential = Gene %in% superessential.rxns.df$Gene) %>%
+    mutate(Superessential = as.numeric(Superessential)) %>%
+    mutate(Specialist = Gene %in% specialist.enzymes$Gene) %>%
+    mutate(Specialist = as.numeric(Specialist)) %>%
+    mutate(Generalist = Gene %in% generalist.enzymes$Gene) %>%
+    mutate(Generalist = as.numeric(Generalist))
+
+pdf("../results/metabolic-enzymes/UpSetPlot.pdf",onefile=FALSE)
+upset(REL606.UpSet.data, sets = c("BiGG Core", "Superessential", "Specialist", "Generalist"), mb.ratio = c(0.55, 0.45), order.by = "freq")
+dev.off()
+
+write.csv(REL606.UpSet.data,file="../results/metabolic-enzymes/TableS1.csv")
+
+################
+
 ## can I come up with a good explanation for the idiosyncratic patterns
 ## of purifying selection on these sets of metabolic enzymes, across LTEE
 ## populations? Anything that's testable? Check out and cite Tim Cooper's
@@ -167,3 +190,6 @@ ggsave("../results/metabolic-enzymes/BiGG-core.pdf", BiGG.core.fig)
 
 ## One guess: pykF knockout is why superessential genes are under strong
 ## purifying selection in Ara-1, but not the other pops.
+## But note that pykF is NOT superessential, however!
+
+
