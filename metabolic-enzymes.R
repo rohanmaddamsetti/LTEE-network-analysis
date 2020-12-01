@@ -1,4 +1,7 @@
 ## metabolic-enzymes.R by Rohan Maddamsetti
+## In short, there looks like there is idiosyncratic purifying selection on
+## core metabolic networks (superessential reactions and specialist enzymes)
+## in the LTEE.
 
 source("metagenomics-library.R")
 library(UpSetR)
@@ -40,49 +43,124 @@ gene.mutation.data <- read.csv(
     header=TRUE,as.is=TRUE) %>%
     mutate(Generation=t0/10000) %>%
     ## This for changing the ordering of populations in plots.
-    mutate(Population=factor(Population,
-                             levels=c(nonmutator.pops,hypermutator.pops))) %>%
+    mutate(Population = factor(
+               Population,
+               levels = c(nonmutator.pops, hypermutator.pops))) %>%
     inner_join(REL606.genes) %>%
     filter(Gene!='intergenic')
 
-#######################################################################
+
+## To simplify figure presentation, put the hypermutator results
+## in the main text, and the nonmutator results in the supplement.
+hypermutator.data <- gene.mutation.data %>%
+    filter(Population %in% hypermutator.pops) %>%
+    ## This for changing the ordering of populations in plots.
+    mutate(Population = factor(Population,
+                             levels = hypermutator.pops))
+
+nonmutator.data <- gene.mutation.data %>%
+    filter(Population %in% nonmutator.pops) %>%
+    ## This for changing the ordering of populations in plots.
+    mutate(Population=factor(Population,
+                             levels = nonmutator.pops))
+
+########################################################
 ## METABOLIC ENZYME ANALYSIS.
 ########################################################
 
-## Some analyses in this vein have already been published in:
-## Metabolic Determinants of Enzyme Evolution in a Genome-Scale Bacterial Metabolic Network
-## by Jose Aguilar-Rodriguez and Andreas Wagner.
+## Run STIMS on BiGG Models E. coli core.
+## Hypothesis: E. coli core metabolism
+## is evolving under purifying selection in the LTEE.
 
-## Only Ara-1 and Ara+6 show evidence of purifying selection on
-## superessential metabolic enzymes. Why only these two? No idea why.
+BiGG.core <- read.csv("../results/metabolic-enzymes/BiGG-Model-Ecoli_core.csv") %>%
+    mutate(blattner = BiGG.ID) %>%
+    left_join(REL606.genes)
 
-## In short, there looks like there is idiosyncratic purifying selection on
-## core metabolic networks (superessential reactions and specialist enzymes)
-## in the LTEE. Results depend on the population, and are not consistent across
-## populations.
+## plot just the hypermutator populations.
+BiGG.core.hypermut.data <- hypermutator.data %>%
+    filter(Gene %in% BiGG.core$Gene)
 
-## Report these findings in the main text, but keep it brief, and put all STIMS
-## figures into the Supplement.
+c.BiGG.core.hypermut <- calc.cumulative.muts(
+    BiGG.core.hypermut.data,
+    BiGG.core,
+    manual.pop.levels.vec = hypermutator.pops)
 
+Fig1A <- plot.base.layer(
+    hypermutator.data,
+    REL606.genes,
+    subset.size = length(unique(BiGG.core$Gene)),
+    manual.pop.levels.vec = hypermutator.pops,
+    plot.rows = 2) %>%
+    add.cumulative.mut.layer(c.BiGG.core.hypermut, my.color="black") +
+    ggtitle("BiGG core metabolic enzymes")
+
+## plot just the nonmutator populations.
+BiGG.core.nonmut.data <- nonmutator.data %>%
+    filter(Gene %in% BiGG.core$Gene)
+
+c.BiGG.core.nonmut <- calc.cumulative.muts(
+    BiGG.core.nonmut.data,
+    BiGG.core,
+    manual.pop.levels.vec = nonmutator.pops)
+
+S1FigA <- plot.base.layer(
+    nonmutator.data,
+    REL606.genes,
+    subset.size = length(unique(BiGG.core$Gene)),
+    manual.pop.levels.vec = nonmutator.pops,
+    plot.rows = 2) %>%
+    add.cumulative.mut.layer(c.BiGG.core.nonmut, my.color="black") +
+    ggtitle("BiGG core metabolic enzymes")
+    
+## calculate formal p-values.
+##BiGG.core.pvals <- calc.traj.pvals(gene.mutation.data, REL606.genes, unique(BiGG.core$Gene))
+
+#####################################################################################
 ## examine superessential metabolic reactions reported by Barve and Wagner (2012).
-superessential.rxns.df <- read.csv("../results/metabolic-enzymes/Barve2012-S6-superessential.csv")
+superessential.rxns.df <- read.csv("../results/metabolic-enzymes/Barve2012-S6-superessential.csv") %>% inner_join(REL606.genes)
 
-superessential.mut.data <- gene.mutation.data %>%
+## plot just the hypermutator populations.
+superessential.hypermut.data <- hypermutator.data %>%
     filter(Gene %in% superessential.rxns.df$Gene)
 
-c.superessential <- calc.cumulative.muts(superessential.mut.data)
+c.superessential.hypermut <- calc.cumulative.muts(
+    superessential.hypermut.data,
+    superessential.rxns.df,
+    manual.pop.levels.vec = hypermutator.pops)
 
-superessential.base.layer <- plot.base.layer(
-    gene.mutation.data,
-    subset.size=length(unique(superessential.rxns.df$Gene)))
+Fig1B <- plot.base.layer(
+    hypermutator.data,
+    REL606.genes,
+    subset.size = length(unique(superessential.rxns.df$Gene)),
+    manual.pop.levels.vec = hypermutator.pops,
+    plot.rows = 2,
+    my.color = "pink") %>%
+    add.cumulative.mut.layer(c.superessential.hypermut, my.color="red") +
+    ggtitle("Superessential metabolic enzymes")
 
-## plot of superessential metabolic enzymes analysis
-superessential.fig <- superessential.base.layer %>% 
-    add.cumulative.mut.layer(c.superessential, my.color="black")
-ggsave("../results/metabolic-enzymes/superessential.pdf", superessential.fig)
+ggsave("../results/metabolic-enzymes/Fig1B.pdf",Fig1B)
+
+## plot just the nonmutator populations.
+superessential.nonmut.data <- nonmutator.data %>%
+    filter(Gene %in% superessential.rxns.df$Gene)
+
+c.superessential.nonmut <- calc.cumulative.muts(
+    superessential.nonmut.data,
+    superessential.rxns.df,
+    manual.pop.levels.vec = nonmutator.pops)
+
+S1FigB <- plot.base.layer(
+    nonmutator.data,
+    REL606.genes,
+    subset.size = length(unique(superessential.rxns.df$Gene)),
+    manual.pop.levels.vec = nonmutator.pops,
+    plot.rows = 2,
+    my.color = "pink") %>%
+    add.cumulative.mut.layer(c.superessential.nonmut, my.color="red") +
+    ggtitle("Superessential metabolic enzymes")
 
 ## calculate formal p-values.
-superessential.pvals <- calc.traj.pvals(gene.mutation.data, unique(superessential.rxns.df$Gene))
+##superessential.pvals <- calc.traj.pvals(gene.mutation.data, REL606.genes, unique(superessential.rxns.df$Gene))
 ## results:
 ## A tibble: 12 x 3
 ##   Population count p.val
@@ -101,7 +179,18 @@ superessential.pvals <- calc.traj.pvals(gene.mutation.data, unique(superessentia
 ##12 Ara+6       9933 0.993
 
 ################################################################
-## look at specialist and generalist enzymes in Nam et al. (2012):
+## Figure 1 combines the BiGG core and superessential gene results
+## for hypermutators.
+Fig1 <- plot_grid(Fig1A, Fig1B, labels=c('A','B'),nrow=2)
+save_plot("../results/metabolic-enzymes/Fig1.pdf",Fig1, base_height=7,base_asp=1)
+
+## Supplementary Figure S1 combines the BiGG and superessential gene
+## results for nonmutators.
+S1Fig <- plot_grid(S1FigA, S1FigB, labels=c('A','B'),nrow=2)
+save_plot("../results/metabolic-enzymes/S1Fig.pdf",S1Fig, base_height=7,base_asp=1)
+
+################################################################
+## Look at specialist and generalist enzymes in Nam et al. (2012):
 ## Network context and selection in the evolution of enzyme specificity.
 
 ## 1157 genes.
@@ -111,51 +200,91 @@ Nam.df <- read.csv("../results/metabolic-enzymes/Nam2012_Database_S1.csv") %>%
 specialist.enzymes <- Nam.df %>% filter(Class=="Spec.")
 generalist.enzymes <- Nam.df %>% filter(Class=="Gen.")
 
-specialist.mut.data <- gene.mutation.data %>%
+## plot just the hypermutator populations.
+specialist.hypermut.data <- hypermutator.data %>%
     filter(Gene %in% specialist.enzymes$Gene)
-c.specialists <- calc.cumulative.muts(specialist.mut.data)
 
-generalist.mut.data <- gene.mutation.data %>%
+c.specialists.hypermut <- calc.cumulative.muts(
+    specialist.hypermut.data,
+    specialist.enzymes,
+    manual.pop.levels.vec = hypermutator.pops)
+
+generalist.hypermut.data <- hypermutator.data %>%
     filter(Gene %in% generalist.enzymes$Gene)
-c.generalists <- calc.cumulative.muts(generalist.mut.data)
 
-specialist.base.layer <- plot.base.layer(
-    gene.mutation.data,
-    subset.size=length(unique(specialist.enzymes$Gene)))
+c.generalists.hypermut <- calc.cumulative.muts(
+    generalist.hypermut.data,
+    generalist.enzymes,
+    manual.pop.levels.vec = hypermutator.pops)
 
-generalist.base.layer <- plot.base.layer(
-    gene.mutation.data,
-    subset.size=length(unique(generalist.enzymes$Gene)))
+Fig2A <- plot.base.layer(
+    hypermutator.data,
+    REL606.genes,
+    subset.size=length(unique(specialist.enzymes$Gene)),
+    manual.pop.levels.vec = hypermutator.pops,
+    plot.rows = 2,
+    my.color = "plum1") %>%
+    add.cumulative.mut.layer(c.specialists.hypermut, my.color="darkorchid4") +
+    ggtitle("Specialist enzymes")
 
-## specialist fig.
-specialist.fig <- specialist.base.layer %>% ## null for specialists
-    add.cumulative.mut.layer(c.specialists, my.color="black")
-ggsave("../results/metabolic-enzymes/specialist.pdf", specialist.fig)
+Fig2B <- plot.base.layer(
+    hypermutator.data,
+    REL606.genes,
+    subset.size=length(unique(generalist.enzymes$Gene)),
+    manual.pop.levels.vec = hypermutator.pops,
+    plot.rows = 2,
+    my.color = "darkolivegreen1") %>%
+    add.cumulative.mut.layer(c.generalists.hypermut, my.color="springgreen4") +
+    ggtitle("Generalist enzymes")
 
-generalist.fig <- generalist.base.layer %>% ## null for generalists
-    add.cumulative.mut.layer(c.generalists, my.color="black")
-ggsave("../results/metabolic-enzymes/generalist.pdf", generalist.fig)
+Fig2 <- plot_grid(Fig2A, Fig2B, labels=c('A','B'),nrow=2)
+save_plot("../results/metabolic-enzymes/Fig2.pdf",Fig2, base_height=7,base_asp=1)
 
-#####################################################################################
-## Run STIMS on BiGG Models E. coli core. Hypothesis: E. coli core metabolism
-## is evolving under purifying selection in the LTEE.
+## plot just the nonmutator populations.
+specialist.nonmut.data <- nonmutator.data %>%
+    filter(Gene %in% specialist.enzymes$Gene)
 
-BiGG.core <- read.csv("../results/metabolic-enzymes/BiGG-Model-Ecoli_core.csv") %>%
-    mutate(blattner = BiGG.ID) %>%
-    left_join(REL606.genes)
+c.specialists.nonmut <- calc.cumulative.muts(
+    specialist.nonmut.data,
+    specialist.enzymes,
+    manual.pop.levels.vec = nonmutator.pops)
 
-BiGG.core.mut.data <- gene.mutation.data %>%
-    filter(Gene %in% BiGG.core$Gene)
-c.BiGG.core <- calc.cumulative.muts(BiGG.core.mut.data)
+generalist.nonmut.data <- nonmutator.data %>%
+    filter(Gene %in% generalist.enzymes$Gene)
 
-BiGG.core.base.layer <- plot.base.layer(
-    gene.mutation.data,
-    subset.size=length(unique(BiGG.core$Gene)))
+c.generalists.nonmut <- calc.cumulative.muts(
+    generalist.nonmut.data,
+    generalist.enzymes,
+    manual.pop.levels.vec = nonmutator.pops)
 
-## BiGG core fig.
-BiGG.core.fig <- BiGG.core.base.layer %>% ## null for BiGG core
-    add.cumulative.mut.layer(c.BiGG.core, my.color="black")
-ggsave("../results/metabolic-enzymes/BiGG-core.pdf", BiGG.core.fig)
+S2FigA <- plot.base.layer(
+    nonmutator.data,
+    REL606.genes,
+    subset.size=length(unique(specialist.enzymes$Gene)),
+    manual.pop.levels.vec = nonmutator.pops,
+    plot.rows = 2,
+    my.color = "plum1") %>%
+    add.cumulative.mut.layer(c.specialists.nonmut, my.color="darkorchid4") +
+    ggtitle("Specialist enzymes")
+
+S2FigB <- plot.base.layer(
+    nonmutator.data,
+    REL606.genes,
+    subset.size=length(unique(generalist.enzymes$Gene)),
+    manual.pop.levels.vec = nonmutator.pops,
+    plot.rows = 2,
+    my.color = "darkolivegreen1") %>%
+    add.cumulative.mut.layer(c.generalists.nonmut, my.color="springgreen4") +
+    ggtitle("Generalist enzymes")
+
+S2Fig <- plot_grid(S2FigA, S2FigB, labels=c('A','B'),nrow=2)
+save_plot("../results/metabolic-enzymes/S2Fig.pdf",S2Fig, base_height=7,base_asp=1)
+
+## calculate formal p-values.
+##specialist.pvals <- calc.traj.pvals(gene.mutation.data, unique(specialist.enzymes$Gene))
+##generalist.pvals <- calc.traj.pvals(gene.mutation.data, unique(generalist.enzymes$Gene))
+
+
 
 ################
 ## Make an UpSet plot to examine set overlap.
@@ -175,21 +304,9 @@ REL606.UpSet.data <- REL606.genes %>%
     mutate(Generalist = Gene %in% generalist.enzymes$Gene) %>%
     mutate(Generalist = as.numeric(Generalist))
 
-pdf("../results/metabolic-enzymes/UpSetPlot.pdf",onefile=FALSE)
-upset(REL606.UpSet.data, sets = c("BiGG Core", "Superessential", "Specialist", "Generalist"), mb.ratio = c(0.55, 0.45), order.by = "freq")
+pdf("../results/metabolic-enzymes/Fig3.pdf",onefile=FALSE)
+upset(REL606.UpSet.data, sets = c("BiGG Core", "Superessential", "Specialist", "Generalist"), mb.ratio = c(0.7, 0.3), order.by = "freq", text.scale=2)
 dev.off()
 
 write.csv(REL606.UpSet.data,file="../results/metabolic-enzymes/TableS1.csv")
-
-################
-
-## can I come up with a good explanation for the idiosyncratic patterns
-## of purifying selection on these sets of metabolic enzymes, across LTEE
-## populations? Anything that's testable? Check out and cite Tim Cooper's
-## recent paper on pykF and epistasis.
-
-## One guess: pykF knockout is why superessential genes are under strong
-## purifying selection in Ara-1, but not the other pops.
-## But note that pykF is NOT superessential, however!
-
 
