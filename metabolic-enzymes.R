@@ -113,7 +113,25 @@ S1FigA <- plot.base.layer(
     ggtitle("BiGG core metabolic enzymes")
     
 ## calculate formal p-values.
-##BiGG.core.pvals <- calc.traj.pvals(gene.mutation.data, REL606.genes, unique(BiGG.core$Gene))
+BiGG.core.pvals <- calc.traj.pvals(gene.mutation.data, REL606.genes, unique(BiGG.core$Gene))
+
+## results:
+##  > BiGG.core.pvals
+##  # A tibble: 12 x 3
+##    Population count p.val
+##    <fct>      <int> <dbl>
+##  1 Ara-5       3118 0.312
+##  2 Ara-6       2079 0.208
+##  3 Ara+1       7836 0.784
+##  4 Ara+2       4072 0.407
+##  5 Ara+4       6300 0.63 
+##  6 Ara+5       2438 0.244
+##  7 Ara-1       9502 0.950
+##  8 Ara-2       7084 0.708
+##  9 Ara-3       1340 0.134
+## 10 Ara-4       9342 0.934
+## 11 Ara+3       9647 0.965
+## 12 Ara+6       9967 0.997
 
 #####################################################################################
 ## examine superessential metabolic reactions reported by Barve and Wagner (2012).
@@ -160,23 +178,25 @@ S1FigB <- plot.base.layer(
     ggtitle("Superessential metabolic enzymes")
 
 ## calculate formal p-values.
-##superessential.pvals <- calc.traj.pvals(gene.mutation.data, REL606.genes, unique(superessential.rxns.df$Gene))
+superessential.pvals <- calc.traj.pvals(gene.mutation.data, REL606.genes, unique(superessential.rxns.df$Gene))
+
 ## results:
-## A tibble: 12 x 3
-##   Population count p.val
-##   <fct>      <int> <dbl>
-## 1 Ara-5       6363 0.636
-## 2 Ara-6       9150 0.915
-## 3 Ara+1       8365 0.836
-## 4 Ara+2       6800 0.68 
-## 5 Ara+4       8913 0.891
-## 6 Ara+5       1892 0.189
-## 7 Ara-1       9999 1.00 
-## 8 Ara-2       6484 0.648
-## 9 Ara-3       6178 0.618
-##10 Ara-4       8766 0.877
-##11 Ara+3       5669 0.567
-##12 Ara+6       9933 0.993
+## > superessential.pvals
+## # A tibble: 12 x 3
+##    Population count p.val
+##    <fct>      <int> <dbl>
+##  1 Ara-5       6279 0.628
+##  2 Ara-6       9133 0.913
+##  3 Ara+1       8249 0.825
+##  4 Ara+2       6725 0.672
+##  5 Ara+4       8841 0.884
+##  6 Ara+5       1976 0.198
+##  7 Ara-1       9999 1.00 
+##  8 Ara-2       6319 0.632
+##  9 Ara-3       5968 0.597
+## 10 Ara-4       8560 0.856
+## 11 Ara+3       5476 0.548
+## 12 Ara+6       9902 0.990
 
 ################################################################
 ## Figure 1 combines the BiGG core and superessential gene results
@@ -281,10 +301,43 @@ S2Fig <- plot_grid(S2FigA, S2FigB, labels=c('A','B'),nrow=2)
 save_plot("../results/metabolic-enzymes/S2Fig.pdf",S2Fig, base_height=7,base_asp=1)
 
 ## calculate formal p-values.
-##specialist.pvals <- calc.traj.pvals(gene.mutation.data, unique(specialist.enzymes$Gene))
-##generalist.pvals <- calc.traj.pvals(gene.mutation.data, unique(generalist.enzymes$Gene))
+specialist.pvals <- calc.traj.pvals(gene.mutation.data, REL606.genes, unique(specialist.enzymes$Gene))
+## results:
+## > specialist.pvals
+## # A tibble: 12 x 3
+##    Population count p.val
+##    <fct>      <int> <dbl>
+##  1 Ara-5       2349 0.235
+##  2 Ara-6       8521 0.852
+##  3 Ara+1       9900 0.99 
+##  4 Ara+2       9649 0.965
+##  5 Ara+4       8247 0.825
+##  6 Ara+5       9379 0.938
+##  7 Ara-1       5472 0.547
+##  8 Ara-2       4766 0.477
+##  9 Ara-3       9266 0.927
+## 10 Ara-4       9506 0.951
+## 11 Ara+3       7796 0.780
+## 12 Ara+6      10000 1    
 
-
+generalist.pvals <- calc.traj.pvals(gene.mutation.data, REL606.genes, unique(generalist.enzymes$Gene))
+## results:
+## > generalist.pvals
+## # A tibble: 12 x 3
+##    Population count  p.val
+##    <fct>      <int>  <dbl>
+##  1 Ara-5       7166 0.717 
+##  2 Ara-6       4566 0.457 
+##  3 Ara+1       6108 0.611 
+##  4 Ara+2       4316 0.432 
+##  5 Ara+4       4127 0.413 
+##  6 Ara+5        277 0.0277
+##  7 Ara-1       9993 0.999 
+##  8 Ara-2       7243 0.724 
+##  9 Ara-3       3413 0.341 
+## 10 Ara-4       6764 0.676 
+## 11 Ara+3       7066 0.707 
+## 12 Ara+6       8988 0.899 
 
 ################
 ## Make an UpSet plot to examine set overlap.
@@ -309,4 +362,3 @@ upset(REL606.UpSet.data, sets = c("BiGG Core", "Superessential", "Specialist", "
 dev.off()
 
 write.csv(REL606.UpSet.data,file="../results/metabolic-enzymes/TableS1.csv")
-

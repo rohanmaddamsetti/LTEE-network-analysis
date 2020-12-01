@@ -77,7 +77,6 @@ calc.cumulative.muts <- function(d, d.metadata, manual.pop.levels.vec=NA,
     ## in the given module (in d.metadata).
     my.genes <- d.metadata %>% dplyr::select(Gene, gene_length) %>% distinct()
     normalization.constant <- sum(my.genes$gene_length)
-
     
     c.dat <- map_dfr(.x=levels(d$Population),
                      .f=cumsum.per.pop.helper.func) %>%
@@ -209,13 +208,6 @@ plot.base.layer <- function(data, REL606.genes, subset.size=50, N=1000, alphaval
         filter(is.na(in.top)) %>%
         filter(is.na(in.bottom)) %>%
         dplyr::select(-in.top,-in.bottom)
-
-    ## hack to remove unwanted Population levels from the plot.
- ##   if (!any(is.na(manual.pop.levels.vec))) {
- ##       filtered.trajectories <- filtered.trajectories %>%
- ##           filter(Population %in% manual.pop.levels.vec) %>%
- ##           mutate(Population = factor(Population, levels=manual.pop.levels.vec))
- ##   }
     
     p <- ggplot(filtered.trajectories,aes(x=Generation,y=normalized.cs)) +
         ylab('Cumulative mutations (normalized)') +
