@@ -3,11 +3,42 @@
 '''
 ppi-resilience-analysis2.py by Rohan Maddamsetti.
 
-Re-design so that I can do multiple runs on the HPC,
-for bootstrapping, and then aggregrate results using a separate program.
-
 This script does a resilience analysis of PPI networks in the LTEE genomes 
 published in Tenaillon et al. (2016).
+
+I enforce the condition that the 'real' genome KOs are a subset of the KO 
+mutations that are annotated for that population in the LTEE metagenomic data.
+
+Why do this?
+
+In the LTEE metagenomics data, multi-gene mutations are always annotated with a
+single gene (the 'leftmost' gene at the boundary).
+This means that multi-gene deletions are mapped to single genes!
+
+Therefore, many genes that are deleted in the LTEE genomes dataset
+(Tenaillon et al. 2016) are missing from the LTEE metagenomics annotation.
+
+Given the limitations in using the annotated genes in the LTEE metagenomics data
+for sampling randomized genes to knock out, my solution is to enforce the
+above condition: all genes KO'ed in a genome must be KO'ed in the metagenomics
+mutation annotation for that population.
+
+A second critical assumption of this data analysis is that the level of analysis
+is focused on sets of genes that are KO'ed-- and not sets of mutations.
+What are the consequences of this assumption? For one, multi-gene deletions
+break consecutive genes. When sampling genes without replacement to be KO'ed
+in randomized genomes, it is unlikely to sample a block of KO'ed genes.
+This choice for how to randomize genomes may affect the results, 
+by breaking up the 'block' structure of multi-gene deletions.
+This may be salient if genes may preferentially interact with nearby genes
+(say, for genes in an operon), such that knocking out a block of X genes is expected to have
+less of an effect on PPI network resilience than knocking out X genes across the genome.
+
+My decision to restrict the 'real' genomes KOs to the genes that are KO'ed in the
+relevant population's metagenomic data should temper the consequences of this
+second critical assumption-- since blocks of deleted genes are effectively
+removed from the LTEE genomes, when enforcing consistency with the metagenomic annotation.
+
 '''
 
 ## check if we are on the Duke Compute Cluster.
@@ -79,28 +110,39 @@ def get_LTEE_genome_knockout_muts():
     return LTEE_knockout_muts
 
 
-def LTEE_strain_to_KO_genes(LTEE_knockout_muts):
-    ''' return a dict of LTEE strain to set of knocked out genes in that strain.'''
-    LTEE_strain_KO_dict = {}
-    ## 250 out of 264 genomes have knockout mutations.
-    LTEE_genome_metadata = LTEE_knockout_muts[['treatment','population','time','strain','clone','mutator_status']].drop_duplicates()
-    LTEE_strains = list(LTEE_genome_metadata['strain'])
-    for clone in LTEE_strains:
-        clone_knockout_muts = LTEE_knockout_muts[LTEE_knockout_muts['strain']==clone]
-        ## remove square brackets from each gene string in the column, split into a list of entries (which are lists),
-        KO_list_of_lists = [x.replace('[', '').replace(']','').split(',') for x in clone_knockout_muts['gene_list']]
-        ## and then flatten the list of lists into a set of knocked out genes.
-        knocked_out_genes = {item for sublist in KO_list_of_lists for item in sublist}
-        LTEE_strain_KO_dict[clone] = knocked_out_genes
-    return LTEE_strain_KO_dict
+def make_LTEE_pop_to_metagenomic_KO_dict():
+    ''' 
+    Import csv of LTEE metagenomics data, and
+    return a dict of population to the set of genes affected by knockout mutations
+    in the metagenomics annotation.
+    knockout mutations are: nonsense SNPs, small indels, and structural variants (sv).
+    '''
+    KO_mut_classes = ["nonsense","indel","sv"]
+    
+    LTEE_pop_to_metagenomic_KO_dict = {}
+    with open("../results/LTEE-metagenome-mutations.csv", "r") as fh:
+        for i, line in enumerate(fh):
+            if i == 0: continue ## skip header
+            line = line.strip()
+            fields = line.split(',')
+            population = fields[0]
+            gene = fields[2]
+            annotation = fields[4]
+            if annotation not in KO_mut_classes: continue
+            if population not in LTEE_pop_to_metagenomic_KO_dict:
+                ## then initialize the key:value pair.
+                LTEE_pop_to_metagenomic_KO_dict[population] = set()
+            else: ## then add the gene to the set of KO'ed genes.
+                LTEE_pop_to_metagenomic_KO_dict[population].update(set(gene))    
+    return LTEE_pop_to_metagenomic_KO_dict
 
 
 def get_LTEE_metagenomics_knockouts():
     ''' 
     Import csv of LTEE metagenomics data, and
     return a list of genes affected by knockout mutations.
-    knockout mutations are: nonsense SNPs, small indels, mobile element insertions, and large deletions.
-'''
+    knockout mutations are: nonsense SNPs, small indels, and structural variants (sv).
+    '''
     LTEE_metagenomics_df = pd.read_csv("../results/LTEE-metagenome-mutations.csv")
     KO_mut_classes = ["nonsense","indel","sv"]
     KO_df = LTEE_metagenomics_df[LTEE_metagenomics_df.Annotation.isin(KO_mut_classes)]
@@ -116,6 +158,27 @@ def make_LTEE_strain_to_pop_dict(LTEE_knockout_muts):
     matching_pops = list(LTEE_genome_metadata['population'])
     LTEE_strain_to_pop = {x:y for x,y in zip(LTEE_strains, matching_pops)}
     return LTEE_strain_to_pop
+
+
+def LTEE_strain_to_KO_genes(LTEE_knockout_muts, LTEE_pop_to_KO_dict):
+    ''' return a dict of LTEE strain to set of knocked out genes in that strain.
+    IMPORTANT: filter those genes by the genes that are annotated as being affected
+    by KO mutations in the strain's population in the LTEE metagenomic data.
+    '''
+    LTEE_strain_KO_dict = {}
+    ## 250 out of 264 genomes have knockout mutations.
+    LTEE_genome_metadata = LTEE_knockout_muts[['treatment','population','time','strain','clone','mutator_status']].drop_duplicates()
+    LTEE_strains = list(LTEE_genome_metadata['strain'])
+    for clone in LTEE_strains:
+        clone_knockout_muts = LTEE_knockout_muts[LTEE_knockout_muts['strain']==clone]
+        ## remove square brackets from each gene string in the column, split into a list of entries (which are lists),
+        KO_list_of_lists = [x.replace('[', '').replace(']','').split(',') for x in clone_knockout_muts['gene_list']]
+        ## and then flatten the list of lists into a set of knocked out genes.
+        knocked_out_genes = {item for sublist in KO_list_of_lists for item in sublist}
+        pop = clone_knockout_muts['population'].drop_duplicates().item()
+        filtered_knocked_out_genes = {x for x in knocked_out_genes if x in LTEE_pop_to_KO_dict[pop]}
+        LTEE_strain_KO_dict[clone] = filtered_knocked_out_genes
+    return LTEE_strain_KO_dict
 
 
 def make_LTEE_pop_to_KO_dict(LTEE_strain_to_KO, LTEE_strain_to_pop, weighted=True):
@@ -393,9 +456,14 @@ def main():
     random.seed() ## seed the random number generator.
     outdir = "../results/resilience/resilience-analysis-runs/"
     REL606_genes = get_REL606_gene_set()
-    LTEE_knockouts_df = get_LTEE_genome_knockout_muts()
-    LTEE_strain_to_knockouts = LTEE_strain_to_KO_genes(LTEE_knockouts_df)
-    LTEE_strain_to_pop =  make_LTEE_strain_to_pop_dict(LTEE_knockouts_df)
+    LTEE_pop_to_metagenomic_KO_dict = make_LTEE_pop_to_metagenomic_KO_dict()
+    raw_LTEE_knockouts_df = get_LTEE_genome_knockout_muts()
+    ## now enforce the condition that KOs in the genomes are a subset of
+    ## KOs in each population in the metagenomics.
+    LTEE_strain_to_knockouts = LTEE_strain_to_KO_genes(raw_LTEE_knockouts_df,
+                                                       LTEE_pop_to_metagenomic_KO_dict)
+    LTEE_strain_to_pop =  make_LTEE_strain_to_pop_dict(raw_LTEE_knockouts_df)
+
     LTEE_metagenomics_KO_genes = get_LTEE_metagenomics_knockouts()
     LTEE_genomics_KO_genes = set()
     for clone_KOset in LTEE_strain_to_knockouts.values():
