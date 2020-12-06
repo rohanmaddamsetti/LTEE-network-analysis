@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 '''
-snap-ppi-resilience-analysis2.py by Rohan Maddamsetti.
+ppi-resilience-analysis2.py by Rohan Maddamsetti.
 
 Re-design so that I can do multiple runs on the HPC,
 for bootstrapping, and then aggregrate results using a separate program.
@@ -10,14 +10,29 @@ This script does a resilience analysis of PPI networks in the LTEE genomes
 published in Tenaillon et al. (2016).
 '''
 
+## check if we are on the Duke Compute Cluster.
+## if so, then import the path to SWIG so that I can import snap.
+from os.path import join, exists
+import sys
+dcc_swig_path = "/opt/apps/rhel7/swig-4.0.2/swig"
+if exists(dcc_swig_path): sys.path.append(dcc_swig_path)
+
+## if running as part of a SLURM job array, get the task ID.
+## otherwise set it to the default value '999'.
+import os
+try:
+    taskID = os.environ['SLURM_ARRAY_TASK_ID']
+except:
+    taskID = '999'
+
 import snap
 from math import log
-from os.path import join
 import random
 import numpy as np
 from scipy.integrate import simps
 import pandas as pd
 import argparse
+
 
 def get_REL606_column_set(col):
     REL606_ID_file = "../results/REL606_IDs.csv"
@@ -325,7 +340,15 @@ def resilience_df(LTEE_strain_to_KO_dict, G, g_to_node, KO_list=None,
             LTEE population from which the focal clone was isolated
             (preserving the same number of KOs as in the actual genomes).'''
             pop = LTEE_strain_to_pop_dict[clone]
-            knocked_out_genes = random.sample(pop_to_KO_dict[pop], KOsamplesize)
+            ## DEBUGGING CODE HERE.
+            try:
+                knocked_out_genes = random.sample(pop_to_KO_dict[pop], KOsamplesize)
+            except:
+                print("clone:",clone)
+                print("population:", pop)
+                print("actual_KO_set:", actual_KO_set)
+                print("KOsamplesize:",KOsamplesize)
+                print("pop_to_KO_dict[pop]:", pop_to_KO_dict[pop])
         elif ((KO_list is None) and
               (LTEE_strain_to_pop_dict is None) and
               (pop_to_KO_dict is None)):
@@ -354,6 +377,11 @@ def resilience_df(LTEE_strain_to_KO_dict, G, g_to_node, KO_list=None,
     resilience_results = pd.DataFrame.from_dict({'strain': strain_col, 'resilience': resilience_col})
     return resilience_results
 
+def outf_path(outdir, outf_name, taskID):
+    outf = outf_name + "_Rep" + taskID + ".csv"
+    outf_path = outdir + outf
+    return outf_path
+    
 def main():
 
     parser = argparse.ArgumentParser(description='Provide integer for analysis to run.')
@@ -396,16 +424,16 @@ def main():
     if args.analysis == 1: 
         ## analyze the resilience of evolved LTEE genomes.
         if args.dataset == "zitnik":
-            outf = outdir + "Zitnik_PPI_LTEE_genome_resilience.csv"
+            outf = outf_path(outdir, "Zitnik_PPI_LTEE_genome_resilience", taskID)
         else:
-            outf = outdir + "Cong_PPI_LTEE_genome_resilience.csv"            
+            outf = outf_path(outdir, "Cong_PPI_LTEE_genome_resilience", taskID)
         results = resilience_df(LTEE_strain_to_knockouts, G, g_to_node)
     elif args.analysis == 2:
         ## calculate randomized resilience of genomes, set of all genes in REL606.
         if args.dataset == "zitnik":
-            outf = outdir + "Zitnik_PPI_all_genes_randomized_resilience.csv"
+            outf = outf_path(outdir, "Zitnik_PPI_all_genes_randomized_resilience", taskID)
         else:
-            outf = outdir + "Cong_PPI_all_genes_randomized_resilience.csv"
+            outf = outf_path(outdir, "Cong_PPI_all_genes_randomized_resilience", taskID)
         results = resilience_df(LTEE_strain_to_knockouts, G, g_to_node,
                                 KO_list=REL606_genes)
     elif args.analysis == 3:
@@ -417,9 +445,9 @@ def main():
         mutations across timepoints in the genomes that are identical by descent.
         '''
         if args.dataset == 'zitnik':
-            outf = outdir + "Zitnik_PPI_across_pops_weighted_randomized_resilience.csv"
+            outf = outf_path(outdir, "Zitnik_PPI_across_pops_weighted_randomized_resilience", taskID)
         else:
-            outf = outdir + "Cong_PPI_across_pops_weighted_randomized_resilience.csv"
+            outf = outf_path(outdir, "Cong_PPI_across_pops_weighted_randomized_resilience", taskID)
         results = resilience_df(LTEE_strain_to_knockouts, G, g_to_node,
                                 KO_list=LTEE_metagenomics_KO_genes)
     elif args.analysis == 4:
@@ -427,9 +455,9 @@ def main():
         using the set of all genes KO'ed in BOTH the LTEE metagenomics data
         and the LTEE genomics data. '''
         if args.dataset == "zitnik":
-            outf = outdir + "Zitnik_PPI_across_pops_randomized_resilience.csv"
+            outf = outf_path(outdir, "Zitnik_PPI_across_pops_randomized_resilience", taskID)
         else:
-            outf = outdir + "Cong_PPI_across_pops_randomized_resilience.csv"    
+            outf = outf_path(outdir, "Cong_PPI_across_pops_randomized_resilience", taskID)
         results = resilience_df(LTEE_strain_to_knockouts, G, g_to_node,
                                 KO_list=all_LTEE_KO_genes)
     elif args.analysis == 5:
@@ -440,9 +468,9 @@ def main():
                                                            LTEE_strain_to_pop,
                                                            weighted=True)
         if args.dataset == "zitnik":
-            outf = outdir + "Zitnik_PPI_within_pops_weighted_randomized_resilience.csv"
+            outf = outf_path(outdir, "Zitnik_PPI_within_pops_weighted_randomized_resilience", taskID)
         else:
-            outf = outdir + "Cong_PPI_within_pops_weighted_randomized_resilience.csv"            
+            outf = outf_path(outdir, "Cong_PPI_within_pops_weighted_randomized_resilience", taskID)
         results = resilience_df(LTEE_strain_to_knockouts, G, g_to_node,
                                 LTEE_strain_to_pop_dict=LTEE_strain_to_pop,
                                 pop_to_KO_dict=weighted_LTEE_pop_to_KO)
@@ -454,9 +482,10 @@ def main():
                                                              LTEE_strain_to_pop,
                                                              weighted=False)
         if args.dataset == "zitnik":
-            outf = outdir + "Zitnik_PPI_within_pops_randomized_resilience.csv"
+            outf = outf_path(outdir, "Zitnik_PPI_within_pops_randomized_resilience", taskID)
         else:
-            outf = outdir + "Cong_PPI_within_pops_randomized_resilience.csv"
+            outf = outf_path(outdir, "Cong_PPI_within_pops_randomized_resilience", taskID)
+            print(outf)
         results = resilience_df(LTEE_strain_to_knockouts, G, g_to_node,
                                 LTEE_strain_to_pop_dict=LTEE_strain_to_pop,
                                 pop_to_KO_dict=unweighted_LTEE_pop_to_KO)
