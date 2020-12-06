@@ -2,6 +2,6 @@
 
 #SBATCH -p scavenger
 #SBATCH --mem=100 ## 100MB of RAM
-#SBATCH --array=1-3
+#SBATCH --array=1-100
 
 python ppi-resilience-analysis2.py --dataset cong --analysis 5

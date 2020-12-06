@@ -396,6 +396,10 @@ def resilience_df(LTEE_strain_to_KO_dict, G, g_to_node, KO_list=None,
             ''' then sample KO'ed genes from KO_list to make randomized genomes 
             (preserving the same number of KOs as in the actual genomes).'''
             knocked_out_genes = random.sample(KO_list, KOsamplesize)
+            ## make sure that there are no duplicates in knocked_out_genes.
+            ## if so, resample until there are no duplicates.
+            while len(set(knocked_out_genes)) != len(knocked_out_genes):
+                knocked_out_genes = random.sample(KO_list, KOsamplesize)
         elif ((KO_list is None) and
               (LTEE_strain_to_pop_dict is not None) and
               (pop_to_KO_dict is not None)):
@@ -403,15 +407,11 @@ def resilience_df(LTEE_strain_to_KO_dict, G, g_to_node, KO_list=None,
             LTEE population from which the focal clone was isolated
             (preserving the same number of KOs as in the actual genomes).'''
             pop = LTEE_strain_to_pop_dict[clone]
-            ## DEBUGGING CODE HERE.
-            try:
+            knocked_out_genes = random.sample(pop_to_KO_dict[pop], KOsamplesize)
+            ## make sure that there are no duplicates in knocked_out_genes.
+            ## if so, resample until there are no duplicates.
+            while len(set(knocked_out_genes)) != len(knocked_out_genes):
                 knocked_out_genes = random.sample(pop_to_KO_dict[pop], KOsamplesize)
-            except:
-                print("clone:",clone)
-                print("population:", pop)
-                print("actual_KO_set:", actual_KO_set)
-                print("KOsamplesize:",KOsamplesize)
-                print("pop_to_KO_dict[pop]:", pop_to_KO_dict[pop])
         elif ((KO_list is None) and
               (LTEE_strain_to_pop_dict is None) and
               (pop_to_KO_dict is None)):
@@ -458,8 +458,9 @@ def main():
     REL606_genes = get_REL606_gene_set()
     LTEE_pop_to_metagenomic_KO_dict = make_LTEE_pop_to_metagenomic_KO_dict()
     raw_LTEE_knockouts_df = get_LTEE_genome_knockout_muts()
-    ## now enforce the condition that KOs in the genomes are a subset of
-    ## KOs in each population in the metagenomics.
+    ''' now enforce the condition that KOs in the genomes are a subset of
+     KOs annotated in each population in the metagenomics. 
+    '''
     LTEE_strain_to_knockouts = LTEE_strain_to_KO_genes(raw_LTEE_knockouts_df,
                                                        LTEE_pop_to_metagenomic_KO_dict)
     LTEE_strain_to_pop =  make_LTEE_strain_to_pop_dict(raw_LTEE_knockouts_df)
