@@ -63,6 +63,7 @@ import numpy as np
 from scipy.integrate import simps
 import pandas as pd
 import argparse
+from pprint import pprint
 
 
 def get_REL606_column_set(col):
@@ -127,13 +128,17 @@ def make_LTEE_pop_to_metagenomic_KO_dict():
             fields = line.split(',')
             population = fields[0]
             gene = fields[2]
+            if gene == "intergenic": continue
             annotation = fields[4]
             if annotation not in KO_mut_classes: continue
             if population not in LTEE_pop_to_metagenomic_KO_dict:
                 ## then initialize the key:value pair.
                 LTEE_pop_to_metagenomic_KO_dict[population] = set()
-            else: ## then add the gene to the set of KO'ed genes.
-                LTEE_pop_to_metagenomic_KO_dict[population].update(set(gene))    
+            else: # then add the gene to the set of KO'ed genes.
+                ## python gotcha here! have to update with '[gene]'
+                ## and not 'gene', otherwise the string is broken up
+                ## into a set of chars.
+                LTEE_pop_to_metagenomic_KO_dict[population].update([gene])
     return LTEE_pop_to_metagenomic_KO_dict
 
 
@@ -554,7 +559,6 @@ def main():
             outf = outf_path(outdir, "Zitnik_PPI_within_pops_randomized_resilience", taskID)
         else:
             outf = outf_path(outdir, "Cong_PPI_within_pops_randomized_resilience", taskID)
-            print(outf)
         results = resilience_df(LTEE_strain_to_knockouts, G, g_to_node,
                                 LTEE_strain_to_pop_dict=LTEE_strain_to_pop,
                                 pop_to_KO_dict=unweighted_LTEE_pop_to_KO)
