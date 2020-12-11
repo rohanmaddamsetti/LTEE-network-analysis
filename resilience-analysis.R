@@ -11,7 +11,7 @@ library(tidyverse)
 library(cowplot)
 
 ################################################################
-## PPI NETWORK RESILIENCE RESULTS.
+## FUNCTIONS.
 
 set.no.KO.strains.resilience.to.REL606 <- function(df) {
     ## strains with no KO mutations get the ancestral resilience value.
@@ -87,14 +87,14 @@ calc.resilience.regression.df <- function(resilience.df) {
         my.regression <- lm(data=pop.df, I(resilience - ancestral.resilience) ~ 0 + Generation)
         resilience.coefficient <- my.regression$coefficients[[1]]
         pop.df.with.slope <- pop.df %>%
-            select(population, timeseries) %>%
+            select(population, replicate, timeseries) %>%
             mutate(resilience.slope = resilience.coefficient) %>%
             distinct()
         return(pop.df.with.slope)
     }
 
     summary.df <- resilience.df %>%
-        split(.$population) %>%
+        split(list(.$population, .$replicate)) %>%
         map_dfr(.f = calc.resilience.slope.per.pop.df)
     return(summary.df)
 }
@@ -139,6 +139,33 @@ regression.slope.test <- function(full.slope.df, null.comp.string) {
 }
 
 ##########################################################################
+## FUNCTIONS for big resilience data analysis.
+
+add_timeseries_column <- function(the.big.df) {
+
+    ## there are six possible values for the timeseries column,
+    ## based on the value in the run_type column.
+    ## actual_data, randomized_within, weighted_randomized_within,
+    ## randomized_across, weighted_randomized_across, randomized_all.
+    the.big.df %>%
+        mutate(
+            timeseries = case_when(
+                run_type == "LTEE_genome_resilience" ~ "actual_data",
+                run_type == "within_pops_randomized_resilience" ~ "randomized_within",
+                run_type == "within_pops_weighted_randomized_resilience"
+                ~ "weighted_randomized_within",
+                run_type == "across_pops_randomized_resilience"
+                ~ "randomized_across",
+                run_type == "across_pops_weighted_randomized_resilience"
+                ~ "weighted_randomized_across",
+                run_type == "all_genes_randomized_resilience" ~ "randomized_all"
+            )
+        )
+}
+
+##########################################################################
+## IMPORT METADATA.
+
 ## Order nonmutator pops, then hypermutator pops by converting Population to
 ## factor type and setting the levels.
 nonmutator.pops <- c("Ara-5", "Ara-6", "Ara+1", "Ara+2", "Ara+4", "Ara+5")
@@ -162,7 +189,60 @@ LTEE.genomes.KO.metadata <- read.csv(
     mutate(population=factor(population,levels=c(nonmutator.pops,hypermutator.pops)))
 
 #######################################################################
-## PPI network resilience results.
+## PPI network resilience results, using Duke Compute Cluster runs.
+
+## IMPORTANT BUG TO FIX: REL958B and REL1066B have NA values in their rows. Why?
+filter(big.resilience.df,is.na(replicate))
+
+big.resilience.df <- read.csv("../results/resilience/collated-resilience-runs.csv") %>%
+    full_join(LTEE.genomes.KO.metadata) %>%
+    set.no.KO.strains.resilience.to.REL606() %>%
+    mutate(log.resilience=log(resilience)) %>%
+    add_timeseries_column() %>%
+    ## HACK TO REMOVE THE TWO PROBLEMATIC CASES FOR NOW (BEFORE DEBUGGING):
+    filter(!is.na(replicate))
+
+cong.slope.df <- big.resilience.df %>%
+    filter(dataset=="Cong") %>%
+    split(list(.$timeseries, .$replicate)) %>%
+    map_dfr(.f = calc.resilience.regression.df)
+
+zitnik.slope.df <- big.resilience.df %>%
+    filter(dataset=="Zitnik") %>%
+    split(list(.$timeseries, .$replicate)) %>%
+    map_dfr(.f = calc.resilience.regression.df)
+
+## let's make some plots.
+big.zitnik.plot <- ggplot(zitnik.slope.df,
+            aes(x = timeseries,
+                y = resilience.slope,
+                color = timeseries)) +
+    facet_wrap(.~population,nrow=4) +
+    theme_classic() +
+    geom_point(alpha = 0.2, size = 0.5) +
+    ylab("Change in network resilience over time") +
+    ggtitle("Zitnik PPI network resilience over time") +
+    theme(legend.position="bottom") +
+    theme(axis.text.x  = element_text(angle=45, vjust=0.5, size=10))
+
+big.cong.plot <- ggplot(cong.slope.df,
+            aes(x = timeseries,
+                y = resilience.slope,
+                color = timeseries)) +
+    facet_wrap(.~population,nrow=4) +
+    theme_classic() +
+    geom_point(alpha = 0.2, size = 0.5) +
+    ylab("Change in network resilience over time") +
+    ggtitle("Cong PPI network resilience over time") +
+    theme(legend.position="bottom") +
+    theme(axis.text.x  = element_text(angle=45, vjust=0.5, size=10))
+
+
+## TODO.
+## Let's calculate rigorous statistics using the DCC runs.
+
+#######################################################################
+## ORIGINAL PPI network resilience results.
 
 ## Now, Zitnik PPI resilience analysis.
 zitnik.network.resilience.df <- read.network.resilience.df(
