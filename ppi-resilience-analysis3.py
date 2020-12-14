@@ -50,6 +50,7 @@ from scipy.integrate import simps
 import pandas as pd
 import argparse
 from pprint import pprint
+from itertools import groupby
 
 
 def outf_path(outdir, outf_name, taskID):
@@ -316,6 +317,19 @@ def resilience_df(LTEE_strain_to_KO_dict, G, g_to_node, KO_list=None, reps=100):
     '''
     REL606_resilience = sum((GraphResilience(G) for x in range(reps)))/float(reps)
 
+    if (KO_list is not None):
+        ''' 
+        then sort the KO_list, and generate probabilities for each
+        item in the list, based on its frequency. See the solution here:
+        https://stackoverflow.com/questions/2161752/how-to-count-the-frequency-of-the-elements-in-an-unordered-list
+        And the solution here:
+        https://medium.com/ibm-watson/incredibly-fast-random-sampling-in-python-baf154bd836a
+        '''
+        KO_list.sort()
+        KO_count_tuples = [(key, len(list(group))) for key, group in groupby(KO_list)]
+        KO_elts = [x for (x,_) in KO_count_tuples]
+        KO_frequencies = [float(c)/len(KO_list) for (_,c) in KO_count_tuples]    
+
     clone_col = []
     resilience = []
     for clone, actual_KO_set in LTEE_strain_to_KO_dict.items():
@@ -324,11 +338,8 @@ def resilience_df(LTEE_strain_to_KO_dict, G, g_to_node, KO_list=None, reps=100):
         if (KO_list is not None):
             ''' then sample KO'ed genes from KO_list to make randomized genomes 
             (preserving the same number of KOs as in the actual genomes).'''
-            knocked_out_genes = random.sample(KO_list, KOsamplesize)
-            ## make sure that there are no duplicates in knocked_out_genes.
-            ## if so, resample until there are no duplicates.
-            while len(set(knocked_out_genes)) != len(knocked_out_genes):
-                knocked_out_genes = random.sample(KO_list, KOsamplesize)
+            knocked_out_genes = np.random.choice(KO_elts, KOsamplesize,
+                                                 p=KO_frequencies,replace=False)
         elif (KO_list is None):
             ## then calculate the network resilience for the actual LTEE genomes.
             knocked_out_genes = actual_KO_set
@@ -407,7 +418,7 @@ def main():
         else:
             outf = outf_path(outdir, "Cong_PPI_all_genes_randomized_resilience", taskID)
         results = resilience_df(LTEE_strain_to_knockouts, G, g_to_node,
-                                KO_list=REL606_genes)
+                                KO_list=list(REL606_genes))
     elif args.analysis == 3:
         ''' calculate randomized resilience of genomes,
         using the list of all genes KO'ed in the LTEE genomics data.
