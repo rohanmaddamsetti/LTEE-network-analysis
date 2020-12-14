@@ -1,12 +1,5 @@
 ## resilience-analysis.R by Rohan Maddamsetti.
 
-## CRITICAL TODO: As an additional control analysis,
-## bootstrap resilience using KO mutations rather than genes, in some way.
-## The idea here is that genes that are over-represented are probably under
-## positive selection. So choose those more often. Then, is the
-## realized resilience trajectory more shallow than this bootstrapped
-## trajectory?
-
 library(tidyverse)
 library(cowplot)
 
@@ -151,9 +144,6 @@ add_timeseries_column <- function(the.big.df) {
         mutate(
             timeseries = case_when(
                 run_type == "LTEE_genome_resilience" ~ "actual_data",
-                run_type == "within_pops_randomized_resilience" ~ "randomized_within",
-                run_type == "within_pops_weighted_randomized_resilience"
-                ~ "weighted_randomized_within",
                 run_type == "across_pops_randomized_resilience"
                 ~ "randomized_across",
                 run_type == "across_pops_weighted_randomized_resilience"
@@ -230,14 +220,11 @@ big.zitnik.slope.df <- big.zitnik.resilience.df %>%
     split(.$timeseries) %>%
     map_dfr(.f = calc.resilience.regression.df)
 
-regression.slope.test(big.zitnik.slope.df, "randomized_within")
 regression.slope.test(big.zitnik.slope.df, "randomized_across")
 regression.slope.test(big.zitnik.slope.df, "randomized_all")
 
-regression.slope.test(big.cong.slope.df, "randomized_within")
 regression.slope.test(big.cong.slope.df, "randomized_across")
 regression.slope.test(big.cong.slope.df, "randomized_all")
-
 
 #######################################################################
 ## ORIGINAL PPI network resilience results.
