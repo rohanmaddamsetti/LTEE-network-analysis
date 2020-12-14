@@ -87,14 +87,14 @@ calc.resilience.regression.df <- function(resilience.df) {
         my.regression <- lm(data=pop.df, I(resilience - ancestral.resilience) ~ 0 + Generation)
         resilience.coefficient <- my.regression$coefficients[[1]]
         pop.df.with.slope <- pop.df %>%
-            select(population, replicate, timeseries) %>%
+            select(population, timeseries) %>%
             mutate(resilience.slope = resilience.coefficient) %>%
             distinct()
         return(pop.df.with.slope)
     }
 
     summary.df <- resilience.df %>%
-        split(list(.$population, .$replicate)) %>%
+        split(.$population) %>%
         map_dfr(.f = calc.resilience.slope.per.pop.df)
     return(summary.df)
 }
@@ -202,44 +202,42 @@ big.resilience.df <- read.csv("../results/resilience/collated-resilience-runs.cs
     ## HACK TO REMOVE THE TWO PROBLEMATIC CASES FOR NOW (BEFORE DEBUGGING):
     filter(!is.na(replicate))
 
-cong.slope.df <- big.resilience.df %>%
-    filter(dataset=="Cong") %>%
-    split(list(.$timeseries, .$replicate)) %>%
+big.cong.resilience.df <- big.resilience.df %>%
+    filter(dataset=="Cong")
+
+big.zitnik.resilience.df <- big.resilience.df %>%
+    filter(dataset=="Zitnik")
+
+
+big.cong.resilience.plot <- make.big.Cong.resilience.plot(big.cong.resilience.df)
+big.zitnik.resilience.plot <- make.big.Zitnik.resilience.plot(big.zitnik.resilience.df)
+
+Fig1.legend <- get_legend(make.big.resilience.plot(big.cong.resilience.df,
+                                                   plot.legend=TRUE))
+
+Fig1 <- plot_grid(plot_grid(big.zitnik.resilience.plot,big.cong.resilience.plot,
+                            labels=c('A','B',NULL),nrow=1, rel_widths=c(1,1,0.4)),
+                  Fig1.legend,ncol=1, rel_heights=c(1,0.05))
+ggsave("../results/resilience/figures/Fig1.pdf",height=7,width=6)
+
+
+## Calculate statistics on differences between slopes.
+big.cong.slope.df <- big.cong.resilience.df %>%
+    split(.$timeseries) %>%
     map_dfr(.f = calc.resilience.regression.df)
 
-zitnik.slope.df <- big.resilience.df %>%
-    filter(dataset=="Zitnik") %>%
-    split(list(.$timeseries, .$replicate)) %>%
+big.zitnik.slope.df <- big.zitnik.resilience.df %>%
+    split(.$timeseries) %>%
     map_dfr(.f = calc.resilience.regression.df)
 
-## let's make some plots.
-big.zitnik.plot <- ggplot(zitnik.slope.df,
-            aes(x = timeseries,
-                y = resilience.slope,
-                color = timeseries)) +
-    facet_wrap(.~population,nrow=4) +
-    theme_classic() +
-    geom_point(alpha = 0.2, size = 0.5) +
-    ylab("Change in network resilience over time") +
-    ggtitle("Zitnik PPI network resilience over time") +
-    theme(legend.position="bottom") +
-    theme(axis.text.x  = element_text(angle=45, vjust=0.5, size=10))
+regression.slope.test(big.zitnik.slope.df, "randomized_within")
+regression.slope.test(big.zitnik.slope.df, "randomized_across")
+regression.slope.test(big.zitnik.slope.df, "randomized_all")
 
-big.cong.plot <- ggplot(cong.slope.df,
-            aes(x = timeseries,
-                y = resilience.slope,
-                color = timeseries)) +
-    facet_wrap(.~population,nrow=4) +
-    theme_classic() +
-    geom_point(alpha = 0.2, size = 0.5) +
-    ylab("Change in network resilience over time") +
-    ggtitle("Cong PPI network resilience over time") +
-    theme(legend.position="bottom") +
-    theme(axis.text.x  = element_text(angle=45, vjust=0.5, size=10))
+regression.slope.test(big.cong.slope.df, "randomized_within")
+regression.slope.test(big.cong.slope.df, "randomized_across")
+regression.slope.test(big.cong.slope.df, "randomized_all")
 
-
-## TODO.
-## Let's calculate rigorous statistics using the DCC runs.
 
 #######################################################################
 ## ORIGINAL PPI network resilience results.
@@ -319,7 +317,7 @@ Fig1.legend <- get_legend(make.big.resilience.plot(big.cong.df, plot.legend=TRUE
 Fig1 <- plot_grid(plot_grid(big.zitnik.plot,big.cong.plot,
                             labels=c('A','B',NULL),nrow=1, rel_widths=c(1,1,0.4)),
                   Fig1.legend,ncol=1, rel_heights=c(1,0.05))
-ggsave("../results/resilience/figures/Fig1.pdf",height=7,width=6)
+ggsave("../results/resilience/figures/oldFig1.pdf",height=7,width=6)
 
 cong.slope.df <- calc.resilience.regression.df(cong.network.resilience.df)
 cong.randomized.within.slope.df <- calc.resilience.regression.df(cong.randomized.within)
