@@ -15,18 +15,26 @@ set.no.KO.strains.resilience.to.REL606 <- function(df) {
     return(new.df)
 }
 
-read.network.resilience.df <- function(path, LTEE.genome.metadata) {
-    ## This function makes sure that metadata and resilience values are set
-    ## consistently, by wrapping the stuff that needs to happen in the right order
-    ## of function calls.
-    resilience.df <- read.csv(path) %>%
-        select(-X) %>% ## remove pandas crud
-        full_join(LTEE.genome.metadata) %>%
-        set.no.KO.strains.resilience.to.REL606() %>%
-        mutate(log.resilience=log(resilience))
-    
-    return(resilience.df)
+
+add_timeseries_column <- function(the.big.df) {
+
+    ## there are six possible values for the timeseries column,
+    ## based on the value in the run_type column.
+    ## actual_data, randomized_within, weighted_randomized_within,
+    ## randomized_across, weighted_randomized_across, randomized_all.
+    the.big.df %>%
+        mutate(
+            timeseries = case_when(
+                run_type == "LTEE_genome_resilience" ~ "actual_data",
+                run_type == "across_pops_randomized_resilience"
+                ~ "randomized_across",
+                run_type == "across_pops_weighted_randomized_resilience"
+                ~ "weighted_randomized_across",
+                run_type == "all_genes_randomized_resilience" ~ "randomized_all"
+            )
+        )
 }
+
 
 make.big.resilience.plot <- function(big.resilience.df, plot.legend=FALSE) {
     ## plot data and randomized data on the same figure.
@@ -63,9 +71,6 @@ make.big.Zitnik.resilience.plot <- function(big.resilience.df) {
 
 }
 
-calc.grand.correlation <- function(resilience.df) {
-    print(cor.test(resilience.df$time, resilience.df$resilience))
-}
 
 calc.resilience.regression.df <- function(resilience.df) {
     ## returns a dataframe with the linear regression coefficients
@@ -92,14 +97,15 @@ calc.resilience.regression.df <- function(resilience.df) {
     return(summary.df)
 }
 
+
 regression.slope.test <- function(full.slope.df, null.comp.string) {
 
-    if (null.comp.string == "randomized_within") {
-        null.df <- full.slope.df %>%
-            filter(timeseries == "randomized_within")
-    } else if (null.comp.string == "randomized_across") {
+    if (null.comp.string == "randomized_across") {
         null.df <- full.slope.df %>%
             filter(timeseries == "randomized_across")
+    } else if (null.comp.string == "weighted_randomized_across") {
+        null.df <- full.slope.df %>%
+            filter(timeseries == "weighted_randomized_across")
     } else if (null.comp.string == "randomized_all") {
         null.df <- full.slope.df %>%
             filter(timeseries == "randomized_all")
@@ -131,27 +137,6 @@ regression.slope.test <- function(full.slope.df, null.comp.string) {
                 paired = TRUE, alternative = "greater")
 }
 
-##########################################################################
-## FUNCTIONS for big resilience data analysis.
-
-add_timeseries_column <- function(the.big.df) {
-
-    ## there are six possible values for the timeseries column,
-    ## based on the value in the run_type column.
-    ## actual_data, randomized_within, weighted_randomized_within,
-    ## randomized_across, weighted_randomized_across, randomized_all.
-    the.big.df %>%
-        mutate(
-            timeseries = case_when(
-                run_type == "LTEE_genome_resilience" ~ "actual_data",
-                run_type == "across_pops_randomized_resilience"
-                ~ "randomized_across",
-                run_type == "across_pops_weighted_randomized_resilience"
-                ~ "weighted_randomized_across",
-                run_type == "all_genes_randomized_resilience" ~ "randomized_all"
-            )
-        )
-}
 
 ##########################################################################
 ## IMPORT METADATA.
@@ -221,107 +206,9 @@ big.zitnik.slope.df <- big.zitnik.resilience.df %>%
     map_dfr(.f = calc.resilience.regression.df)
 
 regression.slope.test(big.zitnik.slope.df, "randomized_across")
+regression.slope.test(big.zitnik.slope.df, "weighted_randomized_across")
 regression.slope.test(big.zitnik.slope.df, "randomized_all")
 
 regression.slope.test(big.cong.slope.df, "randomized_across")
+regression.slope.test(big.cong.slope.df, "weighted_randomized_across")
 regression.slope.test(big.cong.slope.df, "randomized_all")
-
-#######################################################################
-## ORIGINAL PPI network resilience results.
-
-## Now, Zitnik PPI resilience analysis.
-zitnik.network.resilience.df <- read.network.resilience.df(
-    "../results/resilience/original-run-results/Zitnik_PPI_LTEE_genome_resilience.csv",
-    LTEE.genomes.KO.metadata) %>%
-    mutate(timeseries = "actual_data")
-
-zitnik.randomized.within <- read.network.resilience.df(
-    "../results/resilience/original-run-results/Zitnik_PPI_within_pops_randomized_resilience.csv",
-    LTEE.genomes.KO.metadata) %>%
-    mutate(timeseries = "randomized_within")
-
-zitnik.randomized.across <- read.network.resilience.df(
-    "../results/resilience/original-run-results/Zitnik_PPI_across_pops_randomized_resilience.csv",
-    LTEE.genomes.KO.metadata) %>%
-    mutate(timeseries = "randomized_across")
-
-zitnik.randomized.all <- read.network.resilience.df(
-    "../results/resilience/original-run-results/Zitnik_PPI_all_genes_randomized_resilience.csv",
-    LTEE.genomes.KO.metadata) %>%
-    mutate(timeseries = "randomized_all")
-
-## make a big data frame to plot all the data in the same figure.
-big.zitnik.df <- zitnik.network.resilience.df %>%
-    full_join(zitnik.randomized.within) %>%
-    full_join(zitnik.randomized.across) %>%
-    full_join(zitnik.randomized.all)
-## make the big plot for Zitnik data and randomized data.
-big.zitnik.plot <- make.big.Zitnik.resilience.plot(big.zitnik.df)
-
-zitnik.slope.df <- calc.resilience.regression.df(zitnik.network.resilience.df)
-zitnik.randomized.within.slope.df <- calc.resilience.regression.df(zitnik.randomized.within)
-zitnik.randomized.across.slope.df <- calc.resilience.regression.df(zitnik.randomized.across)
-zitnik.randomized.all.slope.df <- calc.resilience.regression.df(zitnik.randomized.all)
-
-full.zitnik.slope.df <- zitnik.slope.df %>%
-    full_join(zitnik.randomized.within.slope.df) %>%
-    full_join(zitnik.randomized.across.slope.df) %>%
-    full_join(zitnik.randomized.all.slope.df)
-
-regression.slope.test(full.zitnik.slope.df, "randomized_within")
-regression.slope.test(full.zitnik.slope.df, "randomized_across")
-regression.slope.test(full.zitnik.slope.df, "randomized_all")
-
-## Now, Cong PPI resilience analysis.
-cong.network.resilience.df <- read.network.resilience.df(
-    "../results/resilience/original-run-results/Cong_PPI_LTEE_genome_resilience.csv",
-    LTEE.genomes.KO.metadata) %>%
-    mutate(timeseries = "actual_data")
-
-cong.randomized.within <- read.network.resilience.df(
-    "../results/resilience/original-run-results/Cong_PPI_within_pops_randomized_resilience.csv",
-    LTEE.genomes.KO.metadata) %>%
-    mutate(timeseries = "randomized_within")
-
-cong.randomized.across <- read.network.resilience.df(
-    "../results/resilience/original-run-results/Cong_PPI_across_pops_randomized_resilience.csv",
-    LTEE.genomes.KO.metadata) %>%
-    mutate(timeseries = "randomized_across")
-
-cong.randomized.all <- read.network.resilience.df(
-    "../results/resilience/original-run-results/Cong_PPI_all_genes_randomized_resilience.csv",
-    LTEE.genomes.KO.metadata) %>%
-    mutate(timeseries = "randomized_all")
-
-big.cong.df <- cong.network.resilience.df %>%
-    full_join(cong.randomized.within) %>%
-    full_join(cong.randomized.across) %>%
-    full_join(cong.randomized.all)
-## make the big plot for Cong data and randomized data.
-big.cong.plot <- make.big.Cong.resilience.plot(big.cong.df)
-Fig1.legend <- get_legend(make.big.resilience.plot(big.cong.df, plot.legend=TRUE))
-
-Fig1 <- plot_grid(plot_grid(big.zitnik.plot,big.cong.plot,
-                            labels=c('A','B',NULL),nrow=1, rel_widths=c(1,1,0.4)),
-                  Fig1.legend,ncol=1, rel_heights=c(1,0.05))
-ggsave("../results/resilience/figures/oldFig1.pdf",height=7,width=6)
-
-cong.slope.df <- calc.resilience.regression.df(cong.network.resilience.df)
-cong.randomized.within.slope.df <- calc.resilience.regression.df(cong.randomized.within)
-cong.randomized.across.slope.df <- calc.resilience.regression.df(cong.randomized.across)
-cong.randomized.all.slope.df <- calc.resilience.regression.df(cong.randomized.all)
-
-full.cong.slope.df <- cong.slope.df %>%
-    full_join(cong.randomized.within.slope.df) %>%
-    full_join(cong.randomized.across.slope.df) %>%
-    full_join(cong.randomized.all.slope.df)
-
-regression.slope.test(full.cong.slope.df, "randomized_within")
-regression.slope.test(full.cong.slope.df, "randomized_across")
-regression.slope.test(full.cong.slope.df, "randomized_all")
-
-
-## although more simulation runs are needed, these results suggest purifying selection on
-## which genes are affected by KO mutations in each population,
-## as resilience falls more slowly in the real data, than in the simulated data.
-
