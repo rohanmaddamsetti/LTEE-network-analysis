@@ -2,6 +2,7 @@
 
 library(tidyverse)
 library(cowplot)
+library(circlize)
 
 ################################################################
 ## FUNCTIONS.
@@ -212,3 +213,81 @@ regression.slope.test(big.zitnik.slope.df, "randomized_all")
 regression.slope.test(big.cong.slope.df, "randomized_across")
 regression.slope.test(big.cong.slope.df, "weighted_randomized_across")
 regression.slope.test(big.cong.slope.df, "randomized_all")
+
+########################################################################
+
+## Make a circos plot for the zitnik and cong networks, as affected by KO
+## mutations in the 50K A clones.
+
+LTEE.50K.A.clone.metadata <- LTEE.genomes.KO.metadata %>%
+    filter(time == 50000) %>%
+    filter(clone == 'A')
+
+
+## First, make a circos plot for each of the PPI networks.
+
+## Then make a facet style plot, showing the edges that are deleted due to KO
+## mutations in each of the 12 50K A clones.
+
+
+REL606.genes <- read.csv("../results/REL606_IDs.csv")
+
+## get edges in Zitnik PPI network.
+raw.zitnik.edges <- read.csv("../results/thermostability/Ecoli-Zitnik-data/Ecoli-treeoflife.interactomes/511145.txt", sep=" ", header=FALSE)
+
+## get edges in Cong PPI network.
+raw.cong.edges <- read.csv("../results/thermostability/Cong-good-interaction-set.tsv",sep="\t",header=FALSE) %>%
+    mutate(edge.number = row_number())
+
+cong.node1 <- raw.cong.edges %>% 
+    mutate(Gene = V1) %>%
+    select(Gene, edge.number) %>%
+    left_join(REL606.genes) %>%
+    ## remove edges with NA values.
+    filter(complete.cases(.))
+
+cong.node2 <- raw.cong.edges %>% 
+    mutate(Gene = V2) %>%
+    select(Gene, edge.number) %>%
+    left_join(REL606.genes) %>%
+    ## remove edges with NA values.
+    filter(complete.cases(.))
+
+## filter for edges between nodes that have not been removed.
+cong.node1 <- cong.node1 %>%
+    filter(edge.number %in% cong.node2$edge.number) %>%
+    mutate(chr = "REL606") %>%
+    relocate(chr) %>%
+    relocate(Gene, .after = last_col())
+
+cong.node2 <- cong.node2 %>%
+    filter(edge.number %in% cong.node1$edge.number) %>%
+    mutate(chr = "REL606") %>%
+    relocate(chr) %>%
+    relocate(Gene, .after = last_col())
+
+
+## just use the essential columns for plotting.
+cong.node1.bed <- cong.node1 %>%
+    select(chr, start, end, Gene)
+cong.node2.bed <- cong.node2 %>%
+    select(chr, start, end, Gene)
+
+## one row df to initialize plot with one sector.
+REL606.sector.df <- data.frame(chr="REL606",start=1, end=4629812)
+circos.genomicInitialize(REL606.sector.df)
+
+
+## now plot the cong PPI network.
+circos.genomicLink(cong.node1.bed, cong.node2.bed,
+                   col = rep("light gray", nrow(cong.node1.bed)),
+                   border = NA)
+
+
+## now make a circos plot for each of the 12 50K A clones,
+## showing the edges that are deleted due to KO mutations.
+
+
+
+## Then make a facet style plot, showing the edges that are deleted due to KO
+## mutations in each of the 12 50K A clones.

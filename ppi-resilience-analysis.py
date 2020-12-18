@@ -403,7 +403,7 @@ def main():
         ## filter Cong PPI graph based on genes in REL606.
         ## 1191 nodes, 1787 edges in this graph.
         G, g_to_node, node_to_g = create_graph_and_dicts(good_edge_f,
-                                                         nodeSet=REL606_genes)    
+                                                         nodeSet=REL606_genes)
     if args.analysis == 1: 
         ## analyze the resilience of evolved LTEE genomes.
         if args.dataset == "zitnik":
