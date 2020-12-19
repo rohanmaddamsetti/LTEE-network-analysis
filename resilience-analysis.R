@@ -147,15 +147,19 @@ regression.slope.test <- function(full.slope.df, null.comp.string) {
 nonmutator.pops <- c("Ara-5", "Ara-6", "Ara+1", "Ara+2", "Ara+4", "Ara+5")
 hypermutator.pops <- c("Ara-1", "Ara-2", "Ara-3", "Ara-4", "Ara+3", "Ara+6")
 
+LTEE.pop.vec <- c(nonmutator.pops, hypermutator.pops)
+
 ## we will add REL606 as ancestor to all 12 populations.
 REL606.metadata <- data.frame(strain = rep('REL606', 12),
-                              population = c(nonmutator.pops, hypermutator.pops),
+                              population = LTEE.pop.vec,
                               time = rep(0, 12),
                               clone = rep('A', 12),
                               mutator_status = rep('non-mutator', 12))
 
-LTEE.genomes.KO.metadata <- read.csv(
-    "../data/LTEE-264-genomes-SNP-nonsense-small-indel-MOB-large-deletions.csv") %>%
+LTEE.genomes.KO.muts <- read.csv(
+    "../data/LTEE-264-genomes-SNP-nonsense-small-indel-MOB-large-deletions.csv")
+
+LTEE.genomes.KO.metadata <- LTEE.genomes.KO.muts %>%
     select(population,time,strain,clone,mutator_status) %>%
     distinct() %>%
     ## let's add REL606.
@@ -219,21 +223,94 @@ regression.slope.test(big.cong.slope.df, "randomized_all")
 ## Make a circos plot for the zitnik and cong networks, as affected by KO
 ## mutations in the 50K A clones.
 
-LTEE.50K.A.clone.metadata <- LTEE.genomes.KO.metadata %>%
+
+make.list.of.strain.to.KOed.genes <- function(LTEE.KO.data) {
+## make a list of strain to vectors of KO'ed genes.
+
+    strip.and.split <- function(x) {
+        ## remove [square brackets] and split on commas.
+        str_replace_all(x, c("\\[" = "",  "\\]" = "")) %>%
+            str_split(",")        
+    }
+    
+    ## This is a helper function that does the string manipulation
+    ## to extract and concatenate genes from rows of the dataframe
+    ## to return a vector of genes.
+    KO.df.to.KO.vec <- function(strain.df) {
+        parsed.gene.list <- sapply(strain.df$gene_list, strip.and.split)
+        reduce(parsed.gene.list, .f = c ) %>% unique()
+    }
+    
+    LTEE.KO.data %>%
+        ## for easy plotting, split on population.
+        ## CRITICAL ASSUMPTION: one strain per population.
+        split(.$population) %>%
+        map(.f = KO.df.to.KO.vec)
+}
+
+## make a data structure for genes affected by KO mutations in 50K genomes.
+LTEE.50K.KO.data <- LTEE.genomes.KO.muts %>%
+    ## remove intergenic mutations.
+    filter(!str_detect(gene_position, "intergenic")) %>%
     filter(time == 50000) %>%
+    select(population, strain, clone, gene_list)
+
+LTEE.50K.A.clone.KO.data <- LTEE.50K.KO.data %>%
     filter(clone == 'A')
+LTEE.50K.B.clone.KO.data <- LTEE.50K.KO.data %>%
+    filter(clone == 'B')
+
+KOed.genes.in.LTEE.50K.A.clones <- make.list.of.strain.to.KOed.genes(LTEE.50K.A.clone.KO.data)
+KOed.genes.in.LTEE.50K.B.clones <- make.list.of.strain.to.KOed.genes(LTEE.50K.B.clone.KO.data)
 
 
-## First, make a circos plot for each of the PPI networks.
-
-## Then make a facet style plot, showing the edges that are deleted due to KO
-## mutations in each of the 12 50K A clones.
-
+################################################################################################
+## get the edges in the Zitnik and Cong PPI networks.
 
 REL606.genes <- read.csv("../results/REL606_IDs.csv")
 
 ## get edges in Zitnik PPI network.
-raw.zitnik.edges <- read.csv("../results/thermostability/Ecoli-Zitnik-data/Ecoli-treeoflife.interactomes/511145.txt", sep=" ", header=FALSE)
+raw.zitnik.edges <- read.csv("../results/thermostability/Ecoli-Zitnik-data/Ecoli-treeoflife.interactomes/511145.txt",
+                             sep=" ", header=FALSE) %>%
+    mutate(edge.number = row_number())
+
+zitnik.node1 <- raw.zitnik.edges %>% 
+    mutate(blattner = V1) %>%
+    select(blattner, edge.number) %>%
+    left_join(REL606.genes) %>%
+    ## remove edges with NA values.
+    filter(complete.cases(.))
+
+zitnik.node2 <- raw.zitnik.edges %>% 
+    mutate(blattner = V2) %>%
+    select(blattner, edge.number) %>%
+    left_join(REL606.genes) %>%
+    ## remove edges with NA values.
+    filter(complete.cases(.))
+
+## filter for edges between nodes that have not been removed.
+zitnik.node1 <- zitnik.node1 %>%
+    filter(edge.number %in% zitnik.node2$edge.number) %>%
+    mutate(chr = "REL606") %>%
+    relocate(chr) %>%
+    relocate(blattner, .after = last_col())
+
+zitnik.node2 <- zitnik.node2 %>%
+    filter(edge.number %in% zitnik.node1$edge.number) %>%
+    mutate(chr = "REL606") %>%
+    relocate(chr) %>%
+    relocate(blattner, .after = last_col())
+
+## just use the essential columns for plotting.
+zitnik.node1.bed <- zitnik.node1 %>%
+    select(chr, start, end, blattner) %>%
+    rename(Gene = blattner)
+
+zitnik.node2.bed <- zitnik.node2 %>%
+    select(chr, start, end, blattner) %>%
+    rename(Gene = blattner)
+
+############################################################
 
 ## get edges in Cong PPI network.
 raw.cong.edges <- read.csv("../results/thermostability/Cong-good-interaction-set.tsv",sep="\t",header=FALSE) %>%
@@ -273,21 +350,87 @@ cong.node1.bed <- cong.node1 %>%
 cong.node2.bed <- cong.node2 %>%
     select(chr, start, end, Gene)
 
-## one row df to initialize plot with one sector.
-REL606.sector.df <- data.frame(chr="REL606",start=1, end=4629812)
-circos.genomicInitialize(REL606.sector.df)
+
+KO.genes.to.color.vec <- function(KO.gene.vec, node1.df, node2.df) {
+    ## returns a vector for the color mapping for circos plot links,
+    ## based on whether the nodes for the link are in KO.gene.vec.
+    
+    node1.vec <- node1.df$Gene
+    node2.vec <- node2.df$Gene
+
+    boolvec1 <- sapply(node1.vec, function(x) ifelse(x %in% KO.gene.vec,TRUE,FALSE))
+    boolvec2 <- sapply(node2.vec, function(x) ifelse(x %in% KO.gene.vec,TRUE,FALSE))
+    or.boolvec <- boolvec1 | boolvec2
+    color.vec <- sapply(or.boolvec, function(x) ifelse(x, "red", "grey95"))
+    return(color.vec)
+    
+}
+
+plot.genome.KOs <- function(KO.gene.vec, node1.bed, node2.bed, my.name="REL606") {
+
+    ## one row df to initialize plot with one sector.
+    sector.df <- data.frame(chr = my.name, start=1, end=4629812)
+
+    ## rename the first column of the nodes to match the name
+    ## for sector.df.
+    node1.bed <- node1.bed %>%
+        mutate(chr = my.name)
+    node2.bed <- node2.bed %>%
+        mutate(chr = my.name)
+    
+    my.color.vec <- KO.genes.to.color.vec(KO.gene.vec, node1.bed, node2.bed)
+    
+    ## now plot the PPI network.
+    circos.genomicInitialize(sector.df)
+
+    circos.genomicLink(node1.bed, node2.bed,
+                       col = my.color.vec,
+                       border = NA)    
+}
+
+## POTENTIAL TODO: re-orient the coordinate system around the origin of replication.
+
+## Figure 2.
+## Make a facet style plot, showing the edges that are deleted due to KO
+## mutations in each of the 12 50K A clones.
+
+## Plot Cong networks.
+layout(matrix(1:12, 3, 4))
+for(cur.pop in LTEE.pop.vec) {
+    par(mar = c(0.5, 0.5, 0.5, 0.5))
+    circos.par(cell.padding = c(0, 0, 0, 0))
+    my.KO.gene.vec <- KOed.genes.in.LTEE.50K.A.clones[[cur.pop]]
+    plot.genome.KOs(my.KO.gene.vec, cong.node1.bed, cong.node2.bed, my.name=cur.pop)
+    circos.clear()
+}
+
+## Too many edges! Showing the Zitnik network causes overplotting:
+## nothing can be seen.
+
+## Plot Zitnik networks.
+##layout(matrix(1:12, 3, 4))
+##for(cur.pop in LTEE.pop.vec) {
+##    par(mar = c(0.5, 0.5, 0.5, 0.5))
+##    circos.par(cell.padding = c(0, 0, 0, 0))
+##    my.KO.gene.vec <- KOed.genes.in.LTEE.50K.A.clones[[cur.pop]]
+##    plot.genome.KOs(my.KO.gene.vec, zitnik.node1.bed, zitnik.node2.bed, my.name=cur.pop)
+##    circos.clear()
+##}
 
 
-## now plot the cong PPI network.
-circos.genomicLink(cong.node1.bed, cong.node2.bed,
-                   col = rep("light gray", nrow(cong.node1.bed)),
-                   border = NA)
 
-
-## now make a circos plot for each of the 12 50K A clones,
+## Supplementary Figure 1.
+## now make a circos plot for each of the 12 50K B clones,
 ## showing the edges that are deleted due to KO mutations.
-
+layout(matrix(1:12, 3, 4))
+for(cur.pop in LTEE.pop.vec) {
+    par(mar = c(0.5, 0.5, 0.5, 0.5))
+    circos.par(cell.padding = c(0, 0, 0, 0))
+    my.KO.gene.vec <- KOed.genes.in.LTEE.50K.B.clones[[cur.pop]]
+    plot.genome.KOs(my.KO.gene.vec, cong.node1.bed, cong.node2.bed, my.name=cur.pop)
+    circos.clear()
+}
 
 
 ## Then make a facet style plot, showing the edges that are deleted due to KO
-## mutations in each of the 12 50K A clones.
+## mutations in each of the 12 50K B clones.
