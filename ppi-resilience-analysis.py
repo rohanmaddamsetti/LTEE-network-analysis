@@ -90,7 +90,7 @@ def get_REL606_blattner_to_gene_dict():
     return get_REL606_column_dict(2,0)
 
 
-def get_LTEE_genome_knockout_muts():
+def get_LTEE_genome_knockout_muts(no_deletions=False):
     '''
     I downloaded this table from Jeff's Shiny web app interface
     to the 264 LTEE genomes dataset. 
@@ -101,6 +101,9 @@ def get_LTEE_genome_knockout_muts():
     LTEE_mut_df = pd.read_csv(LTEE_nonsense_indel_MOB_deletions_in_genomes_f)
     ## filter out all intergenic mutations.
     LTEE_knockout_muts = LTEE_mut_df[~LTEE_mut_df['gene_position'].str.contains("intergenic",na=False)]
+    if no_deletions:
+        ## then filter out large deletions.
+        LTEE_knockout_muts = LTEE_knockout_muts[~LTEE_knockout_muts['mutation_category'].str.contains("large_deletion")]
     return LTEE_knockout_muts
 
 
@@ -372,19 +375,26 @@ def main():
     parser = argparse.ArgumentParser(description='Provide integer for analysis to run.')
     parser.add_argument('--dataset',type=str)
     parser.add_argument('--analysis',type=int)
+    parser.add_argument('--noDeletions', type=bool, default=False)
     args = parser.parse_args()
     assert args.dataset in ["zitnik", "cong"] ## only allowed values.
     
     random.seed() ## seed the random number generator.
-    outdir = "../results/resilience/resilience-analysis-runs/"
+
+    if args.noDeletions == True:
+        outdir = "../results/resilience/noDeletions-resilience-analysis-runs/"
+    else:
+        outdir = "../results/resilience/resilience-analysis-runs/"
+
     REL606_genes = get_REL606_gene_set()
-    LTEE_knockouts_df = get_LTEE_genome_knockout_muts()
+    LTEE_knockouts_df = get_LTEE_genome_knockout_muts(args.noDeletions)
     LTEE_strain_to_knockouts = LTEE_strain_to_KO_genes(LTEE_knockouts_df)
     LTEE_strain_to_pop =  make_LTEE_strain_to_pop_dict(LTEE_knockouts_df)
     LTEE_pop_to_knockouts = make_LTEE_pop_to_KO_dict(LTEE_strain_to_knockouts, LTEE_strain_to_pop)
     LTEE_genomes_KO_gene_list = [KO for KOset in LTEE_pop_to_knockouts.values() for KO in KOset]    
     all_LTEE_KO_genes = list(set(LTEE_genomes_KO_gene_list))
-
+        
+    
     if args.dataset == "zitnik":
         ''' Import protein-protein interaction network from 
         Marinka Zitnik paper in PNAS. '''
