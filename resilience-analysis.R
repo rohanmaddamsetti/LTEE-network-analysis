@@ -502,7 +502,6 @@ cong.dist.df <- calc.REL606.PPI.gene.distances(cong.node1.bed, cong.node2.bed)
 zitnik.dist.df <- calc.REL606.PPI.gene.distances(zitnik.node1.bed, zitnik.node2.bed)
 
 ## Make dataframes for the distance between KO'ed genes across all 12 LTEE pops.
-## TODO.
 
 get.KOed.edges <- function(KO.gene.vec, node1.df, node2.df) {
     ## returns a vector for edges that are knocked out,
@@ -563,6 +562,8 @@ zitnik.PPI.dist.plot <- ggplot(zitnik.dist.df, aes(x=PPI.dist)) +
     geom_histogram(data = KOed.50K.clone.A.zitnik.PPI.dists, fill="red") +
     theme_classic() + ylab("Count")
 
+
+## not significant.
 wilcox.test(cong.dist.df$PPI.dist, KOed.50K.clone.A.cong.PPI.dists$PPI.dist)
 
 ## surprising: pattern is actually in the opposite direction than I expected!
@@ -584,6 +585,19 @@ NoDel.LTEE.50K.A.clone.KO.data <- LTEE.genomes.KO.muts %>%
 NoDel.KOed.genes.in.LTEE.50K.A.clones <- make.list.of.strain.to.KOed.genes(
     NoDel.LTEE.50K.A.clone.KO.data)
 
+OnlyDel.LTEE.50K.A.clone.KO.data <- LTEE.genomes.KO.muts %>%
+    ## remove intergenic mutations.
+    filter(!str_detect(gene_position, "intergenic")) %>%
+    filter(time == 50000) %>%
+    select(population, strain, clone, gene_list) %>%
+    filter(clone == 'A') %>%
+    ## only multigene deletions.
+    filter(str_detect(gene_list, ','))
+
+
+OnlyDel.KOed.genes.in.LTEE.50K.A.clones <- make.list.of.strain.to.KOed.genes(
+    OnlyDel.LTEE.50K.A.clone.KO.data)
+
 
 ## use partial function application so that cur.pop is the only free parameter.
 NoDel.pop.to.clone.A.cong.PPI.gene.dists <- partial(.f = pop.to.KO.edge.distances,
@@ -602,12 +616,30 @@ NoDel.pop.to.clone.A.zitnik.PPI.gene.dists <- partial(.f = pop.to.KO.edge.distan
 NoDel.KOed.50K.clone.A.zitnik.PPI.dists <- map_dfr(.x = LTEE.pop.vec,
                                   .f = NoDel.pop.to.clone.A.zitnik.PPI.gene.dists)
 
+## use partial function application so that cur.pop is the only free parameter.
+OnlyDel.pop.to.clone.A.cong.PPI.gene.dists <- partial(.f = pop.to.KO.edge.distances,
+                         clone.to.KOed.genes.list = OnlyDel.KOed.genes.in.LTEE.50K.A.clones,
+                         node1.df = cong.node1.bed,
+                         node2.df = cong.node2.bed)
+
+OnlyDel.KOed.50K.clone.A.cong.PPI.dists <- map_dfr(.x = LTEE.pop.vec,
+                                  .f = OnlyDel.pop.to.clone.A.cong.PPI.gene.dists)
+
+OnlyDel.pop.to.clone.A.zitnik.PPI.gene.dists <- partial(.f = pop.to.KO.edge.distances,
+                         clone.to.KOed.genes.list = OnlyDel.KOed.genes.in.LTEE.50K.A.clones,
+                         node1.df = zitnik.node1.bed,
+                         node2.df = zitnik.node2.bed)
+
+OnlyDel.KOed.50K.clone.A.zitnik.PPI.dists <- map_dfr(.x = LTEE.pop.vec,
+                                  .f = OnlyDel.pop.to.clone.A.zitnik.PPI.gene.dists)
+
 ## Now, overlay the two KO'ed edge distance distribution on top of the
 ## edge distance distribution for the whole network.
 
 NoDel.cong.PPI.dist.plot <- ggplot(cong.dist.df, aes(x=PPI.dist)) +
-    geom_histogram() +
-    geom_histogram(data = NoDel.KOed.50K.clone.A.cong.PPI.dists, fill="red") +
+    geom_histogram(alpha=0.2) +
+    geom_histogram(data = NoDel.KOed.50K.clone.A.cong.PPI.dists, fill="red",alpha=0.2) +
+    geom_histogram(data = OnlyDel.KOed.50K.clone.A.cong.PPI.dists, fill="blue",alpha=0.2) +
     theme_classic() + ylab("Count")
 
 NoDel.zitnik.PPI.dist.plot <- ggplot(zitnik.dist.df, aes(x=PPI.dist)) +
@@ -615,8 +647,108 @@ NoDel.zitnik.PPI.dist.plot <- ggplot(zitnik.dist.df, aes(x=PPI.dist)) +
     geom_histogram(data = NoDel.KOed.50K.clone.A.zitnik.PPI.dists, fill="red") +
     theme_classic() + ylab("Count")
 
-## by eye, it is unclear to me how to interpret this result.
-wilcox.test(cong.dist.df$PPI.dist, NoDel.KOed.50K.clone.A.cong.PPI.dists$PPI.dist)
+## surprising: the patterns are actually in the opposite direction than I expected!
+wilcox.test(cong.dist.df$PPI.dist, OnlyDel.KOed.50K.clone.A.cong.PPI.dists$PPI.dist)
 
-## surprising: pattern is actually in the opposite direction than I expected!
-wilcox.test(zitnik.dist.df$PPI.dist, NoDel.KOed.50K.clone.A.zitnik.PPI.dists$PPI.dist)
+mean(cong.dist.df$PPI.dist)
+mean(OnlyDel.KOed.50K.clone.A.cong.PPI.dists$PPI.dist)
+
+wilcox.test(zitnik.dist.df$PPI.dist, OnlyDel.KOed.50K.clone.A.zitnik.PPI.dists$PPI.dist)
+
+
+########################
+## Let's examine the degree distribution of KO'ed genes,
+## with and without large deletions.
+
+## examine the degree distribution of KO'ed genes of just large deletions
+## as well.
+
+zitnik.degree.df <- read.csv("../results/thermostability/Zitnik_network_statistics.csv")
+cong.degree.df <- read.csv("../results/thermostability/Cong_network_statistics.csv")
+
+
+## hypothesis: KO'ed genes have a smaller degree distribution.
+
+
+###########
+## calculate degree distribution for KO'ed genes of various stripes.
+
+pop.to.KO.degrees <- function(cur.pop, clone.to.KOed.genes.list, degree.df) {
+    KO.gene.vec <- clone.to.KOed.genes.list[[cur.pop]]
+    degree.df %>%
+        filter(Gene %in% KO.gene.vec)
+}
+
+
+## use partial function application so that cur.pop is the only free parameter.
+pop.to.clone.A.cong.PPI.degrees <- partial(.f = pop.to.KO.degrees,
+                         clone.to.KOed.genes.list = KOed.genes.in.LTEE.50K.A.clones,
+                         degree.df = cong.degree.df)
+
+KOed.50K.clone.A.cong.PPI.degrees <- map_dfr(.x = LTEE.pop.vec,
+                                  .f = pop.to.clone.A.cong.PPI.degrees)
+
+pop.to.clone.A.zitnik.PPI.degrees <- partial(.f = pop.to.KO.degrees,
+                         clone.to.KOed.genes.list = KOed.genes.in.LTEE.50K.A.clones,
+                         degree.df = zitnik.degree.df)
+
+KOed.50K.clone.A.zitnik.PPI.degrees <- map_dfr(.x = LTEE.pop.vec,
+                                  .f = pop.to.clone.A.zitnik.PPI.degrees)
+
+#################
+## exclude large deletions.
+
+NoDel.pop.to.clone.A.cong.PPI.degrees <- partial(.f = pop.to.KO.degrees,
+                         clone.to.KOed.genes.list = NoDel.KOed.genes.in.LTEE.50K.A.clones,
+                         degree.df = cong.degree.df)
+
+NoDel.KOed.50K.clone.A.cong.PPI.degrees <- map_dfr(.x = LTEE.pop.vec,
+                                  .f = NoDel.pop.to.clone.A.cong.PPI.degrees)
+
+NoDel.pop.to.clone.A.zitnik.PPI.degrees <- partial(.f = pop.to.KO.degrees,
+                         clone.to.KOed.genes.list = NoDel.KOed.genes.in.LTEE.50K.A.clones,
+                         degree.df = zitnik.degree.df)
+
+NoDel.KOed.50K.clone.A.zitnik.PPI.degrees <- map_dfr(.x = LTEE.pop.vec,
+                                  .f = NoDel.pop.to.clone.A.zitnik.PPI.degrees)
+##################
+## Only consider large deletions
+
+OnlyDel.pop.to.clone.A.cong.PPI.degrees <- partial(.f = pop.to.KO.degrees,
+                         clone.to.KOed.genes.list = OnlyDel.KOed.genes.in.LTEE.50K.A.clones,
+                         degree.df = cong.degree.df)
+
+OnlyDel.KOed.50K.clone.A.cong.PPI.degrees <- map_dfr(.x = LTEE.pop.vec,
+                                  .f = OnlyDel.pop.to.clone.A.cong.PPI.degrees)
+
+OnlyDel.pop.to.clone.A.zitnik.PPI.degrees <- partial(.f = pop.to.KO.degrees,
+                         clone.to.KOed.genes.list = OnlyDel.KOed.genes.in.LTEE.50K.A.clones,
+                         degree.df = zitnik.degree.df)
+
+OnlyDel.KOed.50K.clone.A.zitnik.PPI.degrees <- map_dfr(.x = LTEE.pop.vec,
+                                  .f = OnlyDel.pop.to.clone.A.zitnik.PPI.degrees)
+
+###########
+## plot the degree distribution.
+
+zitnik.degree.plot <- ggplot(zitnik.degree.df, aes(x=Degree)) +
+    geom_histogram() + 
+    geom_histogram(data=KOed.50K.clone.A.zitnik.PPI.degrees, fill = 'red') +
+    theme_classic()
+
+cong.degree.plot <- ggplot(cong.degree.df, aes(x=Degree)) +
+    geom_histogram() +
+    geom_histogram(data=KOed.50K.clone.A.cong.PPI.degrees, fill = 'red') +
+    theme_classic()
+
+## no significant different in degree between KO'ed genes within and outside of large
+## deletions in the LTEE.
+wilcox.test(OnlyDel.KOed.50K.clone.A.cong.PPI.degrees$Degree, NoDel.KOed.50K.clone.A.cong.PPI.degrees$Degree)
+
+mean(OnlyDel.KOed.50K.clone.A.cong.PPI.degrees$Degree)
+mean(NoDel.KOed.50K.clone.A.cong.PPI.degrees$Degree)
+
+wilcox.test(OnlyDel.KOed.50K.clone.A.zitnik.PPI.degrees$Degree, NoDel.KOed.50K.clone.A.zitnik.PPI.degrees$Degree)
+
+mean(OnlyDel.KOed.50K.clone.A.zitnik.PPI.degrees$Degree)
+mean(NoDel.KOed.50K.clone.A.zitnik.PPI.degrees$Degree)
