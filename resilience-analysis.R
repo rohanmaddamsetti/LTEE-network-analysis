@@ -5,6 +5,8 @@ library(cowplot)
 library(circlize)
 
 ################################################################
+REL606.CHR.LENGTH <- 4629812 ## constant used in a few places in the code.
+
 ## FUNCTIONS.
 
 set.no.KO.strains.resilience.to.REL606 <- function(df) {
@@ -220,7 +222,7 @@ regression.slope.test(big.cong.slope.df, "randomized_all")
 
 ########################################################################
 
-## Make a circos plot for the zitnik and cong networks, as affected by KO
+## Make a circos plot for the cong network, as affected by KO
 ## mutations in the 50K A clones.
 
 
@@ -270,8 +272,7 @@ KOed.genes.in.LTEE.50K.B.clones <- make.list.of.strain.to.KOed.genes(LTEE.50K.B.
 REL606.genes <- read.csv("../results/REL606_IDs.csv")
 
 ## get edges in Zitnik PPI network.
-raw.zitnik.edges <- read.csv("../results/thermostability/Ecoli-Zitnik-data/Ecoli-treeoflife.interactomes/511145.txt",
-                             sep=" ", header=FALSE) %>%
+raw.zitnik.edges <- read.csv("../results/thermostability/Ecoli-Zitnik-data/Ecoli-treeoflife.interactomes/511145.txt", sep=" ", header=FALSE) %>%
     mutate(edge.number = row_number())
 
 zitnik.node1 <- raw.zitnik.edges %>% 
@@ -293,24 +294,22 @@ zitnik.node1 <- zitnik.node1 %>%
     filter(edge.number %in% zitnik.node2$edge.number) %>%
     mutate(chr = "REL606") %>%
     relocate(chr) %>%
-    relocate(blattner, .after = last_col())
+    relocate(Gene, .after = last_col())
 
 zitnik.node2 <- zitnik.node2 %>%
     filter(edge.number %in% zitnik.node1$edge.number) %>%
     mutate(chr = "REL606") %>%
     relocate(chr) %>%
-    relocate(blattner, .after = last_col())
+    relocate(Gene, .after = last_col())
 
 ## just use the essential columns for plotting.
 zitnik.node1.bed <- zitnik.node1 %>%
-    select(chr, start, end, blattner) %>%
-    rename(Gene = blattner)
+    select(chr, start, end, Gene)
 
 zitnik.node2.bed <- zitnik.node2 %>%
-    select(chr, start, end, blattner) %>%
-    rename(Gene = blattner)
+    select(chr, start, end, Gene)
 
-############################################################
+#############################
 
 ## get edges in Cong PPI network.
 raw.cong.edges <- read.csv("../results/thermostability/Cong-good-interaction-set.tsv",sep="\t",header=FALSE) %>%
@@ -369,7 +368,7 @@ KO.genes.to.color.vec <- function(KO.gene.vec, node1.df, node2.df) {
 plot.genome.KOs <- function(KO.gene.vec, node1.bed, node2.bed, my.name="REL606") {
 
     ## one row df to initialize plot with one sector.
-    sector.df <- data.frame(chr = my.name, start=1, end=4629812)
+    sector.df <- data.frame(chr = my.name, start=1, end=REL606.CHR.LENGTH)
 
     ## rename the first column of the nodes to match the name
     ## for sector.df.
@@ -388,13 +387,16 @@ plot.genome.KOs <- function(KO.gene.vec, node1.bed, node2.bed, my.name="REL606")
                        border = NA)    
 }
 
-## POTENTIAL TODO: re-orient the coordinate system around the origin of replication.
 
 ## Figure 2.
+## Plot Cong networks.
 ## Make a facet style plot, showing the edges that are deleted due to KO
 ## mutations in each of the 12 50K A clones.
 
-## Plot Cong networks.
+## The Zitnik network has too many edges!
+## Showing the Zitnik network causes overplotting:
+## nothing can be seen.
+
 layout(matrix(1:12, 3, 4))
 for(cur.pop in LTEE.pop.vec) {
     par(mar = c(0.5, 0.5, 0.5, 0.5))
@@ -404,24 +406,10 @@ for(cur.pop in LTEE.pop.vec) {
     circos.clear()
 }
 
-## Too many edges! Showing the Zitnik network causes overplotting:
-## nothing can be seen.
-
-## Plot Zitnik networks.
-##layout(matrix(1:12, 3, 4))
-##for(cur.pop in LTEE.pop.vec) {
-##    par(mar = c(0.5, 0.5, 0.5, 0.5))
-##    circos.par(cell.padding = c(0, 0, 0, 0))
-##    my.KO.gene.vec <- KOed.genes.in.LTEE.50K.A.clones[[cur.pop]]
-##    plot.genome.KOs(my.KO.gene.vec, zitnik.node1.bed, zitnik.node2.bed, my.name=cur.pop)
-##    circos.clear()
-##}
-
-
-
 ## Supplementary Figure 1.
-## now make a circos plot for each of the 12 50K B clones,
-## showing the edges that are deleted due to KO mutations.
+## make a facet style circos plot, showing the edges that are deleted due to KO
+## mutations in each of the 12 50K B clones.
+
 layout(matrix(1:12, 3, 4))
 for(cur.pop in LTEE.pop.vec) {
     par(mar = c(0.5, 0.5, 0.5, 0.5))
@@ -431,6 +419,155 @@ for(cur.pop in LTEE.pop.vec) {
     circos.clear()
 }
 
+## Figure 3. Calculate the spatial distribution of edges to genomic distances
+## in the REL606 chromosome. Compare this to the spatial distribution of KO'ed edges to
+## genomic distances, with and without large deletions.
 
-## Then make a facet style plot, showing the edges that are deleted due to KO
-## mutations in each of the 12 50K B clones.
+calc.REL606.PPI.gene.distances <- function(node1.df, node2.df) {
+
+    ## helper function that calculates the distance between two genes on
+    ## the REL606 chromosome.
+    calc.PPI.gene.distance <- function(gene1.start, gene2.start) {
+        
+        if (gene1.start < gene2.start) {
+            x1 <- gene1.start
+            x2 <- gene2.start
+        } else {
+            x1 <- gene2.start
+            x2 <- gene1.start
+        }
+
+        d1 <- x2 - x1
+        d2 <- REL606.CHR.LENGTH - x2 + x1
+        return(min(d1, d2))
+    }
+    
+    PPI.dist.vec <- map2_dbl(.x = node1.df$start, .y = node2.df$start,
+                         .f = calc.PPI.gene.distance)
+    PPI.dist.df <- data.frame(PPI.dist=PPI.dist.vec)
+   return(PPI.dist.df) 
+}
+
+## Dataframes of the distance between interacting genes.
+cong.dist.df <- calc.REL606.PPI.gene.distances(cong.node1.bed, cong.node2.bed)
+zitnik.dist.df <- calc.REL606.PPI.gene.distances(zitnik.node1.bed, zitnik.node2.bed)
+
+## Make dataframes for the distance between KO'ed genes across all 12 LTEE pops.
+## TODO.
+
+get.KOed.edges <- function(KO.gene.vec, node1.df, node2.df) {
+    ## returns a vector for edges that are knocked out,
+    ## based on whether the nodes for the link are in KO.gene.vec.
+    
+    node1.vec <- node1.df$Gene
+    node2.vec <- node2.df$Gene
+    
+    boolvec1 <- sapply(node1.vec, function(x) ifelse(x %in% KO.gene.vec,TRUE,FALSE))
+    boolvec2 <- sapply(node2.vec, function(x) ifelse(x %in% KO.gene.vec,TRUE,FALSE))
+    or.boolvec <- boolvec1 | boolvec2
+    return(or.boolvec)
+}
+
+pop.to.KO.edge.distances <- function(cur.pop, clone.to.KOed.genes.list, node1.df, node2.df) {
+
+    KO.gene.vec <- clone.to.KOed.genes.list[[cur.pop]]
+    KO.vec <- get.KOed.edges(KO.gene.vec, node1.df, node2.df)
+
+    KOed.node1.df <- node1.df %>%
+        mutate(KOed.edge = KO.vec) %>%
+        filter(KOed.edge == TRUE)
+    KOed.node2.df <- node2.df %>%
+        mutate(KOed.edge = KO.vec) %>%
+        filter(KOed.edge == TRUE)
+    
+    KOed.edge.distance.df <- calc.REL606.PPI.gene.distances(KOed.node1.df, KOed.node2.df)
+    return(KOed.edge.distance.df)
+}
+
+## use partial function application so that cur.pop is the only free parameter.
+pop.to.clone.A.cong.PPI.gene.dists <- partial(.f = pop.to.KO.edge.distances,
+                         clone.to.KOed.genes.list = KOed.genes.in.LTEE.50K.A.clones,
+                         node1.df = cong.node1.bed,
+                         node2.df = cong.node2.bed)
+
+KOed.50K.clone.A.cong.PPI.dists <- map_dfr(.x = LTEE.pop.vec,
+                                  .f = pop.to.clone.A.cong.PPI.gene.dists)
+
+pop.to.clone.A.zitnik.PPI.gene.dists <- partial(.f = pop.to.KO.edge.distances,
+                         clone.to.KOed.genes.list = KOed.genes.in.LTEE.50K.A.clones,
+                         node1.df = zitnik.node1.bed,
+                         node2.df = zitnik.node2.bed)
+
+KOed.50K.clone.A.zitnik.PPI.dists <- map_dfr(.x = LTEE.pop.vec,
+                                  .f = pop.to.clone.A.zitnik.PPI.gene.dists)
+
+## Now, overlay the two KO'ed edge distance distribution on top of the
+## edge distance distribution for the whole network.
+
+cong.PPI.dist.plot <- ggplot(cong.dist.df, aes(x=PPI.dist)) +
+    geom_histogram() +
+    geom_histogram(data = KOed.50K.clone.A.cong.PPI.dists, fill="red") +
+    theme_classic() + ylab("Count")
+
+zitnik.PPI.dist.plot <- ggplot(zitnik.dist.df, aes(x=PPI.dist)) +
+    geom_histogram() +
+    geom_histogram(data = KOed.50K.clone.A.zitnik.PPI.dists, fill="red") +
+    theme_classic() + ylab("Count")
+
+wilcox.test(cong.dist.df$PPI.dist, KOed.50K.clone.A.cong.PPI.dists$PPI.dist)
+
+## surprising: pattern is actually in the opposite direction than I expected!
+wilcox.test(zitnik.dist.df$PPI.dist, KOed.50K.clone.A.zitnik.PPI.dists$PPI.dist)
+
+#######################################################
+## redo, now omitting large deletions from the picture.
+
+NoDel.LTEE.50K.A.clone.KO.data <- LTEE.genomes.KO.muts %>%
+    ## remove intergenic mutations.
+    filter(!str_detect(gene_position, "intergenic")) %>%
+    filter(time == 50000) %>%
+    select(population, strain, clone, gene_list) %>%
+    filter(clone == 'A') %>%
+    ## filter out multigene deletions.
+    filter(!str_detect(gene_list, ','))
+
+
+NoDel.KOed.genes.in.LTEE.50K.A.clones <- make.list.of.strain.to.KOed.genes(
+    NoDel.LTEE.50K.A.clone.KO.data)
+
+
+## use partial function application so that cur.pop is the only free parameter.
+NoDel.pop.to.clone.A.cong.PPI.gene.dists <- partial(.f = pop.to.KO.edge.distances,
+                         clone.to.KOed.genes.list = NoDel.KOed.genes.in.LTEE.50K.A.clones,
+                         node1.df = cong.node1.bed,
+                         node2.df = cong.node2.bed)
+
+NoDel.KOed.50K.clone.A.cong.PPI.dists <- map_dfr(.x = LTEE.pop.vec,
+                                  .f = NoDel.pop.to.clone.A.cong.PPI.gene.dists)
+
+NoDel.pop.to.clone.A.zitnik.PPI.gene.dists <- partial(.f = pop.to.KO.edge.distances,
+                         clone.to.KOed.genes.list = NoDel.KOed.genes.in.LTEE.50K.A.clones,
+                         node1.df = zitnik.node1.bed,
+                         node2.df = zitnik.node2.bed)
+
+NoDel.KOed.50K.clone.A.zitnik.PPI.dists <- map_dfr(.x = LTEE.pop.vec,
+                                  .f = NoDel.pop.to.clone.A.zitnik.PPI.gene.dists)
+
+## Now, overlay the two KO'ed edge distance distribution on top of the
+## edge distance distribution for the whole network.
+
+NoDel.cong.PPI.dist.plot <- ggplot(cong.dist.df, aes(x=PPI.dist)) +
+    geom_histogram() +
+    geom_histogram(data = NoDel.KOed.50K.clone.A.cong.PPI.dists, fill="red") +
+    theme_classic() + ylab("Count")
+
+NoDel.zitnik.PPI.dist.plot <- ggplot(zitnik.dist.df, aes(x=PPI.dist)) +
+    geom_histogram() +
+    geom_histogram(data = NoDel.KOed.50K.clone.A.zitnik.PPI.dists, fill="red") +
+    theme_classic() + ylab("Count")
+
+## by eye, it is unclear to me how to interpret this result.
+wilcox.test(cong.dist.df$PPI.dist, NoDel.KOed.50K.clone.A.cong.PPI.dists$PPI.dist)
+
+## surprising: pattern is actually in the opposite direction than I expected!
+wilcox.test(zitnik.dist.df$PPI.dist, NoDel.KOed.50K.clone.A.zitnik.PPI.dists$PPI.dist)
