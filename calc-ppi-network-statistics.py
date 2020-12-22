@@ -284,7 +284,7 @@ def getStronglyConnectedComponents(Graph, node_to_g):
     return prot_to_SCcomponent
 
 
-def write_NetworkStatistics(Graph, node_to_g, outf, use_blattner=True):
+def write_NetworkStatistics(Graph, node_to_g, outf):
     ## make dictionaries of genes to network statistics.
     p_to_pagerank = calc_PageRank(Graph, node_to_g)
     p_to_hub, p_to_authority = calc_HubAndAuthorityScores(Graph, node_to_g)
@@ -295,11 +295,7 @@ def write_NetworkStatistics(Graph, node_to_g, outf, use_blattner=True):
     p_to_degree_centrality = calc_DegreeCentrality(Graph, node_to_g)
     p_to_articulation_points = getArticulationPoints(Graph, node_to_g)
     p_to_SCcomponent = getStronglyConnectedComponents(Graph, node_to_g)
-    header = "Pagerank,HubScore,AuthorityScore,ClosenessCentrality,BetweenessCentrality,EigenvectorCentrality,Degree,DegreeCentrality,IsArticulationPoint,StronglyConnectedComponent"
-    if use_blattner: ## Zitnik data
-        header = "blattner," + header
-    else: ## Cong data
-        header = "Gene," + header
+    header = "Gene,Pagerank,HubScore,AuthorityScore,ClosenessCentrality,BetweenessCentrality,EigenvectorCentrality,Degree,DegreeCentrality,IsArticulationPoint,StronglyConnectedComponent"
 
     with open(outf,"w") as outfh:
         outfh.write(header+"\n")
@@ -354,7 +350,7 @@ def main():
     G1file = "../results/thermostability/Zitnik_network_statistics.csv"
     G2file = "../results/thermostability/Cong_network_statistics.csv"
     write_NetworkStatistics(G1, node_to_g1, G1file)
-    write_NetworkStatistics(G2, node_to_g2, G2file, use_blattner=False)
+    write_NetworkStatistics(G2, node_to_g2, G2file)
 
 if __name__ == "__main__":
     main()
