@@ -221,7 +221,56 @@ regression.slope.test(big.cong.slope.df, "weighted_randomized_across")
 regression.slope.test(big.cong.slope.df, "randomized_all")
 
 ########################################################################
+## re-do the previous analysis, but now omitting large deletions.
+## NoDeletion PPI network resilience results, using Duke Compute Cluster runs.
 
+
+noDel.resilience.df <- read.csv("../results/resilience/collated-noDeletions-resilience-runs.csv") %>%
+    full_join(LTEE.genomes.KO.metadata) %>%
+    set.no.KO.strains.resilience.to.REL606() %>%
+    mutate(log.resilience=log(resilience)) %>%
+    add_timeseries_column() %>%
+    ## HACK TO REMOVE THE TWO PROBLEMATIC CASES FOR NOW (BEFORE DEBUGGING):
+    filter(!is.na(replicate))
+
+noDel.cong.resilience.df <- noDel.resilience.df %>%
+    filter(dataset=="Cong")
+
+noDel.zitnik.resilience.df <- noDel.resilience.df %>%
+    filter(dataset=="Zitnik")
+
+
+noDel.cong.resilience.plot <- make.big.Cong.resilience.plot(noDel.cong.resilience.df)
+noDel.zitnik.resilience.plot <- make.big.Zitnik.resilience.plot(noDel.zitnik.resilience.df)
+
+noDelFig.legend <- get_legend(make.big.resilience.plot(noDel.cong.resilience.df,
+                                                   plot.legend=TRUE))
+
+noDelFig <- plot_grid(plot_grid(noDel.zitnik.resilience.plot, noDel.cong.resilience.plot,
+                            labels=c('A','B',NULL),nrow=1, rel_widths=c(1,1,0.4)),
+                  noDelFig.legend,ncol=1, rel_heights=c(1,0.05))
+ggsave("../results/resilience/figures/noDelFig.pdf",height=7,width=6)
+
+
+## Calculate statistics on differences between slopes.
+noDel.cong.slope.df <- noDel.cong.resilience.df %>%
+    split(.$timeseries) %>%
+    map_dfr(.f = calc.resilience.regression.df)
+
+noDel.zitnik.slope.df <- noDel.zitnik.resilience.df %>%
+    split(.$timeseries) %>%
+    map_dfr(.f = calc.resilience.regression.df)
+
+regression.slope.test(noDel.zitnik.slope.df, "randomized_across")
+regression.slope.test(noDel.zitnik.slope.df, "weighted_randomized_across")
+regression.slope.test(noDel.zitnik.slope.df, "randomized_all")
+
+regression.slope.test(noDel.cong.slope.df, "randomized_across")
+regression.slope.test(noDel.cong.slope.df, "weighted_randomized_across")
+regression.slope.test(noDel.cong.slope.df, "randomized_all")
+
+
+########################################################################
 ## Make a circos plot for the cong network, as affected by KO
 ## mutations in the 50K A clones.
 
