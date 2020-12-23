@@ -398,7 +398,6 @@ cong.node1.bed <- cong.node1 %>%
 cong.node2.bed <- cong.node2 %>%
     select(chr, start, end, Gene)
 
-
 KO.genes.to.color.vec <- function(KO.gene.vec, node1.df, node2.df) {
     ## returns a vector for the color mapping for circos plot links,
     ## based on whether the nodes for the link are in KO.gene.vec.
@@ -414,7 +413,8 @@ KO.genes.to.color.vec <- function(KO.gene.vec, node1.df, node2.df) {
     
 }
 
-plot.genome.KOs <- function(KO.gene.vec, node1.bed, node2.bed, my.name="REL606") {
+plot.genome.KOs <- function(KO.gene.vec, node1.bed, node2.bed,
+                            my.name="REL606", filter.nodes=TRUE) {
 
     ## one row df to initialize plot with one sector.
     sector.df <- data.frame(chr = my.name, start=1, end=REL606.CHR.LENGTH)
@@ -427,6 +427,18 @@ plot.genome.KOs <- function(KO.gene.vec, node1.bed, node2.bed, my.name="REL606")
         mutate(chr = my.name)
     
     my.color.vec <- KO.genes.to.color.vec(KO.gene.vec, node1.bed, node2.bed)
+
+    if (filter.nodes) { ## then only plot the KO'ed edges.
+        node1.bed <- node1.bed %>%
+            mutate(my.color = my.color.vec) %>%
+            filter(my.color == 'red')
+        node2.bed <- node2.bed %>%
+            mutate(my.color = my.color.vec) %>%
+            filter(my.color == 'red')
+        
+        my.color.vec <- rep('red', nrow(node1.bed))
+    }
+
     
     ## now plot the PPI network.
     circos.genomicInitialize(sector.df)
@@ -442,10 +454,6 @@ plot.genome.KOs <- function(KO.gene.vec, node1.bed, node2.bed, my.name="REL606")
 ## Make a facet style plot, showing the edges that are deleted due to KO
 ## mutations in each of the 12 50K A clones.
 
-## The Zitnik network has too many edges!
-## Showing the Zitnik network causes overplotting:
-## nothing can be seen.
-
 layout(matrix(1:12, 3, 4))
 for(cur.pop in LTEE.pop.vec) {
     par(mar = c(0.5, 0.5, 0.5, 0.5))
@@ -454,6 +462,17 @@ for(cur.pop in LTEE.pop.vec) {
     plot.genome.KOs(my.KO.gene.vec, cong.node1.bed, cong.node2.bed, my.name=cur.pop)
     circos.clear()
 }
+
+## now plot the Zitnik networks
+layout(matrix(1:12, 3, 4))
+for(cur.pop in LTEE.pop.vec) {
+    par(mar = c(0.5, 0.5, 0.5, 0.5))
+    circos.par(cell.padding = c(0, 0, 0, 0))
+    my.KO.gene.vec <- KOed.genes.in.LTEE.50K.A.clones[[cur.pop]]
+    plot.genome.KOs(my.KO.gene.vec, zitnik.node1.bed, zitnik.node2.bed, my.name=cur.pop)
+    circos.clear()
+}
+
 
 ## Supplementary Figure 1.
 ## make a facet style circos plot, showing the edges that are deleted due to KO
@@ -669,7 +688,6 @@ cong.degree.df <- read.csv("../results/thermostability/Cong_network_statistics.c
 
 ## hypothesis: KO'ed genes have a smaller degree distribution.
 
-
 ###########
 ## calculate degree distribution for KO'ed genes of various stripes.
 
@@ -752,3 +770,64 @@ wilcox.test(OnlyDel.KOed.50K.clone.A.zitnik.PPI.degrees$Degree, NoDel.KOed.50K.c
 
 mean(OnlyDel.KOed.50K.clone.A.zitnik.PPI.degrees$Degree)
 mean(NoDel.KOed.50K.clone.A.zitnik.PPI.degrees$Degree)
+
+
+####################################################################
+##### examine parallel evolution of KO'ed edges in the PPI networks.
+
+pop.to.KO.edges <- function(cur.pop, clone.to.KOed.genes.list, node1.df, node2.df) {
+
+    KO.gene.vec <- clone.to.KOed.genes.list[[cur.pop]]
+    KO.vec <- get.KOed.edges(KO.gene.vec, node1.df, node2.df)
+
+    KOed.node1.df <- node1.df %>%
+        mutate(KOed.edge = KO.vec) %>%
+        filter(KOed.edge == TRUE)
+    KOed.node2.df <- node2.df %>%
+        mutate(KOed.edge = KO.vec) %>%
+        filter(KOed.edge == TRUE)
+
+    KO.edge.df <- data.frame(Gene1 = KOed.node1.df$Gene,
+                             Gene2 = KOed.node2.df$Gene)
+    return(KO.edge.df)
+}
+
+## ignore genes with known parallelism in KO mutations, as reported
+## in Tenaillon et al. (2016) 264 LTEE genomes paper.
+Tenaillon2016.Table2.KO.genes <- c("rbsA", "rbsB" , "rbsD", "nupC", "iap",
+                                   "mokB", "mokC",
+                                   "ybcU", "borD", "ECB_02013", "ECB_02816",
+                                   "kpsD", "hokE", "ldrC", "menC", "fimA",
+                                   "fimC", "fimD", "fimF", "fimG", "fimH")
+
+
+pop.to.clone.A.cong.KO.edges <- partial(.f = pop.to.KO.edges,
+                         clone.to.KOed.genes.list = KOed.genes.in.LTEE.50K.A.clones,
+                         node1.df = cong.node1.bed,
+                         node2.df = cong.node2.bed)
+
+parallel.KO.cong.edges <- map_dfr(.x = LTEE.pop.vec,
+                                  .f = pop.to.clone.A.cong.KO.edges) %>%
+##    filter(!(Gene1 %in% Tenaillon2016.Table2.KO.genes)) %>%
+##    filter(!(Gene2 %in% Tenaillon2016.Table2.KO.genes)) %>%
+    group_by(Gene1, Gene2) %>%
+    summarize(count = n()) %>%
+    arrange(desc(count)) %>%
+    filter(count > 3)
+
+pop.to.clone.A.zitnik.KO.edges <- partial(.f = pop.to.KO.edges,
+                         clone.to.KOed.genes.list = KOed.genes.in.LTEE.50K.A.clones,
+                         node1.df = zitnik.node1.bed,
+                         node2.df = zitnik.node2.bed)
+
+parallel.KO.zitnik.edges <- map_dfr(.x = LTEE.pop.vec,
+                                    .f = pop.to.clone.A.zitnik.KO.edges) %>%
+##    filter(!(Gene1 %in% Tenaillon2016.Table2.KO.genes)) %>%
+##    filter(!(Gene2 %in% Tenaillon2016.Table2.KO.genes)) %>%
+    group_by(Gene1, Gene2) %>%
+    summarize(count = n()) %>%
+    arrange(desc(count)) %>%
+    filter(count > 3)
+
+filter(REL606.genes, Gene == "atpA")
+filter(REL606.genes, Gene == "yhhI")
