@@ -17,14 +17,6 @@ break consecutive genes. When sampling genes without replacement to be KO'ed
 in randomized genomes, it is unlikely to sample a block of KO'ed genes.
 This choice for how to randomize genomes may affect the results, 
 by breaking up the 'block' structure of multi-gene deletions.
-This may be salient if genes may preferentially interact with nearby genes
-(say, for genes in an operon), such that knocking out a block of X genes is expected to have
-less of an effect on PPI network resilience than knocking out X genes across the genome.
-
-To see how multi-gene deletions relate to PPI interactions, I can make a circos plot
-of PPI interactions in the Zitnik and Cong datasets, and plot multi-genes deletions
-(or even KO'ed genes in general) in the 50K genomes as a layer of the plot.
-
 '''
 
 ## check if we are on the Duke Compute Cluster.
