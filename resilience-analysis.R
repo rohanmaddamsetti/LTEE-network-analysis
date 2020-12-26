@@ -2,8 +2,8 @@
 
 library(tidyverse)
 library(cowplot)
+###########################################################################
 
-################################################################
 REL606.CHR.LENGTH <- 4629812 ## constant used in a few places in the code.
 
 ## FUNCTIONS.
@@ -66,6 +66,7 @@ make.big.resilience.plot <- function(big.resilience.df, plot.legend=FALSE) {
     return(p)
 }
 
+
 make.big.Cong.resilience.plot <- function(big.resilience.df) {
     p <- make.big.resilience.plot(big.resilience.df) +
         ## IMPORTANT: axes need to be consistent when comparing plots.
@@ -73,6 +74,7 @@ make.big.Cong.resilience.plot <- function(big.resilience.df) {
         ggtitle("Cong PPI dataset")
     return(p)
 }
+
 
 make.big.Zitnik.resilience.plot <- function(big.resilience.df) {
     p <- make.big.resilience.plot(big.resilience.df) +
@@ -152,90 +154,6 @@ regression.slope.test <- function(full.slope.df, null.comp.string) {
 }
 
 
-##########################################################################
-## IMPORT METADATA.
-
-## Order nonmutator pops, then hypermutator pops by converting Population to
-## factor type and setting the levels.
-nonmutator.pops <- c("Ara-5", "Ara-6", "Ara+1", "Ara+2", "Ara+4", "Ara+5")
-hypermutator.pops <- c("Ara-1", "Ara-2", "Ara-3", "Ara-4", "Ara+3", "Ara+6")
-
-LTEE.pop.vec <- c(nonmutator.pops, hypermutator.pops)
-
-## we will add REL606 as ancestor to all 12 populations.
-REL606.metadata <- data.frame(strain = rep('REL606', 12),
-                              population = LTEE.pop.vec,
-                              time = rep(0, 12),
-                              clone = rep('A', 12),
-                              mutator_status = rep('non-mutator', 12))
-
-LTEE.genomes.KO.muts <- read.csv(
-    "../data/LTEE-264-genomes-SNP-nonsense-small-indel-MOB-large-deletions.csv") %>%
-    ## filter out intergenic mutations.
-    filter(!str_detect(gene_position, "intergenic"))
-
-LTEE.genomes.KO.metadata <- LTEE.genomes.KO.muts %>%
-    select(population,time,strain,clone,mutator_status) %>%
-    distinct() %>%
-    ## let's add REL606.
-    full_join(REL606.metadata) %>%
-    mutate(Generation=time/10000) %>%
-    ## This for changing the ordering of populations in plots.
-    mutate(population=factor(population,levels=c(nonmutator.pops,hypermutator.pops)))
-
-#######################################################################
-## PPI network resilience results, using Duke Compute Cluster runs.
-
-big.resilience.df <- read.csv("../results/resilience/collated-resilience-runs.csv") %>%
-    full_join(LTEE.genomes.KO.metadata) %>%
-    set.no.KO.strains.resilience.to.REL606() %>%
-    mutate(log.resilience=log(resilience)) %>%
-    ## remove the runs for the set of genes KO'ed across the LTEE populations.
-    filter(run_type != "across_pops_randomized_resilience") %>%
-    add_Treatment_column()
-
-big.cong.resilience.df <- big.resilience.df %>%
-    filter(dataset=="Cong")
-
-big.zitnik.resilience.df <- big.resilience.df %>%
-    filter(dataset=="Zitnik")
-
-big.cong.resilience.plot <- make.big.Cong.resilience.plot(big.cong.resilience.df)
-big.zitnik.resilience.plot <- make.big.Zitnik.resilience.plot(big.zitnik.resilience.df)
-
-Fig1.legend <- get_legend(make.big.resilience.plot(big.cong.resilience.df,
-                                                   plot.legend=TRUE))
-
-Fig1 <- plot_grid(plot_grid(big.zitnik.resilience.plot,big.cong.resilience.plot,
-                            labels=c('A','B',NULL),nrow=1, rel_widths=c(1,1,0.4)),
-                  Fig1.legend,ncol=1, rel_heights=c(1,0.05))
-ggsave("../results/resilience/figures/Fig1.pdf",height=7,width=6)
-
-
-## calculate the slopes of the resilience regressions.
-big.cong.slope.df <- calc.resilience.regression.df(big.cong.resilience.df)
-big.zitnik.slope.df <- calc.resilience.regression.df(big.zitnik.resilience.df)
-
-cong.slopes.from.data <- big.cong.slope.df %>%
-    filter(Treatment == "actual data")
-
-zitnik.slopes.from.data <- big.zitnik.slope.df %>%
-    filter(Treatment == "actual data")
-
-## Calculate statistics on differences between slopes.
-regression.slope.test(big.zitnik.slope.df, "randomized over LTEE")
-regression.slope.test(big.zitnik.slope.df, "randomized over genome")
-
-regression.slope.test(big.cong.slope.df, "randomized over LTEE")
-regression.slope.test(big.cong.slope.df, "randomized over genome")
-
-########################################################################
-## Analysis to see whether large deletions systematically bias
-## the result reported in Figure 1.
-########################################################################
-
-## FUNCTIONS.
-
 make.list.of.strain.to.KOed.genes <- function(LTEE.KO.data) {
 ## make a list of strain to vectors of KO'ed genes.
 
@@ -259,6 +177,7 @@ make.list.of.strain.to.KOed.genes <- function(LTEE.KO.data) {
         split(.$population) %>%
         map(.f = KO.df.to.KO.vec)
 }
+
 
 calc.REL606.PPI.gene.distances <- function(node1.df, node2.df) {
     ## Calculate the spatial distribution of edges to genomic distances
@@ -328,7 +247,37 @@ pop.to.KO.degrees <- function(cur.pop, clone.to.KOed.genes.list, degree.df) {
         filter(Gene %in% KO.gene.vec)
 }
 
-#############################################################################
+
+##########################################################################
+## IMPORT METADATA.
+
+## Order nonmutator pops, then hypermutator pops by converting Population to
+## factor type and setting the levels.
+nonmutator.pops <- c("Ara-5", "Ara-6", "Ara+1", "Ara+2", "Ara+4", "Ara+5")
+hypermutator.pops <- c("Ara-1", "Ara-2", "Ara-3", "Ara-4", "Ara+3", "Ara+6")
+
+LTEE.pop.vec <- c(nonmutator.pops, hypermutator.pops)
+
+## we will add REL606 as ancestor to all 12 populations.
+REL606.metadata <- data.frame(strain = rep('REL606', 12),
+                              population = LTEE.pop.vec,
+                              time = rep(0, 12),
+                              clone = rep('A', 12),
+                              mutator_status = rep('non-mutator', 12))
+
+LTEE.genomes.KO.muts <- read.csv(
+    "../data/LTEE-264-genomes-SNP-nonsense-small-indel-MOB-large-deletions.csv") %>%
+    ## filter out intergenic mutations.
+    filter(!str_detect(gene_position, "intergenic"))
+
+LTEE.genomes.KO.metadata <- LTEE.genomes.KO.muts %>%
+    select(population,time,strain,clone,mutator_status) %>%
+    distinct() %>%
+    ## let's add REL606.
+    full_join(REL606.metadata) %>%
+    mutate(Generation=time/10000) %>%
+    ## This for changing the ordering of populations in plots.
+    mutate(population=factor(population,levels=c(nonmutator.pops,hypermutator.pops)))
 
 ## import metadata for genes in the REL606 genomes.
 REL606.genes <- read.csv("../results/REL606_IDs.csv")
@@ -342,11 +291,62 @@ LTEE.50K.KO.data <- LTEE.genomes.KO.muts %>%
 
 LTEE.50K.A.clone.KO.data <- LTEE.50K.KO.data %>%
     filter(clone == 'A')
-LTEE.50K.B.clone.KO.data <- LTEE.50K.KO.data %>%
-    filter(clone == 'B')
 
-KOed.genes.in.LTEE.50K.A.clones <- make.list.of.strain.to.KOed.genes(LTEE.50K.A.clone.KO.data)
+KOed.genes.in.LTEE.50K.A.clones <- make.list.of.strain.to.KOed.genes(
+    LTEE.50K.A.clone.KO.data)
 
+
+#######################################################################
+## PPI network resilience results, using Duke Compute Cluster runs.
+
+big.resilience.df <- read.csv("../results/resilience/collated-resilience-runs.csv") %>%
+    full_join(LTEE.genomes.KO.metadata) %>%
+    set.no.KO.strains.resilience.to.REL606() %>%
+    mutate(log.resilience=log(resilience)) %>%
+    ## remove the runs for the set of genes KO'ed across the LTEE populations.
+    filter(run_type != "across_pops_randomized_resilience") %>%
+    add_Treatment_column()
+
+big.cong.resilience.df <- big.resilience.df %>%
+    filter(dataset=="Cong")
+
+big.zitnik.resilience.df <- big.resilience.df %>%
+    filter(dataset=="Zitnik")
+
+big.cong.resilience.plot <- make.big.Cong.resilience.plot(big.cong.resilience.df)
+big.zitnik.resilience.plot <- make.big.Zitnik.resilience.plot(big.zitnik.resilience.df)
+
+Fig1.legend <- get_legend(make.big.resilience.plot(big.cong.resilience.df,
+                                                   plot.legend=TRUE))
+
+Fig1 <- plot_grid(plot_grid(big.zitnik.resilience.plot,big.cong.resilience.plot,
+                            labels=c('A','B',NULL),nrow=1, rel_widths=c(1,1,0.4)),
+                  Fig1.legend,ncol=1, rel_heights=c(1,0.05))
+ggsave("../results/resilience/figures/Fig1.pdf",height=7,width=6)
+
+
+## calculate the slopes of the resilience regressions.
+big.cong.slope.df <- calc.resilience.regression.df(big.cong.resilience.df)
+big.zitnik.slope.df <- calc.resilience.regression.df(big.zitnik.resilience.df)
+
+cong.slopes.from.data <- big.cong.slope.df %>%
+    filter(Treatment == "actual data")
+
+zitnik.slopes.from.data <- big.zitnik.slope.df %>%
+    filter(Treatment == "actual data")
+
+## Calculate statistics on differences between slopes.
+regression.slope.test(big.zitnik.slope.df, "randomized over genome")
+regression.slope.test(big.cong.slope.df, "randomized over genome")
+
+regression.slope.test(big.zitnik.slope.df, "randomized over LTEE")
+regression.slope.test(big.cong.slope.df, "randomized over LTEE")
+
+
+########################################################################
+## Analysis to see whether large deletions systematically bias
+## the result reported in Figure 1.
+########################################################################
 
 ## get edges in Zitnik PPI network.
 raw.zitnik.edges <- read.csv("../results/thermostability/Ecoli-Zitnik-data/Ecoli-treeoflife.interactomes/511145.txt", sep=" ", header=FALSE) %>%
@@ -369,11 +369,11 @@ zitnik.node2 <- raw.zitnik.edges %>%
 ## filter for edges between nodes that have not been removed.
 zitnik.node1 <- zitnik.node1 %>%
     filter(edge.number %in% zitnik.node2$edge.number) %>%
-    select(Gene, start)
+    select(Gene, start, edge.number)
 
 zitnik.node2 <- zitnik.node2 %>%
     filter(edge.number %in% zitnik.node1$edge.number) %>%
-    select(Gene, start)
+    select(Gene, start, edge.number)
 
 #############################
 
@@ -398,11 +398,11 @@ cong.node2 <- raw.cong.edges %>%
 ## filter for edges between nodes that have not been removed.
 cong.node1 <- cong.node1 %>%
     filter(edge.number %in% cong.node2$edge.number) %>%
-    select(Gene, start)
+    select(Gene, start, edge.number)
 
 cong.node2 <- cong.node2 %>%
     filter(edge.number %in% cong.node1$edge.number) %>%
-    select(Gene, start)
+    select(Gene, start, edge.number)
 
 #############################
 
@@ -413,40 +413,29 @@ zitnik.dist.df <- calc.REL606.PPI.gene.distances(zitnik.node1, zitnik.node2)
 ## Calculate the genomic distance for KO'ed interactions across all 12 LTEE pops.
 
 ## use partial function application so that cur.pop is the only free parameter.
-pop.to.clone.A.cong.PPI.gene.dists <- partial(.f = pop.to.KO.edge.distances,
-                         clone.to.KOed.genes.list = KOed.genes.in.LTEE.50K.A.clones,
-                         node1.df = cong.node1,
-                         node2.df = cong.node2)
+pop.to.clone.A.cong.PPI.gene.dists <- partial(
+    .f = pop.to.KO.edge.distances,
+    clone.to.KOed.genes.list = KOed.genes.in.LTEE.50K.A.clones,
+    node1.df = cong.node1,
+    node2.df = cong.node2)
 
-KOed.50K.clone.A.cong.PPI.dists <- map_dfr(.x = LTEE.pop.vec,
-                                  .f = pop.to.clone.A.cong.PPI.gene.dists)
+pop.to.clone.A.zitnik.PPI.gene.dists <- partial(
+    .f = pop.to.KO.edge.distances,
+    clone.to.KOed.genes.list = KOed.genes.in.LTEE.50K.A.clones,
+    node1.df = zitnik.node1,
+    node2.df = zitnik.node2)
 
-pop.to.clone.A.zitnik.PPI.gene.dists <- partial(.f = pop.to.KO.edge.distances,
-                         clone.to.KOed.genes.list = KOed.genes.in.LTEE.50K.A.clones,
-                         node1.df = zitnik.node1,
-                         node2.df = zitnik.node2)
+## IMPORTANT NOTE: These distributions involve
+## parallel evolution. So edges that are knocked out in multiple populations
+## are counted multiple times.
 
-KOed.50K.clone.A.zitnik.PPI.dists <- map_dfr(.x = LTEE.pop.vec,
-                                  .f = pop.to.clone.A.zitnik.PPI.gene.dists)
+KOed.50K.clone.A.cong.PPI.dists <- map_dfr(
+    .x = LTEE.pop.vec,
+    .f = pop.to.clone.A.cong.PPI.gene.dists)
 
-## Now, overlay the two KO'ed edge distance distribution on top of the
-## edge distance distribution for the whole network.
-
-cong.PPI.dist.plot <- ggplot(cong.dist.df, aes(x=PPI.dist)) +
-    geom_histogram() +
-    geom_histogram(data = KOed.50K.clone.A.cong.PPI.dists, fill="red") +
-    theme_classic() + ylab("Count")
-
-zitnik.PPI.dist.plot <- ggplot(zitnik.dist.df, aes(x=PPI.dist)) +
-    geom_histogram() +
-    geom_histogram(data = KOed.50K.clone.A.zitnik.PPI.dists, fill="red") +
-    theme_classic() + ylab("Count")
-
-## not significant.
-wilcox.test(cong.dist.df$PPI.dist, KOed.50K.clone.A.cong.PPI.dists$PPI.dist)
-
-## surprising: pattern is actually in the opposite direction than I expected!
-wilcox.test(zitnik.dist.df$PPI.dist, KOed.50K.clone.A.zitnik.PPI.dists$PPI.dist)
+KOed.50K.clone.A.zitnik.PPI.dists <- map_dfr(
+    .x = LTEE.pop.vec,
+    .f = pop.to.clone.A.zitnik.PPI.gene.dists)
 
 #######################################################
 ## redo, now omitting large deletions from the picture.
@@ -460,10 +449,6 @@ NoDel.LTEE.50K.A.clone.KO.data <- LTEE.genomes.KO.muts %>%
     ## filter out multigene deletions.
     filter(!str_detect(gene_list, ','))
 
-
-NoDel.KOed.genes.in.LTEE.50K.A.clones <- make.list.of.strain.to.KOed.genes(
-    NoDel.LTEE.50K.A.clone.KO.data)
-
 OnlyDel.LTEE.50K.A.clone.KO.data <- LTEE.genomes.KO.muts %>%
     ## remove intergenic mutations.
     filter(!str_detect(gene_position, "intergenic")) %>%
@@ -472,6 +457,10 @@ OnlyDel.LTEE.50K.A.clone.KO.data <- LTEE.genomes.KO.muts %>%
     filter(clone == 'A') %>%
     ## only multigene deletions.
     filter(str_detect(gene_list, ','))
+
+
+NoDel.KOed.genes.in.LTEE.50K.A.clones <- make.list.of.strain.to.KOed.genes(
+    NoDel.LTEE.50K.A.clone.KO.data)
 
 
 OnlyDel.KOed.genes.in.LTEE.50K.A.clones <- make.list.of.strain.to.KOed.genes(
@@ -484,140 +473,110 @@ NoDel.pop.to.clone.A.cong.PPI.gene.dists <- partial(.f = pop.to.KO.edge.distance
                          node1.df = cong.node1,
                          node2.df = cong.node2)
 
-NoDel.KOed.50K.clone.A.cong.PPI.dists <- map_dfr(.x = LTEE.pop.vec,
-                                  .f = NoDel.pop.to.clone.A.cong.PPI.gene.dists)
+OnlyDel.pop.to.clone.A.cong.PPI.gene.dists <- partial(.f = pop.to.KO.edge.distances,
+                         clone.to.KOed.genes.list = OnlyDel.KOed.genes.in.LTEE.50K.A.clones,
+                         node1.df = cong.node1,
+                         node2.df = cong.node2)
 
 NoDel.pop.to.clone.A.zitnik.PPI.gene.dists <- partial(.f = pop.to.KO.edge.distances,
                          clone.to.KOed.genes.list = NoDel.KOed.genes.in.LTEE.50K.A.clones,
                          node1.df = zitnik.node1,
                          node2.df = zitnik.node2)
 
-NoDel.KOed.50K.clone.A.zitnik.PPI.dists <- map_dfr(.x = LTEE.pop.vec,
-                                  .f = NoDel.pop.to.clone.A.zitnik.PPI.gene.dists)
-
-## use partial function application so that cur.pop is the only free parameter.
-OnlyDel.pop.to.clone.A.cong.PPI.gene.dists <- partial(.f = pop.to.KO.edge.distances,
-                         clone.to.KOed.genes.list = OnlyDel.KOed.genes.in.LTEE.50K.A.clones,
-                         node1.df = cong.node1,
-                         node2.df = cong.node2)
-
-OnlyDel.KOed.50K.clone.A.cong.PPI.dists <- map_dfr(.x = LTEE.pop.vec,
-                                  .f = OnlyDel.pop.to.clone.A.cong.PPI.gene.dists)
-
 OnlyDel.pop.to.clone.A.zitnik.PPI.gene.dists <- partial(.f = pop.to.KO.edge.distances,
                          clone.to.KOed.genes.list = OnlyDel.KOed.genes.in.LTEE.50K.A.clones,
                          node1.df = zitnik.node1,
                          node2.df = zitnik.node2)
 
-OnlyDel.KOed.50K.clone.A.zitnik.PPI.dists <- map_dfr(.x = LTEE.pop.vec,
-                                  .f = OnlyDel.pop.to.clone.A.zitnik.PPI.gene.dists)
 
-## Now, overlay the two KO'ed edge distance distribution on top of the
-## edge distance distribution for the whole network.
+NoDel.KOed.50K.clone.A.cong.PPI.dists <- map_dfr(
+    .x = LTEE.pop.vec,
+    .f = NoDel.pop.to.clone.A.cong.PPI.gene.dists)
 
-NoDel.cong.PPI.dist.plot <- ggplot(cong.dist.df, aes(x=PPI.dist)) +
-    geom_histogram(alpha=0.2) +
-    geom_histogram(data = NoDel.KOed.50K.clone.A.cong.PPI.dists, fill="red",alpha=0.2) +
-    geom_histogram(data = OnlyDel.KOed.50K.clone.A.cong.PPI.dists, fill="blue",alpha=0.2) +
-    theme_classic() + ylab("Count")
+OnlyDel.KOed.50K.clone.A.cong.PPI.dists <- map_dfr(
+    .x = LTEE.pop.vec,
+    .f = OnlyDel.pop.to.clone.A.cong.PPI.gene.dists)
 
-NoDel.zitnik.PPI.dist.plot <- ggplot(zitnik.dist.df, aes(x=PPI.dist)) +
-    geom_histogram() +
-    geom_histogram(data = NoDel.KOed.50K.clone.A.zitnik.PPI.dists, fill="red") +
-    theme_classic() + ylab("Count")
+
+NoDel.KOed.50K.clone.A.zitnik.PPI.dists <- map_dfr(
+    .x = LTEE.pop.vec,
+    .f = NoDel.pop.to.clone.A.zitnik.PPI.gene.dists)
+
+OnlyDel.KOed.50K.clone.A.zitnik.PPI.dists <- map_dfr(
+    .x = LTEE.pop.vec,
+    .f = OnlyDel.pop.to.clone.A.zitnik.PPI.gene.dists)
+
 
 ## surprising: the patterns are actually in the opposite direction than I expected!
-wilcox.test(NoDel.KOed.50K.clone.A.cong.PPI.dists$PPI.dist, OnlyDel.KOed.50K.clone.A.cong.PPI.dists$PPI.dist)
+wilcox.test(NoDel.KOed.50K.clone.A.zitnik.PPI.dists$PPI.dist,
+            OnlyDel.KOed.50K.clone.A.zitnik.PPI.dists$PPI.dist)
 
-mean(NoDel.KOed.50K.clone.A.cong.PPI.dists$PPI.dist)
-mean(OnlyDel.KOed.50K.clone.A.cong.PPI.dists$PPI.dist)
-
-wilcox.test(NoDel.KOed.50K.clone.A.zitnik.PPI.dists$PPI.dist, OnlyDel.KOed.50K.clone.A.zitnik.PPI.dists$PPI.dist)
-
-mean(NoDel.KOed.50K.clone.A.zitnik.PPI.dists$PPI.dist)
 mean(OnlyDel.KOed.50K.clone.A.zitnik.PPI.dists$PPI.dist)
+mean(NoDel.KOed.50K.clone.A.zitnik.PPI.dists$PPI.dist)
+
+wilcox.test(NoDel.KOed.50K.clone.A.cong.PPI.dists$PPI.dist,
+            OnlyDel.KOed.50K.clone.A.cong.PPI.dists$PPI.dist)
+
+mean(OnlyDel.KOed.50K.clone.A.cong.PPI.dists$PPI.dist)
+mean(NoDel.KOed.50K.clone.A.cong.PPI.dists$PPI.dist)
+
 
 ########################
 ## Let's examine the degree distribution of KO'ed genes,
 ## with and without large deletions.
 
-## examine the degree distribution of KO'ed genes of just large deletions
-## as well.
-
 zitnik.degree.df <- read.csv("../results/thermostability/Zitnik_network_statistics.csv")
 cong.degree.df <- read.csv("../results/thermostability/Cong_network_statistics.csv")
 
-## hypothesis: KO'ed genes have a smaller degree distribution.
-
-## use partial function application so that cur.pop is the only free parameter.
-pop.to.clone.A.cong.PPI.degrees <- partial(.f = pop.to.KO.degrees,
-                         clone.to.KOed.genes.list = KOed.genes.in.LTEE.50K.A.clones,
-                         degree.df = cong.degree.df)
-
-KOed.50K.clone.A.cong.PPI.degrees <- map_dfr(.x = LTEE.pop.vec,
-                                  .f = pop.to.clone.A.cong.PPI.degrees)
-
-pop.to.clone.A.zitnik.PPI.degrees <- partial(.f = pop.to.KO.degrees,
-                         clone.to.KOed.genes.list = KOed.genes.in.LTEE.50K.A.clones,
-                         degree.df = zitnik.degree.df)
-
-KOed.50K.clone.A.zitnik.PPI.degrees <- map_dfr(.x = LTEE.pop.vec,
-                                  .f = pop.to.clone.A.zitnik.PPI.degrees)
-
-#################
-## exclude large deletions.
-
-NoDel.pop.to.clone.A.cong.PPI.degrees <- partial(.f = pop.to.KO.degrees,
-                         clone.to.KOed.genes.list = NoDel.KOed.genes.in.LTEE.50K.A.clones,
-                         degree.df = cong.degree.df)
-
-NoDel.KOed.50K.clone.A.cong.PPI.degrees <- map_dfr(.x = LTEE.pop.vec,
-                                  .f = NoDel.pop.to.clone.A.cong.PPI.degrees)
-
-NoDel.pop.to.clone.A.zitnik.PPI.degrees <- partial(.f = pop.to.KO.degrees,
-                         clone.to.KOed.genes.list = NoDel.KOed.genes.in.LTEE.50K.A.clones,
-                         degree.df = zitnik.degree.df)
-
-NoDel.KOed.50K.clone.A.zitnik.PPI.degrees <- map_dfr(.x = LTEE.pop.vec,
-                                  .f = NoDel.pop.to.clone.A.zitnik.PPI.degrees)
-##################
-## Only consider large deletions
 
 OnlyDel.pop.to.clone.A.cong.PPI.degrees <- partial(.f = pop.to.KO.degrees,
                          clone.to.KOed.genes.list = OnlyDel.KOed.genes.in.LTEE.50K.A.clones,
                          degree.df = cong.degree.df)
 
-OnlyDel.KOed.50K.clone.A.cong.PPI.degrees <- map_dfr(.x = LTEE.pop.vec,
-                                  .f = OnlyDel.pop.to.clone.A.cong.PPI.degrees)
+NoDel.pop.to.clone.A.cong.PPI.degrees <- partial(.f = pop.to.KO.degrees,
+                         clone.to.KOed.genes.list = NoDel.KOed.genes.in.LTEE.50K.A.clones,
+                         degree.df = cong.degree.df)
+
 
 OnlyDel.pop.to.clone.A.zitnik.PPI.degrees <- partial(.f = pop.to.KO.degrees,
                          clone.to.KOed.genes.list = OnlyDel.KOed.genes.in.LTEE.50K.A.clones,
                          degree.df = zitnik.degree.df)
 
-OnlyDel.KOed.50K.clone.A.zitnik.PPI.degrees <- map_dfr(.x = LTEE.pop.vec,
-                                  .f = OnlyDel.pop.to.clone.A.zitnik.PPI.degrees)
+NoDel.pop.to.clone.A.zitnik.PPI.degrees <- partial(.f = pop.to.KO.degrees,
+                         clone.to.KOed.genes.list = NoDel.KOed.genes.in.LTEE.50K.A.clones,
+                         degree.df = zitnik.degree.df)
 
-###########
-## plot the degree distribution.
 
-zitnik.degree.plot <- ggplot(zitnik.degree.df, aes(x=Degree)) +
-    geom_histogram() + 
-    geom_histogram(data=KOed.50K.clone.A.zitnik.PPI.degrees, fill = 'red') +
-    theme_classic()
+OnlyDel.KOed.50K.clone.A.cong.PPI.degrees <- map_dfr(
+    .x = LTEE.pop.vec,
+    .f = OnlyDel.pop.to.clone.A.cong.PPI.degrees) 
 
-cong.degree.plot <- ggplot(cong.degree.df, aes(x=Degree)) +
-    geom_histogram() +
-    geom_histogram(data=KOed.50K.clone.A.cong.PPI.degrees, fill = 'red') +
-    theme_classic()
+
+NoDel.KOed.50K.clone.A.cong.PPI.degrees <- map_dfr(
+    .x = LTEE.pop.vec,
+    .f = NoDel.pop.to.clone.A.cong.PPI.degrees)
+
+
+OnlyDel.KOed.50K.clone.A.zitnik.PPI.degrees <- map_dfr(
+    .x = LTEE.pop.vec,
+    .f = OnlyDel.pop.to.clone.A.zitnik.PPI.degrees)
+
+NoDel.KOed.50K.clone.A.zitnik.PPI.degrees <- map_dfr(
+    .x = LTEE.pop.vec,
+    .f = NoDel.pop.to.clone.A.zitnik.PPI.degrees)
 
 ## no significant different in degree between KO'ed genes within and outside of large
 ## deletions in the LTEE.
-wilcox.test(OnlyDel.KOed.50K.clone.A.cong.PPI.degrees$Degree, NoDel.KOed.50K.clone.A.cong.PPI.degrees$Degree)
+wilcox.test(OnlyDel.KOed.50K.clone.A.zitnik.PPI.degrees$Degree,
+            NoDel.KOed.50K.clone.A.zitnik.PPI.degrees$Degree)
+
+mean(OnlyDel.KOed.50K.clone.A.zitnik.PPI.degrees$Degree)
+mean(NoDel.KOed.50K.clone.A.zitnik.PPI.degrees$Degree)
+
+
+wilcox.test(OnlyDel.KOed.50K.clone.A.cong.PPI.degrees$Degree,
+            NoDel.KOed.50K.clone.A.cong.PPI.degrees$Degree)
 
 mean(OnlyDel.KOed.50K.clone.A.cong.PPI.degrees$Degree)
 mean(NoDel.KOed.50K.clone.A.cong.PPI.degrees$Degree)
 
-wilcox.test(OnlyDel.KOed.50K.clone.A.zitnik.PPI.degrees$Degree, NoDel.KOed.50K.clone.A.zitnik.PPI.degrees$Degree)
-
-mean(OnlyDel.KOed.50K.clone.A.zitnik.PPI.degrees$Degree)
-mean(NoDel.KOed.50K.clone.A.zitnik.PPI.degrees$Degree)

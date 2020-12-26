@@ -4,7 +4,7 @@
 collate-resilience-runs.py by Rohan Maddamsetti
 
 This script makes a big csv file from the output of running
-ppi-resilience-analysis2.py on the Duke Compute Cluster
+ppi-resilience-analysis.py on the Duke Compute Cluster
 (the files in results/resilience/resilience-analysis-runs)
 
 '''
