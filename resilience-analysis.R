@@ -9,8 +9,13 @@ REL606.CHR.LENGTH <- 4629812 ## constant used in a few places in the code.
 ## FUNCTIONS.
 
 set.no.KO.strains.resilience.to.REL606 <- function(df) {
+    
+    ## get the average ancestral resilience.
+    REL606.df <- df %>%
+        filter(Generation == 0)
+    ancestral.resilience <- mean(unique(REL606.df$resilience))
+
     ## strains with no KO mutations get the ancestral resilience value.
-    ancestral.resilience <- unique(filter(df, strain == 'REL606')$resilience)
     new.df <- df %>% mutate(resilience = ifelse(is.na(resilience),
                                       ancestral.resilience,
                                       resilience))
