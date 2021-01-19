@@ -585,3 +585,83 @@ wilcox.test(OnlyDel.KOed.50K.clone.A.cong.PPI.degrees$Degree,
 mean(OnlyDel.KOed.50K.clone.A.cong.PPI.degrees$Degree)
 mean(NoDel.KOed.50K.clone.A.cong.PPI.degrees$Degree)
 
+########################################################
+## Compare population fitness and change in fitness (Wiser et al. 2013)
+## to the resilience of genomes isolated at those time points.
+## Overall, I find this result inconclusive.
+## measuring the actual fitnesses of the relevant clones
+## would give a better picture.
+
+calc.dFitness.dt <- function(wiser.df) {
+
+    calc.dFitness.dt.helper <- function(pop.df) {
+        df <- pop.df %>%
+            mutate(Fitness.diff = mean.Fitness - lag(mean.Fitness)) %>%
+            mutate(Generation.diff = Generation - lag(Generation)) %>%
+            mutate(dFitness.dt = Fitness.diff/Generation.diff)
+    }
+    
+    wiser.df %>%
+        split(.$population) %>%
+        map_dfr(.f = calc.dFitness.dt.helper)
+}
+
+wiser.data <- read.csv("../data/Concatenated.LTEE.data.all.csv") %>%
+    ## get time units to match the resilience dataframes.
+    mutate(Generation = Generation/10000) %>%
+    ## make population column name match the resilience dataframes.
+    mutate(population = Population) %>%
+    select(Generation, Red.Pop, White.Pop, population, Rep, Fitness, Complete) %>%
+    group_by(Generation, Red.Pop, White.Pop, population) %>%
+    ## calculate the average fitness over replicates
+    summarize(mean.Fitness = mean(Fitness)) %>%
+    ungroup() %>%
+    select(Generation, population, mean.Fitness) %>%
+    ## calculate delta Fitness/delta Generation
+    calc.dFitness.dt()
+
+
+cong.resilience.with.fitness.df <- big.cong.resilience.df %>%
+    filter(run_type == "LTEE_genome_resilience") %>%
+    filter(Treatment == "actual data") %>%
+    select(dataset, replicate, strain, resilience,
+           population, Generation) %>%
+    group_by(dataset, strain, population, Generation) %>%
+    summarize(mean.resilience = mean(resilience)) %>%
+    left_join(wiser.data)
+
+zitnik.resilience.with.fitness.df <- big.zitnik.resilience.df %>%
+    filter(run_type == "LTEE_genome_resilience") %>%
+    filter(Treatment == "actual data") %>%
+    select(dataset, replicate, strain, resilience,
+           population, Generation) %>%
+    group_by(dataset, strain, population, Generation) %>%
+    summarize(mean.resilience = mean(resilience)) %>%
+    left_join(wiser.data)
+
+
+cong.fitness.plot <- ggplot(cong.resilience.with.fitness.df,
+                            aes(x=mean.Fitness,y=mean.resilience,color=population)) +
+    geom_point() +
+    theme_classic()
+
+cong.dFitness.dt.plot <- ggplot(cong.resilience.with.fitness.df,
+                            aes(x=dFitness.dt,y=mean.resilience,color=population)) +
+    geom_point() +
+    theme_classic()
+
+zitnik.fitness.plot <- ggplot(zitnik.resilience.with.fitness.df,
+                            aes(x=mean.Fitness,y=mean.resilience,color=population)) +
+    geom_point() +
+    theme_classic()
+
+zitnik.dFitness.dt.plot <- ggplot(zitnik.resilience.with.fitness.df,
+                            aes(x=dFitness.dt,y=mean.resilience,color=population)) +
+    geom_point() +
+    theme_classic()
+
+
+fitness.Fig <- plot_grid(cong.fitness.plot, cong.dFitness.dt.plot,
+                         zitnik.fitness.plot, zitnik.dFitness.dt.plot,
+                         labels=c('A','B','C','D'),
+                         ncol=2)
