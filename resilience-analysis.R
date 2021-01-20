@@ -629,40 +629,61 @@ zitnik.resilience.with.fitness.df <- big.zitnik.resilience.df %>%
     filter(complete.cases(.))
 
 
-cong.fitness.plot <- ggplot(cong.resilience.with.fitness.df,
+cong.fitness.plot.with.legend <- ggplot(cong.resilience.with.fitness.df,
                             aes(x=mean.Fitness,y=mean.resilience,color=population)) +
     geom_point() +
-    theme_classic()
+    theme_classic() +
+    xlab("Mean population fitness") +
+    ylab("PPI network resilience") +
+    theme(legend.position="bottom")
+
+cong.fitness.plot <- cong.fitness.plot.with.legend + guides(color=FALSE)
+fitness.resilience.legend <- get_legend(cong.fitness.plot.with.legend)
 
 zitnik.fitness.plot <- ggplot(zitnik.resilience.with.fitness.df,
                             aes(x=mean.Fitness,y=mean.resilience,color=population)) +
     geom_point() +
-    theme_classic()
+    theme_classic() +
+    xlab("Mean population fitness") +
+    ylab("PPI network resilience") +
+    guides(color=FALSE)
 
-
-cong.fitness.plot2 <- ggplot(cong.resilience.with.fitness.df,
+cong.fitness.curve <- ggplot(cong.resilience.with.fitness.df,
                              aes(x = Generation,
                                  y = mean.Fitness,
                                  color = mean.resilience)) +
     geom_point() +
     theme_classic() +
-    scale_color_viridis_c(option = "plasma", direction = -1)
+    xlab("Time (x 10,000 generations)") +
+    ylab("Mean population fitness") +
+    scale_color_viridis_c(name = "resilience", option = "plasma", direction = -1) +
+    ggtitle("Cong PPI dataset")
 
-zitnik.fitness.plot2 <- ggplot(zitnik.resilience.with.fitness.df,
+zitnik.fitness.curve <- ggplot(zitnik.resilience.with.fitness.df,
                                aes(x = Generation,
                                    y = mean.Fitness,
                                    color = mean.resilience)) +
     geom_point() +
     theme_classic() +
-    scale_color_viridis_c(option = "plasma", direction = -1)
+    xlab("Time (x 10,000 generations)") +
+    ylab("Mean population fitness") +
+    scale_color_viridis_c(name = "resilience", option = "plasma", direction = -1) +
+    ggtitle("Zitnik PPI dataset")
 
-fitness.Fig <- plot_grid(cong.fitness.plot2,
-                         zitnik.fitness.plot2,
-                         cong.fitness.plot,
-                         zitnik.fitness.plot,
-                         labels=c('A','B','C','D'),
-                         nrow=2)
+S1Fig <- plot_grid(
+    plot_grid(
+        zitnik.fitness.curve,
+        cong.fitness.curve,
+        zitnik.fitness.plot,
+        cong.fitness.plot,
+        labels=c('A','B','',''),
+        nrow=2),
+    fitness.resilience.legend,
+    ncol=1,
+    rel_heights = c(1,0.15))
+ggsave("../results/resilience/figures/S1Fig.pdf", S1Fig, height=6, width=7)
 
+## calculate correlation coefficients and p-values.
 cor.test(zitnik.resilience.with.fitness.df$mean.resilience,
          zitnik.resilience.with.fitness.df$mean.Fitness)
 
