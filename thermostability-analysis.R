@@ -58,7 +58,7 @@ calc.gene.mutation.densities <- function(gene.mutation.data) {
     
     ## look at dN density.
     dN.density <- calc.gene.mutation.density(
-        gene.mutation.data,c("missense")) %>%
+        gene.mutation.data,c("missense", "nonsense")) %>%
         rename(dN.mut.count = mut.count) %>%
         rename(dN.mut.density = density)
     
@@ -113,8 +113,82 @@ hypermut.mutation.densities <- gene.mutation.data %>%
     filter(Population %in% hypermutator.pops) %>%
     calc.gene.mutation.densities()
 
+## For the supplementary information, examine the correlations when genes
+## with zero mutations are omitted.
+nozero.nonmut.mutation.densities <- nonmut.mutation.densities %>%
+    filter(all.mut.density > 0)
+
+nozero.hypermut.mutation.densities <- hypermut.mutation.densities %>%
+    filter(all.mut.density > 0)
+
+
+
 ########################################################################
 ## Do mRNA and protein abundances predict evolutionary rates in the LTEE and in nature?
+########################################################################
+
+## analysis of Time Cooper's 2003 cDNA macroarray expression data.
+cooper.data <- read.csv("../data/Cooper2003-expression-arrays.tsv", sep="\t")
+
+## TODO: ANALYZE THESE DATA!
+
+
+########################################################################
+## Favate et al. (2021) analysis of ancestral clones and 11 evolved 50K LTEE clones.
+
+Favate.TableS1 <- read.csv("../data/Favate2021_table_s1_read_counts.csv",
+                           as.is=TRUE, header=TRUE) %>%
+    ## let's do the analysis based on est_counts rather than tpm.
+    select(repl, seqtype, line, target_id, est_counts) %>%
+    ## now, we need to match the target_id field to genes or IDs in the REL606 genome.
+    ## I'm not sure what the ERC_00XXX IDs are. Ignore those and the tRNAs for now.
+    mutate(locus_tag = target_id) %>%
+    filter(str_detect(locus_tag,"^ECB"))
+    
+## Two datasets to examine separately: ribosome profiling and RNAseq.
+riboseq.Favate.data <- Favate.TableS1 %>% filter(seqtype == "ribo") %>%
+    group_by(seqtype, line, locus_tag) %>%
+    summarize(avg_est_counts = mean(est_counts)) %>%
+    ungroup()
+
+rnaseq.Favate.data <- Favate.TableS1 %>% filter(seqtype == "rna") %>%
+    group_by(seqtype, line, locus_tag) %>%
+    summarize(avg_est_counts = mean(est_counts)) %>%
+    ungroup()
+
+
+rnaseq.with.nonmut.mutation.density <- rnaseq.Favate.data %>%
+    left_join(nonmut.mutation.densities)
+
+rnaseq.with.hypermut.mutation.density <- rnaseq.Favate.data %>%
+    left_join(hypermut.mutation.densities)
+
+nonmut.cor <- cor.test(rnaseq.with.nonmut.mutation.density$avg_est_counts,
+         rnaseq.with.nonmut.mutation.density$all.mut.density)
+
+hypermut.cor <- cor.test(rnaseq.with.hypermut.mutation.density$avg_est_counts,
+         rnaseq.with.hypermut.mutation.density$all.mut.density)
+hypermut.cor$p.value
+
+
+riboseq.with.nonmut.mutation.density <- riboseq.Favate.data %>%
+    left_join(nonmut.mutation.densities)
+
+riboseq.with.hypermut.mutation.density <- riboseq.Favate.data %>%
+    left_join(hypermut.mutation.densities)
+
+cor.test(riboseq.with.nonmut.mutation.density$avg_est_counts,
+         riboseq.with.nonmut.mutation.density$all.mut.density)
+
+cor.test(riboseq.with.hypermut.mutation.density$avg_est_counts,
+         riboseq.with.hypermut.mutation.density$all.mut.density)
+
+
+
+REL606.rnaseq.Favate.data <- rnaseq.Favate.data %>% filter(line=="REL606")
+
+#######################################
+## Caglar et al. analysis of REL606 over time.
 ## Import RNA and protein abundance data from Caglar et al. (2017).
 ## make sure to check abundances during BOTH exponential and stationary phase.
 Caglar.samples <- read.csv("../results/thermostability/glucose-Caglar2017-REL606-data/glucose-Caglar2017-S1.csv", as.is=TRUE, header=TRUE) %>%
@@ -160,12 +234,21 @@ Caglar.summary <- full.Caglar.data %>%
 nonmut.density.Caglar <- inner_join(nonmut.mutation.densities, Caglar.summary)
 hypermut.density.Caglar <- inner_join(hypermut.mutation.densities, Caglar.summary)
 
-correlate.mut.density.with.timepoint <- function(density.Caglar) {
+## For supplementary information, re-run when genes with no mutations are excluded.
+nozero.nonmut.density.Caglar <- inner_join(nozero.nonmut.mutation.densities,
+                                           Caglar.summary)
+nozero.hypermut.density.Caglar <- inner_join(nozero.hypermut.mutation.densities,
+                                             Caglar.summary)
+
+
+correlate.mut.density.with.timepoint <- function(density.Caglar, my.method="pearson") {
 
     print.correlations.given.timepoint <- function(my.data) {
         my.t <- unique(my.data$growthTime_hr)
-        mRNA.result <- cor.test(my.data$mRNA.mean, my.data$all.mut.density)
-        Protein.result <- cor.test(my.data$Protein.mean, my.data$all.mut.density)
+        mRNA.result <- cor.test(my.data$mRNA.mean, my.data$all.mut.density,
+                                method=my.method)
+        Protein.result <- cor.test(my.data$Protein.mean, my.data$all.mut.density,
+                                   method=my.method)
         
         print(paste("TIME:", my.t, 'hrs'))
         print("mRNA abundance correlation with mut density:")
@@ -180,30 +263,71 @@ correlate.mut.density.with.timepoint <- function(density.Caglar) {
 }
 
 ## positive correlation in mutation density and mRNA,
-## but no correlation with mutation density and  protein abundance
+## but no correlation with mutation density and protein abundance
 ## for nonmutators.
 correlate.mut.density.with.timepoint(nonmut.density.Caglar)
 ## HIGHLY SIGNIFICANT anti-correlations with mutation density with
 ## both mRNA and protein abundances in REL606 in all timepoints!
 correlate.mut.density.with.timepoint(hypermut.density.Caglar)
 
-plot.mut.density.mRNA.anticorrelation <- function(my.data) {
+
+## For supplement: re-run, excluding zeros.
+correlate.mut.density.with.timepoint(nozero.nonmut.density.Caglar)
+correlate.mut.density.with.timepoint(nozero.hypermut.density.Caglar)
+
+
+plot.mut.density.mRNA.anticorrelation <- function(my.data, my.method="pearson",
+                                                  muts.to.plot="all") {
     ## This is a helper function to plot an mRNA panel for the full figure.
     my.t <- unique(my.data$growthTime_hr)
-    time.title = paste0(as.character(my.t), "h")
+    time.title <- paste0(as.character(my.t), "h")
 
-    ## if the correlation is not significant, then the regression line is gray.
-    mRNA.result <- cor.test(my.data$mRNA.mean, my.data$all.mut.density)
+    if (muts.to.plot == "dN") {
+        mRNA.result <- cor.test(my.data$mRNA.mean, my.data$dN.mut.density, method=my.method)
+    } else if (muts.to.plot == "dS") {
+        mRNA.result <- cor.test(my.data$mRNA.mean, my.data$dS.mut.density, method=my.method)
+    } else { ## default is to plot the density of all mutations.
+        mRNA.result <- cor.test(my.data$mRNA.mean, my.data$all.mut.density, method=my.method)
+    }
+
+    ## if the Pearson correlation is not significant, then the regression line is gray.
     ## factor of (1/9) is a Bonferroni-correction for multiple tests.
     my.color <- ifelse(mRNA.result$p.value < 0.05*(1/9), "blue", "light gray")
+
+    ## annotate r and p-values for Pearson correlations.
+    pearson.r <- signif(mRNA.result$estimate,digits=3)
+    pearson.p.value <- signif(mRNA.result$p.value,digits=3)
+
+    lbl.rval <- paste("r", "=", pearson.r)
+    lbl.p.value <- paste("p", "=", pearson.p.value)
     
-    mRNA.plot <- my.data %>%
-        ggplot(aes(x = mRNA.mean, y = all.mut.density)) +
+
+    if (muts.to.plot == "dN") {
+          mRNA.plot <- my.data %>%
+              ggplot(aes(x = mRNA.mean, y = dN.mut.density)) +
+              ylim(0,0.05)
+    } else if (muts.to.plot == "dS") {
+         mRNA.plot <- my.data %>%
+             ggplot(aes(x = mRNA.mean, y = dS.mut.density)) +
+             ylim(0,0.05)
+    } else { ## default is to plot the density of all mutations.
+         mRNA.plot <- my.data %>%
+        ggplot(aes(x = mRNA.mean, y = all.mut.density))
+
+    }
+    
+    mRNA.plot <- mRNA.plot +
         geom_point(color = "violet", alpha = 0.5) +
         geom_smooth(method = 'lm', formula = y~x, color = my.color) +
         theme_classic() +
         coord_cartesian(xlim = c(0, 15)) +
-        ggtitle(time.title)
+        ggtitle(time.title) +
+        ## annotate correlation on the figure.
+        annotate("text", x = 7, y = 0.03, size = 3,
+                 label = lbl.rval, fontface = 'bold.italic') +
+        ## annotate p-value on the figure.
+        annotate("text", x = 7, y = 0.04, size = 3,
+                 label = lbl.p.value, fontface = 'bold.italic')
 
     ## use some conditional statements to label x-axis for the
     ## bottom center panel (168 hr) and to label y-axis for the
@@ -217,25 +341,67 @@ plot.mut.density.mRNA.anticorrelation <- function(my.data) {
     return(mRNA.plot)
 }
 
-plot.mut.density.protein.anticorrelation <- function(my.data) {
+plot.mut.density.protein.anticorrelation <- function(my.data, my.method="pearson",
+                                                     muts.to.plot="all") {
     ## This is a helper function to plot a protein panel for the full figure.
     my.t <- unique(my.data$growthTime_hr)
-    time.title = paste0(as.character(my.t), "h")
+    time.title <- paste0(as.character(my.t), "h")
 
-    ## if the correlation is not significant, then the regression line is gray.
-    Protein.result <- cor.test(my.data$Protein.mean, my.data$all.mut.density)
+    if (muts.to.plot == "dN") {
+        Protein.result <- cor.test(my.data$Protein.mean,
+                                   my.data$dN.mut.density,method=my.method)
+        
+    } else if (muts.to.plot == "dS") {
+        Protein.result <- cor.test(my.data$Protein.mean,
+                                   my.data$dS.mut.density,method=my.method)
+        
+    } else { ## default is to plot the density of all mutations.
+        Protein.result <- cor.test(my.data$Protein.mean,
+                                   my.data$all.mut.density,method=my.method)  
+    }
+        
+    ## if the Pearson correlation is not significant, then the regression line is gray.
     ## factor of (1/9) is a Bonferroni-correction for multiple tests.
     my.color <- ifelse(Protein.result$p.value < 0.05*(1/9), "blue", "light gray")
-    
-    Protein.plot <- my.data %>%
-        ggplot(aes(x = Protein.mean, y = all.mut.density)) +
+
+    ## annotate r and p-values for Pearson correlations.
+    pearson.r <- signif(Protein.result$estimate,digits=3)
+    pearson.p.value <- signif(Protein.result$p.value,digits=3)
+
+    lbl.rval <- paste("r", "=", pearson.r)
+    lbl.p.value <- paste("p", "=", pearson.p.value)
+
+
+    if (muts.to.plot == "dN") {
+          Protein.plot <- my.data %>%
+              ggplot(aes(x = Protein.mean, y = dN.mut.density)) +
+              ylim(0,0.05)
+    } else if (muts.to.plot == "dS") {
+         Protein.plot <- my.data %>%
+             ggplot(aes(x = Protein.mean, y = dS.mut.density)) +
+             ylim(0,0.05)
+    } else { ## default is to plot the density of all mutations.
+         Protein.plot <- my.data %>%
+        ggplot(aes(x = Protein.mean, y = all.mut.density))
+
+    }
+   
+    Protein.plot <- Protein.plot +
         geom_point(color = "light green", alpha = 0.5) +
         geom_smooth(method = 'lm', formula = y~x, color = my.color) +
         theme_classic() +
         coord_cartesian(xlim = c(0, 10)) +
         scale_x_continuous(breaks=c(0,5,10)) +
         ggtitle(time.title) +
-        ylab("") ## no need for ylabel since the mRNA subfigure will be on the left.
+        ## no need for ylabel since the mRNA subfigure will be on the left.
+        ylab("") +
+        ## annotate correlation on the figure.
+        annotate("text", x = 5, y = 0.03, size=3,
+                 label = lbl.rval, fontface = 'bold.italic') +
+        ## annotate p-value on the figure.
+        annotate("text", x = 5, y = 0.04, size=3,
+                 label = lbl.p.value, fontface = 'bold.italic')
+  
 
     ## use a conditional statement to label x-axis for the
     ## bottom center panel (168 hr).
@@ -246,18 +412,27 @@ plot.mut.density.protein.anticorrelation <- function(my.data) {
     return(Protein.plot)
 }
 
-make.mut.density.RNA.protein.expression.figure <- function(density.Caglar) {
+make.mut.density.RNA.protein.expression.figure <- function(density.Caglar,
+                                                           method="pearson",
+                                                           muts.for.plot="all") {
     ## makes a figure that combines all 18 panels.
     ## generate a list of smaller panels, then pass
     ## to cowplot::plot_grid using do.call().
+
+    ## pass plotting parameters through the use of partial function application.
+    mRNA.plot.func <- partial(.f = plot.mut.density.mRNA.anticorrelation,
+                              my.method=method, muts.to.plot=muts.for.plot)
+
+    protein.plot.func <- partial(.f = plot.mut.density.protein.anticorrelation,
+                              my.method=method, muts.to.plot=muts.for.plot)
     
     mRNA.panels <- density.Caglar %>%
         split(.$growthTime_hr) %>%
-        map(.f = plot.mut.density.mRNA.anticorrelation)
+        map(.f = mRNA.plot.func)
     
     protein.panels <- density.Caglar %>%
         split(.$growthTime_hr) %>%
-        map(.f = plot.mut.density.protein.anticorrelation)
+        map(.f = protein.plot.func)
 
     ## fill in some parameters for plot_grid using partial function application,
     ## and save the specialized versions.
@@ -277,6 +452,19 @@ S1Fig <- make.mut.density.RNA.protein.expression.figure(nonmut.density.Caglar)
 
 ggsave("../results/thermostability/figures/Fig1.pdf", Fig1, height = 4, width = 9)
 ggsave("../results/thermostability/figures/S1Fig.pdf", S1Fig, height = 4, width = 9)
+
+
+dN.Fig1 <- make.mut.density.RNA.protein.expression.figure(hypermut.density.Caglar, muts.for.plot="dN")
+dS.Fig1 <- make.mut.density.RNA.protein.expression.figure(hypermut.density.Caglar, muts.for.plot="dS")
+ggsave("../results/thermostability/figures/dN-Fig1.pdf", dN.Fig1, height = 4, width = 9)
+ggsave("../results/thermostability/figures/dS-Fig1.pdf", dS.Fig1, height = 4, width = 9)
+
+
+spearmanFig1 <- make.mut.density.RNA.protein.expression.figure(hypermut.density.Caglar, method="spearman")
+spearmanS1Fig <- make.mut.density.RNA.protein.expression.figure(nonmut.density.Caglar,method="spearman")
+ggsave("../results/thermostability/figures/spearmanFig1.pdf", spearmanFig1, height = 4, width = 9)
+ggsave("../results/thermostability/figures/spearmanS1Fig.pdf", spearmanS1Fig, height = 4, width = 9)
+
 ########################################################
 
 ## PPI network statistics analysis.
@@ -353,31 +541,75 @@ cor.test(hypermut.PPI.cong$IsArticulationPoint, hypermut.PPI.cong$all.mut.densit
 ## consistent throughout, and even the non-significant correlations show the same,
 ## consistent trends seen for degree distribution.
 
-make.mut.density.PPI.degree.panel <- function(PPI.data, my.color="gray") {
+make.mut.density.PPI.degree.panel <- function(PPI.data,
+                                              lbl.xpos, rlbl.ypos, plbl.ypos,
+                                              my.color="gray") {
     ## This is a helper function that plots a single panel.
+
+    ## annotate r and p-values on the panel.
+    PPI.result <- cor.test(PPI.data$Degree,
+                           PPI.data$all.mut.density)
+
+    pearson.r <- signif(PPI.result$estimate,digits=3)
+    pearson.p.value <- signif(PPI.result$p.value,digits=3)
+
+    lbl.rval <- paste("r", "=", pearson.r)
+    lbl.p.value <- paste("p", "=", pearson.p.value)
+    
     PPI.panel <- PPI.data %>%
         ggplot(aes(x = Degree, y = all.mut.density)) +
         geom_point(color = my.color, alpha = 0.2) +
         geom_smooth(method = 'lm', formula = y~x) +
         theme_classic() +
         ylab("Mutation density") +
-        xlab("PPI degree")
+        xlab("PPI degree") +
+        ## annotate correlation on the figure.
+        annotate("text", x = lbl.xpos, y = rlbl.ypos, size=3,
+                 label = lbl.rval, fontface = 'bold.italic') +
+        ## annotate p-value on the figure.
+        annotate("text", x = lbl.xpos, y = plbl.ypos, size=3,
+                 label = lbl.p.value, fontface = 'bold.italic')
+
     return(PPI.panel)
 }
 
 make.mut.density.PPI.degree.figure <- function(nonmut.PPI.zitnik, nonmut.PPI.cong,
                                                hypermut.PPI.zitnik, hypermut.PPI.cong) {
+
+    ## label positions for each figure:
+    zitnik.xpos <- 100
+    cong.xpos <- 10
+
+    nonmut.r.ypos <- 0.01
+    nonmut.p.ypos <- 0.012
+    hypermut.r.ypos <- 0.03
+    hypermut.p.ypos <- 0.035
     
     panelA <- make.mut.density.PPI.degree.panel(nonmut.PPI.zitnik,
+                                                zitnik.xpos,
+                                                nonmut.r.ypos,
+                                                nonmut.p.ypos,
                                                 "lightsteelblue") +
         ggtitle("Nonmutators")
-    panelB <- make.mut.density.PPI.degree.panel(nonmut.PPI.cong, "moccasin") +
+    panelB <- make.mut.density.PPI.degree.panel(nonmut.PPI.cong,
+                                                cong.xpos,
+                                                nonmut.r.ypos,
+                                                nonmut.p.ypos,
+                                                "moccasin") +
         ggtitle("Nonmutators")
     panelC <- make.mut.density.PPI.degree.panel(hypermut.PPI.zitnik,
+                                                zitnik.xpos,
+                                                hypermut.r.ypos,
+                                                hypermut.p.ypos,
                                                 "lightsteelblue") +
         ggtitle("Hypermutators")
-    panelD <- make.mut.density.PPI.degree.panel(hypermut.PPI.cong, "moccasin") +
+    panelD <- make.mut.density.PPI.degree.panel(hypermut.PPI.cong,
+                                                cong.xpos,
+                                                hypermut.r.ypos,
+                                                hypermut.p.ypos,
+                                                "moccasin") +
         ggtitle("Hypermutators")
+
     
     fig <- plot_grid(panelA, panelB, panelC, panelD, nrow = 2,
                         labels = c('A', 'B', 'C', 'D'))
