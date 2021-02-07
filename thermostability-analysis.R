@@ -49,34 +49,39 @@ gene.mutation.data <- read.csv(
 ########################################################################
 ## calculate densities of mutations per gene.
 ## This is used for filtering data.
-calc.gene.mutation.densities <- function(gene.mutation.data) {
+calc.gene.mutation.densities <- function(gene.mutation.data,use.pseudocount=FALSE) {
     all.mutation.density <- calc.gene.mutation.density(
         gene.mutation.data,
-        c("missense", "sv", "synonymous", "noncoding", "indel", "nonsense")) %>%
+        c("missense", "sv", "synonymous", "noncoding", "indel", "nonsense"),
+        add.pseudocount=use.pseudocount) %>%
         rename(all.mut.count = mut.count) %>%
         rename(all.mut.density = density)
     
     ## look at dN density.
     dN.density <- calc.gene.mutation.density(
-        gene.mutation.data,c("missense", "nonsense")) %>%
+        gene.mutation.data,c("missense", "nonsense"),
+        add.pseudocount=use.pseudocount) %>%
         rename(dN.mut.count = mut.count) %>%
         rename(dN.mut.density = density)
     
     ## look at dS density.
     dS.density <- calc.gene.mutation.density(
-        gene.mutation.data,c("synonymous")) %>%
+        gene.mutation.data,c("synonymous"),
+        add.pseudocount=use.pseudocount) %>%
         rename(dS.mut.count = mut.count) %>%
         rename(dS.mut.density = density)
     
     ## all except dS density.
     all.except.dS.density <- calc.gene.mutation.density(
-        gene.mutation.data,c("sv", "indel", "nonsense", "missense")) %>%
+        gene.mutation.data,c("sv", "indel", "nonsense", "missense"),
+        add.pseudocount=use.pseudocount) %>%
         rename(all.except.dS.mut.count = mut.count) %>%
         rename(all.except.dS.mut.density = density)
 
     ## knockout (KO) density.
     KO.density <- calc.gene.mutation.density(
-        gene.mutation.data,c("sv", "indel", "nonsense")) %>%
+        gene.mutation.data,c("sv", "indel", "nonsense"),
+        add.pseudocount=use.pseudocount) %>%
         rename(KO.mut.count = mut.count) %>%
         rename(KO.mut.density = density)
     
@@ -87,15 +92,35 @@ calc.gene.mutation.densities <- function(gene.mutation.data) {
         full_join(dS.density) %>%
         full_join(all.except.dS.density) %>%
         full_join(KO.density) %>%
-        as_tibble() %>%
-        ## CRITICAL STEP: replace NAs with zeros.
-        ## We need to keep track of genes that haven't been hit by any mutations
-        ## in a given mutation class (sv, indels, dN, etc.)
-        replace_na(list(all.mut.count = 0, all.mut.density = 0,
-                        dN.mut.count = 0, dN.mut.density = 0,
-                        dS.mut.count = 0, dS.mut.density = 0,
-                        all.except.dS.mut.count = 0, all.except.dS.mut.density = 0,
-                        KO.mut.count = 0, KO.mut.density = 0))
+        as_tibble()
+
+    if (use.pseudocount) {
+        gene.mutation.densities <- gene.mutation.densities %>%
+            ## CRITICAL STEP: replace NAs with pseudocounts of 0.1
+            ## We need to keep track of genes that haven't been hit by any mutations
+            ## in a given mutation class (sv, indels, dN, etc.)
+            replace_na(list(all.mut.count = 0.1,
+                            dN.mut.count = 0.1,
+                            dS.mut.count = 0.1,
+                            all.except.dS.mut.count = 0.1,
+                            KO.mut.count = 0.1)) %>%
+            mutate(all.mut.density = all.mut.count/gene_length,
+                            dN.mut.density = dN.mut.count/gene_length,
+                            dS.mut.density = dS.mut.count/gene_length,
+                            all.except.dS.mut.density = all.except.dS.mut.count/gene_length,
+                            KO.mut.density = KO.mut.count/gene_length)
+    } else {
+        gene.mutation.densities <- gene.mutation.densities %>%
+            ## CRITICAL STEP: replace NAs with zeros.
+            ## We need to keep track of genes that haven't been hit by any mutations
+            ## in a given mutation class (sv, indels, dN, etc.)
+            replace_na(list(all.mut.count = 0, all.mut.density = 0,
+                            dN.mut.count = 0, dN.mut.density = 0,
+                            dS.mut.count = 0, dS.mut.density = 0,
+                            all.except.dS.mut.count = 0, all.except.dS.mut.density = 0,
+                            KO.mut.count = 0, KO.mut.density = 0))
+    }
+    
     
     return(gene.mutation.densities)
 }
@@ -122,7 +147,6 @@ nozero.hypermut.mutation.densities <- hypermut.mutation.densities %>%
     filter(all.mut.density > 0)
 
 
-
 ########################################################################
 ## Do mRNA and protein abundances predict evolutionary rates in the LTEE and in nature?
 ########################################################################
@@ -146,46 +170,141 @@ Favate.TableS1 <- read.csv("../data/Favate2021_table_s1_read_counts.csv",
     filter(str_detect(locus_tag,"^ECB"))
     
 ## Two datasets to examine separately: ribosome profiling and RNAseq.
-riboseq.Favate.data <- Favate.TableS1 %>% filter(seqtype == "ribo") %>%
-    group_by(seqtype, line, locus_tag) %>%
+## combine REL606 and REL607 data, and average the data for the evolved strains.
+
+## RNAseq data
+ancestral.rnaseq.Favate.data <- Favate.TableS1 %>%
+    filter(seqtype == "rna") %>%
+    filter(line %in% c("REL606", "REL607")) %>%
+    group_by(locus_tag) %>%
     summarize(avg_est_counts = mean(est_counts)) %>%
     ungroup()
 
-rnaseq.Favate.data <- Favate.TableS1 %>% filter(seqtype == "rna") %>%
-    group_by(seqtype, line, locus_tag) %>%
+nonmut.rnaseq.Favate.data <- Favate.TableS1 %>%
+    filter(seqtype == "rna") %>%
+    filter(line %in% nonmutator.pops) %>%
+    group_by(locus_tag) %>%
     summarize(avg_est_counts = mean(est_counts)) %>%
     ungroup()
 
+hypermut.rnaseq.Favate.data <- Favate.TableS1 %>%
+    filter(seqtype == "rna") %>%
+    filter(line %in% hypermutator.pops) %>%
+    group_by(locus_tag) %>%
+    summarize(avg_est_counts = mean(est_counts)) %>%
+    ungroup()
 
-rnaseq.with.nonmut.mutation.density <- rnaseq.Favate.data %>%
+## Riboseq data
+ancestral.riboseq.Favate.data <- Favate.TableS1 %>%
+    filter(seqtype == "ribo") %>%
+    filter(line %in% c("REL606", "REL607")) %>%
+    group_by(locus_tag) %>%
+    summarize(avg_est_counts = mean(est_counts)) %>%
+    ungroup()
+
+nonmut.riboseq.Favate.data <- Favate.TableS1 %>%
+    filter(seqtype == "ribo") %>%
+    filter(line %in% nonmutator.pops) %>%
+    group_by(locus_tag) %>%
+    summarize(avg_est_counts = mean(est_counts)) %>%
+    ungroup()
+
+hypermut.riboseq.Favate.data <- Favate.TableS1 %>%
+    filter(seqtype == "ribo") %>%
+    filter(line %in% hypermutator.pops) %>%
+    group_by(locus_tag) %>%
+    summarize(avg_est_counts = mean(est_counts)) %>%
+    ungroup()
+
+## examine the correlations in the RNAseq data.
+anc.rnaseq.with.nonmut.mutation.density <- ancestral.rnaseq.Favate.data %>%
     left_join(nonmut.mutation.densities)
 
-rnaseq.with.hypermut.mutation.density <- rnaseq.Favate.data %>%
+anc.rnaseq.with.hypermut.mutation.density <- ancestral.rnaseq.Favate.data %>%
     left_join(hypermut.mutation.densities)
 
-nonmut.cor <- cor.test(rnaseq.with.nonmut.mutation.density$avg_est_counts,
-         rnaseq.with.nonmut.mutation.density$all.mut.density)
+anc.rnaseq.nonmut.cor <- cor.test(anc.rnaseq.with.nonmut.mutation.density$avg_est_counts,
+         anc.rnaseq.with.nonmut.mutation.density$all.mut.density)
 
-hypermut.cor <- cor.test(rnaseq.with.hypermut.mutation.density$avg_est_counts,
+anc.rnaseq.hypermut.cor <- cor.test(rnaseq.with.hypermut.mutation.density$avg_est_counts,
          rnaseq.with.hypermut.mutation.density$all.mut.density)
-hypermut.cor$p.value
+anc.rnaseq.hypermut.cor$p.value
 
-
-riboseq.with.nonmut.mutation.density <- riboseq.Favate.data %>%
+evol.rnaseq.with.nonmut.mutation.density <- nonmut.rnaseq.Favate.data %>%
     left_join(nonmut.mutation.densities)
 
-riboseq.with.hypermut.mutation.density <- riboseq.Favate.data %>%
+evol.rnaseq.with.hypermut.mutation.density <- hypermut.rnaseq.Favate.data %>%
     left_join(hypermut.mutation.densities)
 
-cor.test(riboseq.with.nonmut.mutation.density$avg_est_counts,
-         riboseq.with.nonmut.mutation.density$all.mut.density)
+evol.rnaseq.nonmut.cor <- cor.test(evol.rnaseq.with.nonmut.mutation.density$avg_est_counts,
+                                  evol.rnaseq.with.nonmut.mutation.density$all.mut.density)
 
-cor.test(riboseq.with.hypermut.mutation.density$avg_est_counts,
-         riboseq.with.hypermut.mutation.density$all.mut.density)
+evol.rnaseq.hypermut.cor <- cor.test(evol.rnaseq.with.hypermut.mutation.density$avg_est_counts, evol.rnaseq.with.hypermut.mutation.density$all.mut.density)
+evol.rnaseq.hypermut.cor$p.value
+
+## examine the correlations in the riboseq data.
+anc.riboseq.with.nonmut.mutation.density <- ancestral.riboseq.Favate.data %>%
+    left_join(nonmut.mutation.densities)
+
+anc.riboseq.with.hypermut.mutation.density <- ancestral.riboseq.Favate.data %>%
+    left_join(hypermut.mutation.densities)
+
+anc.riboseq.nonmut.cor <- cor.test(anc.riboseq.with.nonmut.mutation.density$avg_est_counts,
+         anc.riboseq.with.nonmut.mutation.density$all.mut.density)
+
+anc.riboseq.hypermut.cor <- cor.test(anc.riboseq.with.hypermut.mutation.density$avg_est_counts, anc.riboseq.with.hypermut.mutation.density$all.mut.density,)
+anc.riboseq.hypermut.cor$p.value
+
+evol.riboseq.with.nonmut.mutation.density <- nonmut.riboseq.Favate.data %>%
+    left_join(nonmut.mutation.densities)
+
+evol.riboseq.with.hypermut.mutation.density <- hypermut.riboseq.Favate.data %>%
+    left_join(hypermut.mutation.densities)
+
+evol.riboseq.nonmut.cor <- cor.test(evol.riboseq.with.nonmut.mutation.density$avg_est_counts, evol.riboseq.with.nonmut.mutation.density$all.mut.density)
+
+evol.riboseq.hypermut.cor <- cor.test(evol.riboseq.with.hypermut.mutation.density$avg_est_counts, evol.riboseq.with.hypermut.mutation.density$all.mut.density)
+evol.riboseq.hypermut.cor$p.value
+
+## now make a figure for this analysis.
+make.mut.density.favate.panel <- function(favate.data,
+                                              lbl.xpos, rlbl.ypos, plbl.ypos,
+                                              my.color="gray") {
+    ## This is a helper function that plots a single panel.
+
+    ## annotate r and p-values on the panel.
+    favate.result <- cor.test((1+favate.data$avg_est_counts),
+                           favate.data$all.mut.density)
+
+    pearson.r <- signif(favate.result$estimate,digits=3)
+    pearson.p.value <- signif(favate.result$p.value,digits=3)
+
+    lbl.rval <- paste("r", "=", pearson.r)
+    lbl.p.value <- paste("p", "=", pearson.p.value)
+    
+    favate.panel <- favate.data %>%
+        ggplot(aes(x = log(1+avg_est_counts), y = all.mut.density)) +
+        geom_point(color = my.color, alpha = 0.2) +
+        geom_smooth(method = 'lm', formula = y~x) +
+        theme_classic() +
+        ylab("Mutation density") +
+        xlab("Gene expression (estimated counts)") +
+        ## annotate correlation on the figure.
+        annotate("text", x = lbl.xpos, y = rlbl.ypos, size=3,
+                 label = lbl.rval, fontface = 'bold.italic') +
+        ## annotate p-value on the figure.
+        annotate("text", x = lbl.xpos, y = plbl.ypos, size=3,
+                 label = lbl.p.value, fontface = 'bold.italic')
+
+    return(favate.panel)
+}
+
+make.mut.density.favate.panel(evol.rnaseq.with.hypermut.mutation.density,
+                              lbl.xpos=10,
+                              rlbl.ypos=0.05,
+                              plbl.ypos=0.04)
 
 
-
-REL606.rnaseq.Favate.data <- rnaseq.Favate.data %>% filter(line=="REL606")
 
 #######################################
 ## Caglar et al. analysis of REL606 over time.
@@ -464,6 +583,18 @@ spearmanFig1 <- make.mut.density.RNA.protein.expression.figure(hypermut.density.
 spearmanS1Fig <- make.mut.density.RNA.protein.expression.figure(nonmut.density.Caglar,method="spearman")
 ggsave("../results/thermostability/figures/spearmanFig1.pdf", spearmanFig1, height = 4, width = 9)
 ggsave("../results/thermostability/figures/spearmanS1Fig.pdf", spearmanS1Fig, height = 4, width = 9)
+
+nozeroFig1 <- make.mut.density.RNA.protein.expression.figure(nozero.hypermut.density.Caglar)
+nozeroS1Fig <- make.mut.density.RNA.protein.expression.figure(nozero.nonmut.density.Caglar)
+
+ggsave("../results/thermostability/figures/nozeroFig1.pdf", nozeroFig1, height = 4, width = 9)
+ggsave("../results/thermostability/figures/nozeroS1Fig.pdf", nozeroS1Fig, height = 4, width = 9)
+
+
+dSnozeroFig1 <- make.mut.density.RNA.protein.expression.figure(nozero.hypermut.density.Caglar, muts.for.plot="dS")
+ggsave("../results/thermostability/figures/dSnozeroFig1.pdf", dSnozeroFig1, height = 4, width = 9)
+
+
 
 ########################################################
 

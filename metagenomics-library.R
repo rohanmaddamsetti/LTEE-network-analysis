@@ -243,7 +243,8 @@ add.cumulative.mut.layer <- function(p, layer.df, my.color) {
 ## Examine the distribution of various classes of mutations across genes in the
 ## genomics or metagenomics data. Which genes are enriched? Which genes are depleted?
 ## Then, can look at the annotation of these genes in STRING.
-calc.gene.mutation.density <- function(gene.mutation.data, mut_type_vec) {
+calc.gene.mutation.density <- function(gene.mutation.data, mut_type_vec,
+                                       add.pseudocount=FALSE) {
     density.df <- gene.mutation.data %>%
         filter(Annotation %in% mut_type_vec) %>%
         filter(Gene!= "intergenic") %>%
@@ -259,6 +260,14 @@ calc.gene.mutation.density <- function(gene.mutation.data, mut_type_vec) {
     density.df[is.na(density.df)] <- 0
     density.df <- tbl_df(density.df)
 
+    if(add.pseudocount) {
+        ## then recalculate as follows:
+        ## add 0.1 to every gene, then normalize for the density.
+        density.df <- density.df %>%
+            mutate(mut.count = mut.count + 0.1) %>%
+            mutate(density=mut.count/gene_length) %>%
+            arrange(desc(density))
+    }
     
     return(density.df)
 }
