@@ -49,7 +49,10 @@ gene.mutation.data <- read.csv(
 ########################################################################
 ## calculate densities of mutations per gene.
 ## This is used for filtering data.
-calc.gene.mutation.densities <- function(gene.mutation.data,use.pseudocount=FALSE) {
+calc.gene.mutation.densities <- function(gene.mutation.data,
+                                         REL606.genes,
+                                         use.pseudocount=FALSE) {
+    
     all.mutation.density <- calc.gene.mutation.density(
         gene.mutation.data,
         c("missense", "sv", "synonymous", "noncoding", "indel", "nonsense"),
@@ -96,14 +99,15 @@ calc.gene.mutation.densities <- function(gene.mutation.data,use.pseudocount=FALS
 
     if (use.pseudocount) {
         gene.mutation.densities <- gene.mutation.densities %>%
-            ## CRITICAL STEP: replace NAs with pseudocounts of 0.1
+            ## CRITICAL STEP: replace NAs with pseudocounts of 0.0001
+            ## following approach in Serohijos et al. (2012).
             ## We need to keep track of genes that haven't been hit by any mutations
             ## in a given mutation class (sv, indels, dN, etc.)
-            replace_na(list(all.mut.count = 0.1,
-                            dN.mut.count = 0.1,
-                            dS.mut.count = 0.1,
-                            all.except.dS.mut.count = 0.1,
-                            KO.mut.count = 0.1)) %>%
+            replace_na(list(all.mut.count = 0.0001,
+                            dN.mut.count = 0.0001,
+                            dS.mut.count = 0.0001,
+                            all.except.dS.mut.count = 0.0001,
+                            KO.mut.count = 0.0001)) %>%
             mutate(all.mut.density = all.mut.count/gene_length,
                             dN.mut.density = dN.mut.count/gene_length,
                             dS.mut.density = dS.mut.count/gene_length,
@@ -125,18 +129,18 @@ calc.gene.mutation.densities <- function(gene.mutation.data,use.pseudocount=FALS
     return(gene.mutation.densities)
 }
 
-gene.mutation.densities <- calc.gene.mutation.densities(gene.mutation.data)
+gene.mutation.densities <- calc.gene.mutation.densities(gene.mutation.data, REL606.genes)
 
 ## Calculate mutation densities per gene separately for
 ## nonmutators and hypermutators.
 
-nonmut.mutation.densities <- gene.mutation.data %>%
-    filter(Population %in% nonmutator.pops) %>%
-    calc.gene.mutation.densities()
+nonmut.mutation.densities <- calc.gene.mutation.densities(
+    filter(gene.mutation.data, Population %in% nonmutator.pops),
+    REL606.genes)
 
-hypermut.mutation.densities <- gene.mutation.data %>%
-    filter(Population %in% hypermutator.pops) %>%
-    calc.gene.mutation.densities()
+hypermut.mutation.densities <- calc.gene.mutation.densities(
+    filter(gene.mutation.data, Population %in% hypermutator.pops),
+   REL606.genes)
 
 ## For the supplementary information, examine the correlations when genes
 ## with zero mutations are omitted.
@@ -639,41 +643,74 @@ ggsave("../results/thermostability/figures/dSnozeroFig1.pdf", dSnozeroFig1, heig
 ## Protein Biophysics Explains Why Highly Abundant Proteins Evolve Slowly
 ## by Serohijos et al. (2012).
 
-## IMPORTANT BUG TO FIX: MAKE SURE ZEROS IN EACH POPULATION ARE NOT THROWN OUT!
+calc.pop.gene.mutation.densities <- function(gene.mutation.data, REL606.genes) {
 
-calc.pop.gene.mutation.densities <- function(gene.mutation.data) {
-    all.mutation.density <- pop.calc.gene.mutation.density(
+    keep.pop.zero.muts.for.merging <- function(pop.mut.density) {
+        ## This helper function joins the mut.density for a single population
+        ## to REL606.genes in order to preserve the Population label
+        ## for zero mutation genes.
+        ## REL606.genes is a global variable for this helper.
+        
+        ## CRITICAL STEP: replace NAs with zeros.
+        ## We need to keep track of genes that haven't been hit by any mutations
+        ## in a given mutation class (sv, indels, dN, etc.),
+        ## on a __per population__ basis.
+
+        full_join(REL606.genes, pop.mut.density) %>%
+            replace_na(list(mut.count = 0, density = 0,
+                            Population = unique(pop.mut.density$Population)))
+    }
+
+    population.factor.levels <- levels(gene.mutation.data$Population)
+    ## When we split on the population factor, it will pass ALL
+    ## levels, including ones that are not even in the data,
+    ## to the helper function keep.pop.zero.muts.for.merging.
+    ## For this reason, I change the Population column
+    ## from a factor to a character vector, apply the helper function,
+    ## and then change the Population column from a character vector
+    ## back into a factor.
+    ## This prevents the helper function from getting empty data frames
+    ## as inputs.
+    
+    pop.all.mutation.density <- pop.calc.gene.mutation.density(
         gene.mutation.data,
         c("missense", "sv", "synonymous", "noncoding", "indel", "nonsense")) %>%
+        ## Population column: Factor -> Character
+        mutate(Population = as.character(Population)) %>%
+        split(.$Population) %>%
+        map_dfr(.f = keep.pop.zero.muts.for.merging) %>%
         rename(all.mut.count = mut.count) %>%
         rename(all.mut.density = density)
     
-    ## look at dN density.
-    dN.density <- pop.calc.gene.mutation.density(
+    ## look at dN density per pop.
+    pop.dN.density <- pop.calc.gene.mutation.density(
         gene.mutation.data,c("missense", "nonsense")) %>%
+        ## Population column: Factor -> Character
+        mutate(Population = as.character(Population)) %>%
+        split(.$Population) %>%
+        map_dfr(.f = keep.pop.zero.muts.for.merging) %>%
         rename(dN.mut.count = mut.count) %>%
         rename(dN.mut.density = density)
     
-    ## look at dS density.
-    dS.density <- pop.calc.gene.mutation.density(
+    ## look at dS density per pop.
+    pop.dS.density <- pop.calc.gene.mutation.density(
         gene.mutation.data,c("synonymous")) %>%
+        ## Population column: Factor -> Character
+        mutate(Population = as.character(Population)) %>%
+        split(.$Population) %>%
+        map_dfr(.f = keep.pop.zero.muts.for.merging) %>%
         rename(dS.mut.count = mut.count) %>%
         rename(dS.mut.density = density)
     
     ## combine these into one dataframe.
-    pop.gene.mutation.densities <- REL606.genes %>%
-        full_join(all.mutation.density) %>%
-        full_join(dN.density) %>%
-        full_join(dS.density) %>%
+    pop.gene.mutation.densities <- pop.all.mutation.density %>%
+        full_join(pop.dN.density) %>%
+        full_join(pop.dS.density) %>%
         as_tibble()
-    
-    pop.gene.mutation.densities <- pop.gene.mutation.densities %>%
-        ## CRITICAL STEP: replace NAs with zeros.
-        ## We need to keep track of genes that haven't been hit by any mutations
-        ## in a given mutation class (sv, indels, dN, etc.)
-        replace_na(list(all.mut.count = 0, all.mut.density = 0,
-                        dN.mut.count = 0, dN.mut.density = 0,
-                        dS.mut.count = 0, dS.mut.density = 0))
+
+    ## Population column: Character -> Factor
+    levels(pop.gene.mutation.densities$Population) <- population.factor.levels
+
     
     return(pop.gene.mutation.densities)
 }
@@ -694,39 +731,15 @@ total.muts.per.population <- gene.mutation.data %>%
     summarize(total.observed.muts = n()) %>%
     ungroup()
 
-######################################################################
-
 ## calculate the density of mutations per gene per population.
-pop.density.Caglar <- calc.pop.gene.mutation.densities(gene.mutation.data) %>%
+pop.density.Caglar <- calc.pop.gene.mutation.densities(gene.mutation.data,
+                                                       REL606.genes) %>%
     ## use an inner join to exclude any genes with no protein/RNA data.
     inner_join(Caglar.summary)
-
-## CRITICAL BUG TO FIX!!!!!!!!!!!! working here.
-buggy.df <- calc.pop.gene.mutation.densities(gene.mutation.data)
-filter(buggy.df, all.mut.count == 0)
-
-
-## scratch space for debugging.
-
-ara.minus5.gene.mutation.data <- filter(gene.mutation.data,Population=="Ara-5")
-
-ara.minus.5.gene.mutation.densities <- calc.pop.gene.mutation.densities(
-    ara.minus5.gene.mutation.data)
-
-
-ara.minus.5.density.Caglar <- ara.minus.5.gene.mutation.densities %>%
-    inner_join(Caglar.summary)
-
-
-
-
-quit()
-###################################
 
 ## for recalculating the correlations when genes with zero mutation density are
 ## excluded.
 nozero.pop.density.Caglar <- pop.density.Caglar %>% filter(all.mut.density > 0)
-
 
 ## now calculate the correlation between abundance and density of mutations
 ## per population and per timepoint.
@@ -743,25 +756,6 @@ pop.mut.density.protein.abundance.correlation.plot <- ggplot(
         color=Population, shape = is.Hypermutator)) +
     geom_point() + theme_classic() + xlab("Total observed mutations per population") +
     ylab("Correlation between protein abundance and mutation density")
-
-## NOW-- recalculate the correlations when genes with zero mutation density are
-## excluded.
-nozero.pop.mut.density.protein.abundance.correlation.df <- pop.density.Caglar %>%
-    split(list(.$growthTime_hr, .$Population)) %>%
-    map_dfr(.f = calc.correlation.helper) %>%
-    ## merge with the number of observed mutations per population
-    left_join(total.muts.per.population) %>%
-    mutate(is.Hypermutator = Population %in% hypermutator.pops)
-
-nozero.pop.mut.density.prot.abundance.plot <- ggplot(
-    data=nozero.pop.mut.density.protein.abundance.correlation.df,
-    aes(x=total.observed.muts, y = correlation,
-        color=Population, shape = is.Hypermutator)) +
-    geom_point() + theme_classic() + xlab("Total observed mutations per population") +
-    ylab("Correlation between protein abundance and mutation density")
-
-## CRITICAL BUG: DOUBLE-CHECK THESE CORRELATIONS!
-## NON-MUTATOR CORRELATIONS ARE NOT CONSISTENT WITH PREVIOUS RESULTS!!!
 
 
 ########################################################
@@ -1146,7 +1140,7 @@ correlate.meltPoint.with.timepoint(meltome.with.abundance)
 plot.meltPoint.mRNA.anticorrelation <- function(my.data) {
     ## This is a helper function to plot an mRNA panel for the full figure.
     my.t <- unique(my.data$growthTime_hr)
-    time.title = paste0(as.character(my.t), "h")
+    time.title <- paste0(as.character(my.t), "h")
 
     ## if the correlation is not significant, then the fill is gray.
     mRNA.result <- cor.test(my.data$mRNA.mean, my.data$meltPoint)
@@ -1190,7 +1184,7 @@ plot.meltPoint.mRNA.anticorrelation <- function(my.data) {
 plot.meltPoint.protein.anticorrelation <- function(my.data) {
     ## This is a helper function to plot a protein panel for the full figure.
     my.t <- unique(my.data$growthTime_hr)
-    time.title = paste0(as.character(my.t), "h")
+    time.title <- paste0(as.character(my.t), "h")
 
     ## if the correlation is not significant, then the fill is gray.
     Protein.result <- cor.test(my.data$Protein.mean, my.data$meltPoint)
