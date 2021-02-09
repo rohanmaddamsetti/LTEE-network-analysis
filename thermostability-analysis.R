@@ -168,15 +168,16 @@ tidy.cooper.data <- cooper.data %>%
 anc.cooper.data <- tidy.cooper.data %>%
     filter(Sample %in% c("REL606", "REL607")) %>%
     group_by(locus_tag, Sample) %>%
+    ## only analyze genes with reproducible expression values.
     summarize(mean_mRNA = mean(mRNA, na.rm=TRUE)) %>%
     ungroup()
 
 evol.cooper.data <- tidy.cooper.data %>%
     filter(Sample %in% c("AraPlus1_20K", "AraMinus1_20K")) %>%
     group_by(locus_tag, Sample) %>%
+    ## only analyze genes with reproducible expression values.
     summarize(mean_mRNA = mean(mRNA, na.rm=TRUE)) %>%
     ungroup()
-
 
 anc.cooper.with.nonmut.mutation.density <- anc.cooper.data %>%
     left_join(nonmut.mutation.densities)
@@ -188,7 +189,7 @@ anc.cooper.nonmut.cor <- cor.test(anc.cooper.with.nonmut.mutation.density$mean_m
          anc.cooper.with.nonmut.mutation.density$all.mut.density)
 
 anc.cooper.hypermut.cor <- cor.test(anc.cooper.with.hypermut.mutation.density$mean_mRNA,
-                                anc.cooper.with.hypermut.mutation.density$all.mut.density)
+                                    anc.cooper.with.hypermut.mutation.density$all.mut.density)
 anc.cooper.hypermut.cor$p.value
 
 
@@ -202,9 +203,8 @@ evol.cooper.nonmut.cor <- cor.test(evol.cooper.with.nonmut.mutation.density$mean
          evol.cooper.with.nonmut.mutation.density$all.mut.density)
 
 evol.cooper.hypermut.cor <- cor.test(evol.cooper.with.hypermut.mutation.density$mean_mRNA,
-                                evol.cooper.with.hypermut.mutation.density$all.mut.density)
+                                     evol.cooper.with.hypermut.mutation.density$all.mut.density)
 evol.cooper.hypermut.cor$p.value
-
 
 
 ########################################################################
@@ -630,6 +630,138 @@ ggsave("../results/thermostability/figures/nozeroS1Fig.pdf", nozeroS1Fig, height
 dSnozeroFig1 <- make.mut.density.RNA.protein.expression.figure(nozero.hypermut.density.Caglar, muts.for.plot="dS")
 ggsave("../results/thermostability/figures/dSnozeroFig1.pdf", dSnozeroFig1, height = 5, width = 9)
 
+########################################################
+
+## Compare "divergence" in terms of number of observed mutations
+## per population to the correlation with protein abundance.
+
+## Compare to the theoretical expectation in Fig. 4 of
+## Protein Biophysics Explains Why Highly Abundant Proteins Evolve Slowly
+## by Serohijos et al. (2012).
+
+## IMPORTANT BUG TO FIX: MAKE SURE ZEROS IN EACH POPULATION ARE NOT THROWN OUT!
+
+calc.pop.gene.mutation.densities <- function(gene.mutation.data) {
+    all.mutation.density <- pop.calc.gene.mutation.density(
+        gene.mutation.data,
+        c("missense", "sv", "synonymous", "noncoding", "indel", "nonsense")) %>%
+        rename(all.mut.count = mut.count) %>%
+        rename(all.mut.density = density)
+    
+    ## look at dN density.
+    dN.density <- pop.calc.gene.mutation.density(
+        gene.mutation.data,c("missense", "nonsense")) %>%
+        rename(dN.mut.count = mut.count) %>%
+        rename(dN.mut.density = density)
+    
+    ## look at dS density.
+    dS.density <- pop.calc.gene.mutation.density(
+        gene.mutation.data,c("synonymous")) %>%
+        rename(dS.mut.count = mut.count) %>%
+        rename(dS.mut.density = density)
+    
+    ## combine these into one dataframe.
+    pop.gene.mutation.densities <- REL606.genes %>%
+        full_join(all.mutation.density) %>%
+        full_join(dN.density) %>%
+        full_join(dS.density) %>%
+        as_tibble()
+    
+    pop.gene.mutation.densities <- pop.gene.mutation.densities %>%
+        ## CRITICAL STEP: replace NAs with zeros.
+        ## We need to keep track of genes that haven't been hit by any mutations
+        ## in a given mutation class (sv, indels, dN, etc.)
+        replace_na(list(all.mut.count = 0, all.mut.density = 0,
+                        dN.mut.count = 0, dN.mut.density = 0,
+                        dS.mut.count = 0, dS.mut.density = 0))
+    
+    return(pop.gene.mutation.densities)
+}
+
+calc.correlation.helper <- function(pop.density.Caglar.subdf,my.method="pearson") {
+    my.test <- cor.test(pop.density.Caglar.subdf$Protein.mean,
+             pop.density.Caglar.subdf$all.mut.density,
+             method=my.method)
+    my.df <- data.frame(Population = unique(pop.density.Caglar.subdf$Population),
+                        growthTime_hr = unique(pop.density.Caglar.subdf$growthTime_hr),
+                        correlation = my.test$estimate)
+    return(my.df)
+}
+
+## count the number of observed mutations per population.
+total.muts.per.population <- gene.mutation.data %>%
+    group_by(Population) %>%
+    summarize(total.observed.muts = n()) %>%
+    ungroup()
+
+######################################################################
+
+## calculate the density of mutations per gene per population.
+pop.density.Caglar <- calc.pop.gene.mutation.densities(gene.mutation.data) %>%
+    ## use an inner join to exclude any genes with no protein/RNA data.
+    inner_join(Caglar.summary)
+
+## CRITICAL BUG TO FIX!!!!!!!!!!!! working here.
+buggy.df <- calc.pop.gene.mutation.densities(gene.mutation.data)
+filter(buggy.df, all.mut.count == 0)
+
+
+## scratch space for debugging.
+
+ara.minus5.gene.mutation.data <- filter(gene.mutation.data,Population=="Ara-5")
+
+ara.minus.5.gene.mutation.densities <- calc.pop.gene.mutation.densities(
+    ara.minus5.gene.mutation.data)
+
+
+ara.minus.5.density.Caglar <- ara.minus.5.gene.mutation.densities %>%
+    inner_join(Caglar.summary)
+
+
+
+
+quit()
+###################################
+
+## for recalculating the correlations when genes with zero mutation density are
+## excluded.
+nozero.pop.density.Caglar <- pop.density.Caglar %>% filter(all.mut.density > 0)
+
+
+## now calculate the correlation between abundance and density of mutations
+## per population and per timepoint.
+pop.mut.density.protein.abundance.correlation.df <- pop.density.Caglar %>%
+    split(list(.$growthTime_hr, .$Population)) %>%
+    map_dfr(.f = calc.correlation.helper) %>%
+    ## merge with the number of observed mutations per population
+    left_join(total.muts.per.population) %>%
+    mutate(is.Hypermutator = Population %in% hypermutator.pops)
+
+pop.mut.density.protein.abundance.correlation.plot <- ggplot(
+    data = pop.mut.density.protein.abundance.correlation.df,
+    aes(x=total.observed.muts, y = correlation,
+        color=Population, shape = is.Hypermutator)) +
+    geom_point() + theme_classic() + xlab("Total observed mutations per population") +
+    ylab("Correlation between protein abundance and mutation density")
+
+## NOW-- recalculate the correlations when genes with zero mutation density are
+## excluded.
+nozero.pop.mut.density.protein.abundance.correlation.df <- pop.density.Caglar %>%
+    split(list(.$growthTime_hr, .$Population)) %>%
+    map_dfr(.f = calc.correlation.helper) %>%
+    ## merge with the number of observed mutations per population
+    left_join(total.muts.per.population) %>%
+    mutate(is.Hypermutator = Population %in% hypermutator.pops)
+
+nozero.pop.mut.density.prot.abundance.plot <- ggplot(
+    data=nozero.pop.mut.density.protein.abundance.correlation.df,
+    aes(x=total.observed.muts, y = correlation,
+        color=Population, shape = is.Hypermutator)) +
+    geom_point() + theme_classic() + xlab("Total observed mutations per population") +
+    ylab("Correlation between protein abundance and mutation density")
+
+## CRITICAL BUG: DOUBLE-CHECK THESE CORRELATIONS!
+## NON-MUTATOR CORRELATIONS ARE NOT CONSISTENT WITH PREVIOUS RESULTS!!!
 
 
 ########################################################
