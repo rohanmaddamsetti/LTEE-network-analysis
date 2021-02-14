@@ -211,6 +211,60 @@ evol.cooper.hypermut.cor <- cor.test(evol.cooper.with.hypermut.mutation.density$
 evol.cooper.hypermut.cor$p.value
 
 
+
+## now make a figure for this analysis.
+make.mut.density.cooper.panel <- function(cooper.data,
+                                          lbl.xpos, rlbl.ypos, plbl.ypos,
+                                          my.color="gray",
+                                          muts.to.plot="all") {
+    ## This is a helper function that plots a single panel.
+
+    ## annotate r and p-values on the panel.
+    ## default is to plot the density of all mutations.
+    favate.result <- cor.test(cooper.data$mean_mRNA, cooper.data$all.mut.density)
+    
+    pearson.r <- signif(favate.result$estimate,digits=3)
+    pearson.p.value <- signif(favate.result$p.value,digits=3)
+
+    lbl.rval <- paste("r", "=", pearson.r)
+    lbl.p.value <- paste("p", "=", pearson.p.value)
+
+    ## default is to plot the density of all mutations.
+    cooper.panel <- cooper.data %>%
+            ggplot(aes(x = mean_mRNA, y = all.mut.density))
+
+    cooper.panel <- cooper.panel +
+        geom_point(color = my.color, alpha = 0.2) +
+        geom_smooth(method = 'lm', formula = y~x) +
+        theme_classic() +
+        ylab("Mutation density") +
+        xlab("mRNA") +
+        ## annotate correlation on the figure.
+        annotate("text", x = lbl.xpos, y = rlbl.ypos, size=3,
+                 label = lbl.rval, fontface = 'bold.italic') +
+        ## annotate p-value on the figure.
+        annotate("text", x = lbl.xpos, y = plbl.ypos, size=3,
+                 label = lbl.p.value, fontface = 'bold.italic')
+
+    return(cooper.panel)
+}
+
+S9FigA <- make.mut.density.cooper.panel(anc.cooper.with.hypermut.mutation.density,
+                              lbl.xpos = -5,
+                              rlbl.ypos = 0.04,
+                              plbl.ypos = 0.05) + ggtitle("Ancestral expression")
+
+S9FigB <- make.mut.density.cooper.panel(evol.cooper.with.hypermut.mutation.density,
+                              lbl.xpos=-5,
+                              rlbl.ypos=0.04,
+                              plbl.ypos=0.05) + ggtitle("Ara+1 and Ara-1 clones at 20,000 generations")
+
+## Make the figure.
+S9Fig <- plot_grid(S9FigA, S9FigB, nrow = 1,
+                   labels = c('A', 'B'))
+ggsave("../results/thermostability/figures/S9Fig.pdf", S9Fig, height=5, width=9)
+
+
 ########################################################################
 ## Favate et al. (2021) analysis of ancestral clones and 11 evolved 50K LTEE clones.
 
@@ -325,27 +379,33 @@ make.mut.density.favate.panel <- function(favate.data,
     return(favate.panel)
 }
 
-make.mut.density.favate.panel(rnaseq.with.hypermut.mutation.density,
+S8FigA <- make.mut.density.favate.panel(rnaseq.with.hypermut.mutation.density,
                               lbl.xpos=2,
                               rlbl.ypos=0.06,
-                              plbl.ypos=0.07)
+                              plbl.ypos=0.07) + ggtitle("All mutations")
 
-make.mut.density.favate.panel(rnaseq.with.hypermut.mutation.density,
+S8FigB <- make.mut.density.favate.panel(rnaseq.with.hypermut.mutation.density,
                               lbl.xpos=2,
-                              rlbl.ypos=0.06,
-                              plbl.ypos=0.07,
-                              muts.to.plot="dN")
+                              rlbl.ypos=0.028,
+                              plbl.ypos=0.03,
+                              muts.to.plot="dN") + ggtitle("Nonsynonymous mutations")
 
-make.mut.density.favate.panel(rnaseq.with.hypermut.mutation.density,
+S8FigC <- make.mut.density.favate.panel(rnaseq.with.hypermut.mutation.density,
                               lbl.xpos=2,
-                              rlbl.ypos=0.06,
-                              plbl.ypos=0.07,
-                              muts.to.plot="dS")
+                              rlbl.ypos=0.012,
+                              plbl.ypos=0.015,
+                              muts.to.plot="dS") + ggtitle("Synonymous mutations")
 
-make.mut.density.favate.panel(rnaseq.with.nonmut.mutation.density,
+## This one is less relevant, so omit from S8Fig.
+favate.nonmut.plot <- make.mut.density.favate.panel(rnaseq.with.nonmut.mutation.density,
                               lbl.xpos=2,
                               rlbl.ypos=0.06,
-                              plbl.ypos=0.07)
+                              plbl.ypos=0.07) + ggtitle("All mutations in nonmutators")
+
+## Make the figure.
+S8Fig <- plot_grid(S8FigA, S8FigB, S8FigC, nrow = 1,
+                   labels = c('A', 'B', 'C', 'D'))
+ggsave("../results/thermostability/figures/S8Fig.pdf", S8Fig, height=5, width=9)
 
 #######################################
 ## Caglar et al. analysis of REL606 over time.
@@ -606,35 +666,47 @@ make.mut.density.RNA.protein.expression.figure <- function(density.Caglar,
     return(big.fig)
 }
 
-Fig1 <- make.mut.density.RNA.protein.expression.figure(hypermut.density.Caglar)
-S1Fig <- make.mut.density.RNA.protein.expression.figure(nonmut.density.Caglar)
+## now make the main figure.
+Fig2 <- make.mut.density.RNA.protein.expression.figure(hypermut.density.Caglar)
+ggsave("../results/thermostability/figures/Fig2.pdf", Fig2, height = 5, width = 9)
 
-ggsave("../results/thermostability/figures/Fig1.pdf", Fig1, height = 5, width = 9)
+## repeat, but using Spearman correlation.
+S1Fig <- make.mut.density.RNA.protein.expression.figure(hypermut.density.Caglar, method="spearman")
 ggsave("../results/thermostability/figures/S1Fig.pdf", S1Fig, height = 5, width = 9)
 
+## now examine hypermutators when zero mutation genes are excluded.
+S2Fig <- make.mut.density.RNA.protein.expression.figure(
+    nozero.hypermut.density.Caglar)
+ggsave("../results/thermostability/figures/S2Fig.pdf",
+       S2Fig, height = 5, width = 9)
 
-dN.Fig1 <- make.mut.density.RNA.protein.expression.figure(hypermut.density.Caglar, muts.for.plot="dN")
-dS.Fig1 <- make.mut.density.RNA.protein.expression.figure(hypermut.density.Caglar, muts.for.plot="dS")
-ggsave("../results/thermostability/figures/dN-Fig1.pdf", dN.Fig1, height = 5, width = 9)
-ggsave("../results/thermostability/figures/dS-Fig1.pdf", dS.Fig1, height = 5, width = 9)
+## now examine just nonsynonymous mutations in hypermutators.
+S3Fig <- make.mut.density.RNA.protein.expression.figure(
+    hypermut.density.Caglar, muts.for.plot="dN")
+ggsave("../results/thermostability/figures/S3Fig.pdf",
+       S3Fig, height = 5, width = 9)
+
+## for comparison, examine just synonymous mutations in hypermutators.
+S4Fig <- make.mut.density.RNA.protein.expression.figure(
+    hypermut.density.Caglar, muts.for.plot="dS")
+ggsave("../results/thermostability/figures/S4Fig.pdf",
+       S4Fig, height = 5, width = 9)
+## and examine synonymous mutations in hypermutators, when zeros are excluded.
+S5Fig <- make.mut.density.RNA.protein.expression.figure(
+    nozero.hypermut.density.Caglar, muts.for.plot="dS")
+ggsave("../results/thermostability/figures/S5Fig.pdf",
+       S5Fig, height = 5, width = 9)
 
 
-spearmanFig1 <- make.mut.density.RNA.protein.expression.figure(hypermut.density.Caglar, method="spearman")
-spearmanS1Fig <- make.mut.density.RNA.protein.expression.figure(nonmut.density.Caglar,method="spearman")
-ggsave("../results/thermostability/figures/spearmanFig1.pdf", spearmanFig1, height = 5, width = 9)
-ggsave("../results/thermostability/figures/spearmanS1Fig.pdf", spearmanS1Fig, height = 5, width = 9)
-
-nozeroFig1 <- make.mut.density.RNA.protein.expression.figure(nozero.hypermut.density.Caglar)
-nozeroS1Fig <- make.mut.density.RNA.protein.expression.figure(nozero.nonmut.density.Caglar)
-
-ggsave("../results/thermostability/figures/nozeroFig1.pdf", nozeroFig1, height = 5, width = 9)
-ggsave("../results/thermostability/figures/nozeroS1Fig.pdf", nozeroS1Fig, height = 5, width = 9)
-
-
-dSnozeroFig1 <- make.mut.density.RNA.protein.expression.figure(nozero.hypermut.density.Caglar, muts.for.plot="dS")
-ggsave("../results/thermostability/figures/dSnozeroFig1.pdf", dSnozeroFig1, height = 5, width = 9)
+## now examine nonmutators.
+S6Fig <- make.mut.density.RNA.protein.expression.figure(nonmut.density.Caglar)
+ggsave("../results/thermostability/figures/S6Fig.pdf", S6Fig, height = 5, width = 9)
+## repeat, using Spearman correlation.
+S7Fig <- make.mut.density.RNA.protein.expression.figure(nonmut.density.Caglar,method="spearman")
+ggsave("../results/thermostability/figures/S7Fig.pdf", S7Fig, height = 5, width = 9)
 
 ########################################################
+## Figure 3. 
 
 ## Compare "divergence" in terms of number of observed mutations
 ## per population to the correlation with protein abundance.
@@ -737,10 +809,6 @@ pop.density.Caglar <- calc.pop.gene.mutation.densities(gene.mutation.data,
     ## use an inner join to exclude any genes with no protein/RNA data.
     inner_join(Caglar.summary)
 
-## for recalculating the correlations when genes with zero mutation density are
-## excluded.
-nozero.pop.density.Caglar <- pop.density.Caglar %>% filter(all.mut.density > 0)
-
 ## now calculate the correlation between abundance and density of mutations
 ## per population and per timepoint.
 pop.mut.density.protein.abundance.correlation.df <- pop.density.Caglar %>%
@@ -750,15 +818,19 @@ pop.mut.density.protein.abundance.correlation.df <- pop.density.Caglar %>%
     left_join(total.muts.per.population) %>%
     mutate(is.Hypermutator = Population %in% hypermutator.pops)
 
-pop.mut.density.protein.abundance.correlation.plot <- ggplot(
+Fig3 <- ggplot(
     data = pop.mut.density.protein.abundance.correlation.df,
     aes(x=total.observed.muts, y = correlation,
         color=Population, shape = is.Hypermutator)) +
-    geom_point() + theme_classic() + xlab("Total observed mutations per population") +
-    ylab("Correlation between protein abundance and mutation density")
+    geom_point() + theme_classic() + xlab("Total observed mutations") +
+    ylab("Correlation between protein abundance and mutation density") +
+    guides(shape = FALSE)
 
+ggsave("../results/thermostability/figures/Fig3.pdf",
+       Fig3, width=5, height=5)
 
 ########################################################
+## Figure 4.
 
 ## PPI network statistics analysis.
 ## to generate these files, run: python snap-ppi-analysis.py 
@@ -866,38 +938,41 @@ make.mut.density.PPI.degree.panel <- function(PPI.data,
     return(PPI.panel)
 }
 
-make.mut.density.PPI.degree.figure <- function(nonmut.PPI.zitnik, nonmut.PPI.cong,
-                                               hypermut.PPI.zitnik, hypermut.PPI.cong) {
+make.mut.density.PPI.degree.figure <- function(nonmut.PPI.cong, nonmut.PPI.zitnik, 
+                                               hypermut.PPI.cong, hypermut.PPI.zitnik) {
 
     ## label positions for each figure:
-    zitnik.xpos <- 100
     cong.xpos <- 10
+    zitnik.xpos <- 100
 
     nonmut.r.ypos <- 0.01
     nonmut.p.ypos <- 0.012
     hypermut.r.ypos <- 0.03
     hypermut.p.ypos <- 0.035
     
-    panelA <- make.mut.density.PPI.degree.panel(nonmut.PPI.zitnik,
-                                                zitnik.xpos,
+    panelA <- make.mut.density.PPI.degree.panel(nonmut.PPI.cong,
+                                                cong.xpos,
                                                 nonmut.r.ypos,
                                                 nonmut.p.ypos,
                                                 "lightsteelblue") +
         ggtitle("Nonmutators")
-    panelB <- make.mut.density.PPI.degree.panel(nonmut.PPI.cong,
-                                                cong.xpos,
+    
+    panelB <- make.mut.density.PPI.degree.panel(nonmut.PPI.zitnik,
+                                                zitnik.xpos,
                                                 nonmut.r.ypos,
                                                 nonmut.p.ypos,
                                                 "moccasin") +
         ggtitle("Nonmutators")
-    panelC <- make.mut.density.PPI.degree.panel(hypermut.PPI.zitnik,
-                                                zitnik.xpos,
+
+    panelC <- make.mut.density.PPI.degree.panel(hypermut.PPI.cong,
+                                                cong.xpos,
                                                 hypermut.r.ypos,
                                                 hypermut.p.ypos,
                                                 "lightsteelblue") +
         ggtitle("Hypermutators")
-    panelD <- make.mut.density.PPI.degree.panel(hypermut.PPI.cong,
-                                                cong.xpos,
+
+    panelD <- make.mut.density.PPI.degree.panel(hypermut.PPI.zitnik,
+                                                zitnik.xpos,
                                                 hypermut.r.ypos,
                                                 hypermut.p.ypos,
                                                 "moccasin") +
@@ -909,12 +984,12 @@ make.mut.density.PPI.degree.figure <- function(nonmut.PPI.zitnik, nonmut.PPI.con
     return(fig)
 }
 
-PPI.figure <- make.mut.density.PPI.degree.figure(nonmut.PPI.zitnik,
-                                                 nonmut.PPI.cong,
-                                                 hypermut.PPI.zitnik,
-                                                 hypermut.PPI.cong)
-ggsave("../results/thermostability/figures/PPI-figure.pdf",
-       PPI.figure, width=4, height=4)
+Fig4 <- make.mut.density.PPI.degree.figure(nonmut.PPI.cong,
+                                           nonmut.PPI.zitnik,
+                                           hypermut.PPI.cong,
+                                           hypermut.PPI.zitnik)
+ggsave("../results/thermostability/figures/Fig4.pdf",
+       Fig4, width=4, height=4)
 
 ################################################################################
 ## Analyze E. coli data from the ProteomeVis database.
@@ -983,24 +1058,66 @@ make.ProteomeVis.contact.density.figure <- function(nonmut.proteome.vis.comp.df,
             xlab("Contact density") 
         return(formatted.plot)
     }
-    
+
+    ## annotate r and p-values on the panel.
+    nonmut.result <- cor.test(nonmut.proteome.vis.comp.df$contact_density,
+                           nonmut.proteome.vis.comp.df$all.mut.density)
+
+    hypermut.result <- cor.test(hypermut.proteome.vis.comp.df$contact_density,
+                           hypermut.proteome.vis.comp.df$all.mut.density)
+
+    nonmut.pearson.r <- signif(nonmut.result$estimate,digits=3)
+    nonmut.pearson.p.value <- signif(nonmut.result$p.value,digits=3)
+
+    hypermut.pearson.r <- signif(hypermut.result$estimate,digits=3)
+    hypermut.pearson.p.value <- signif(hypermut.result$p.value,digits=3)
+
+    nonmut.lbl.rval <- paste("r", "=", nonmut.pearson.r)
+    nonmut.lbl.p.value <- paste("p", "=", nonmut.pearson.p.value)
+
+    hypermut.lbl.rval <- paste("r", "=", hypermut.pearson.r)
+    hypermut.lbl.p.value <- paste("p", "=", hypermut.pearson.p.value)
+
+
+    ## label positions for each figure:
+    lbl.xpos <- 8
+
+    nonmut.r.ypos <- 0.01
+    nonmut.p.ypos <- 0.012
+    hypermut.r.ypos <- 0.03
+    hypermut.p.ypos <- 0.035
+
     nonmut.plot <- ggplot(nonmut.proteome.vis.comp.df,
                         aes(x = contact_density, y = all.mut.density)) %>%
         add.formatting() + 
-        ggtitle("Nonmutators")
+        ggtitle("Nonmutators") +
+        ## annotate correlation on the figure.
+        annotate("text", x = lbl.xpos, y = nonmut.r.ypos, size=3,
+                 label = nonmut.lbl.rval, fontface = 'bold.italic') +
+        ## annotate p-value on the figure.
+        annotate("text", x = lbl.xpos, y = nonmut.p.ypos, size=3,
+                 label = nonmut.lbl.p.value, fontface = 'bold.italic')
+
     
     hypermut.plot <- ggplot(hypermut.proteome.vis.comp.df,
                           aes(x = contact_density, y = all.mut.density)) %>%
         add.formatting() + 
-        ggtitle("Hypermutators")
+        ggtitle("Hypermutators") +
+        ## annotate correlation on the figure.
+        annotate("text", x = lbl.xpos, y = hypermut.r.ypos, size=3,
+                 label = hypermut.lbl.rval, fontface = 'bold.italic') +
+        ## annotate p-value on the figure.
+        annotate("text", x = lbl.xpos, y = hypermut.p.ypos, size=3,
+                 label = hypermut.lbl.p.value, fontface = 'bold.italic')
+
 
     fig <- plot_grid(nonmut.plot, hypermut.plot)
     return(fig)
 }
 
-ProteomeVisFig <- make.ProteomeVis.contact.density.figure(nonmut.proteome.vis.comp.df,
-                                                       hypermut.proteome.vis.comp.df)
-ggsave("../results/thermostability/figures/ProteomeVisFig.pdf", ProteomeVisFig, width=4, height=2)
+S10Fig <- make.ProteomeVis.contact.density.figure(nonmut.proteome.vis.comp.df,
+                                                  hypermut.proteome.vis.comp.df)
+ggsave("../results/thermostability/figures/S10Fig.pdf", S10Fig, width=4, height=2)
 
 ############################################################################
 ## E. COLI MELTOME ATLAS DATA ANALYSIS
@@ -1035,7 +1152,7 @@ categorize.by.meltPoint <- function(meltome) {
                                     meltPoint.quantile.to.category)) %>%
         select(-meltPoint.quantile)
 
-    ## merge back into the original data including nonmelters (meltPoint == NA),
+    ## merge back into the original data including nonmelters,
     ## and categorize the nonmelters.
     meltome.with.Tm.category <- meltome %>%
         left_join(data.with.meltPoint) %>%
@@ -1057,12 +1174,12 @@ Ecoli.meltome <- read.csv("../results/thermostability/Ecoli-meltome.csv") %>%
 
 ## to check correctness, plot the distribution of meltPoints in each Tm category.
 ## This should be a supplementary figure, if this strategies is used for other plots.
-meltome.tertile.plot <- ggplot(Ecoli.meltome,
+S12Fig <- ggplot(Ecoli.meltome,
                                aes(x = meltPoint, fill = Tm.category)) +
     xlab("Melting point") + ylab("Count") +
     geom_histogram(bins=100) + theme_classic() + guides(fill = FALSE)
-ggsave("../results/thermostability/figures/meltome-tertiles.pdf",
-       meltome.tertile.plot, height=3, width = 3)
+ggsave("../results/thermostability/figures/S12Fig.pdf",
+       S12Fig, height=3, width = 3)
 
 ## examine the nonmelter proteins.
 nonmelters <- Ecoli.meltome %>% filter(is.na(meltPoint)) %>%
@@ -1236,17 +1353,11 @@ make.meltPoint.RNA.protein.expression.figure <- function(meltPoint.Caglar) {
     return(big.fig)
 }
 
-meltPointOverTime.Fig <- make.meltPoint.RNA.protein.expression.figure(meltome.with.abundance)
-ggsave("../results/thermostability/figures/meltPointOverTime.pdf",
-       meltPointOverTime.Fig,
-       height = 4, width = 9)
-
-## Put both figures for the meltome analysis together for Figure 3.
-
-Fig3 <- plot_grid(plot_grid(hypermut.meltome.plot,NULL),
-                  meltPointOverTime.Fig,
+## Put both figures for the meltome analysis together for Figure S11.
+S11Fig <- plot_grid(plot_grid(hypermut.meltome.plot,NULL),
+                  make.meltPoint.RNA.protein.expression.figure(meltome.with.abundance),
                   labels = c('A','B'), ncol = 1,
                   rel_heights = c(1, 2))
                   
-ggsave("../results/thermostability/figures/Fig3.pdf",
-       Fig3, height = 6, width = 7)
+ggsave("../results/thermostability/figures/S11Fig.pdf",
+       S11Fig, height = 6, width = 7)
