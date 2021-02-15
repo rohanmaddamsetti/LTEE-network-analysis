@@ -221,10 +221,10 @@ make.mut.density.cooper.panel <- function(cooper.data,
 
     ## annotate r and p-values on the panel.
     ## default is to plot the density of all mutations.
-    favate.result <- cor.test(cooper.data$mean_mRNA, cooper.data$all.mut.density)
+    cooper.result <- cor.test(cooper.data$mean_mRNA, cooper.data$all.mut.density)
     
-    pearson.r <- signif(favate.result$estimate,digits=3)
-    pearson.p.value <- signif(favate.result$p.value,digits=3)
+    pearson.r <- signif(cooper.result$estimate,digits=3)
+    pearson.p.value <- signif(cooper.result$p.value,digits=3)
 
     lbl.rval <- paste("r", "=", pearson.r)
     lbl.p.value <- paste("p", "=", pearson.p.value)
