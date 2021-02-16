@@ -46,6 +46,16 @@ gene.mutation.data <- read.csv(
     inner_join(REL606.genes) %>%
     filter(Gene!='intergenic')
 
+## how many mutations are in the dataset, when split into
+## nonmutator and hypermutator groups?
+nonmut.mutation.data <- gene.mutation.data %>%
+    filter(Population %in% nonmutator.pops)
+nrow(nonmut.mutation.data)
+
+hypermut.mutation.data <- gene.mutation.data %>%
+    filter(Population %in% hypermutator.pops)
+nrow(hypermut.mutation.data)
+
 ########################################################################
 ## calculate densities of mutations per gene.
 ## This is used for filtering data.
@@ -150,159 +160,10 @@ nozero.nonmut.mutation.densities <- nonmut.mutation.densities %>%
 nozero.hypermut.mutation.densities <- hypermut.mutation.densities %>%
     filter(all.mut.density > 0)
 
-########################################################################
-## Do mRNA and protein abundances predict evolutionary rates in the LTEE and in nature?
-########################################################################
+###########################################################################################
+## Do mRNA and protein abundances anti-correlate with hypermutator mutation densities?
+###########################################################################################
 
-## Favate et al. (2021) analysis of ancestral clones and 11 evolved 50K LTEE clones.
-
-Favate.TableS1 <- read.csv("../data/Favate2021_table_s1_read_counts.csv",
-                           as.is=TRUE, header=TRUE) %>%
-    select(repl, seqtype, line, target_id, est_counts, tpm) %>%
-    ## now, we need to match the target_id field to genes or IDs in the REL606 genome.
-    ## I'm not sure what the ERC_00XXX IDs are. Ignore those and the tRNAs for now.
-    mutate(locus_tag = target_id) %>%
-    filter(str_detect(locus_tag,"^ECB")) %>%
-    ## filter for genes that were used in the metagenomics data.
-    filter(locus_tag %in% REL606.genes$locus_tag)
-    
-## Two datasets to examine separately: ribosome profiling and RNAseq.
-## restrict analysis to evolved strains.
-
-## RNAseq data
-rnaseq.Favate.data <- Favate.TableS1 %>%
-    filter(seqtype == "rna") %>%
-    filter(!(line %in% c("REL606", "REL607"))) %>%
-    group_by(line, locus_tag) %>%
-    summarize(avg_est_counts = mean(est_counts,na.rm=TRUE),
-              avg_tpm = mean(tpm,na.rm=TRUE)) %>%
-    ungroup() %>%
-    mutate(log_est_counts = log(1+avg_est_counts))
-
-## Riboseq data
-riboseq.Favate.data <- Favate.TableS1 %>%
-    filter(seqtype == "ribo") %>%
-    filter(!(line %in% c("REL606", "REL607"))) %>%
-    group_by(line, locus_tag) %>%
-    summarize(avg_est_counts = mean(est_counts,na.rm=TRUE),
-              avg_tpm = mean(tpm,na.rm=TRUE)) %>%
-    ungroup() %>%
-    mutate(log_est_counts = log(1+avg_est_counts))
-
-## examine the correlations in the RNAseq data.
-rnaseq.with.nonmut.mutation.density <- rnaseq.Favate.data %>%
-    left_join(nonmut.mutation.densities)
-
-rnaseq.with.hypermut.mutation.density <- rnaseq.Favate.data %>%
-    left_join(hypermut.mutation.densities)
-
-rnaseq.nonmut.cor <- cor.test(rnaseq.with.nonmut.mutation.density$log_est_counts,
-                              rnaseq.with.nonmut.mutation.density$all.mut.density,
-                              method = "spearman")
-
-rnaseq.hypermut.cor <- cor.test(rnaseq.with.hypermut.mutation.density$log_est_counts,
-                                rnaseq.with.hypermut.mutation.density$all.mut.density,
-                                method = "spearman")
-rnaseq.hypermut.cor$p.value
-
-## examine the correlations in the riboseq data.
-riboseq.with.nonmut.mutation.density <- riboseq.Favate.data %>%
-    left_join(nonmut.mutation.densities)
-
-riboseq.with.hypermut.mutation.density <- riboseq.Favate.data %>%
-    left_join(hypermut.mutation.densities)
-
-riboseq.nonmut.cor <- cor.test(riboseq.with.nonmut.mutation.density$avg_est_counts,
-                               riboseq.with.nonmut.mutation.density$all.mut.density,
-                               method = "spearman")
-                                   
-riboseq.hypermut.cor <- cor.test(riboseq.with.hypermut.mutation.density$avg_est_counts,
-                                 riboseq.with.hypermut.mutation.density$all.mut.density,
-                                 method = "spearman")
-riboseq.hypermut.cor$p.value
-
-## now make a figure for this analysis.
-make.mut.density.favate.panel <- function(favate.data,
-                                          lbl.xpos, rlbl.ypos, plbl.ypos,
-                                          my.color="gray",
-                                          muts.to.plot="all") {
-    ## This is a helper function that plots a single panel.
-
-    ## annotate r and p-values on the panel.
-    if (muts.to.plot == "dN") {
-        favate.result <- cor.test(favate.data$log_est_counts, favate.data$dN.mut.density,
-                                  method = "spearman")
-    } else if (muts.to.plot == "dS") {
-        favate.result <- cor.test(favate.data$log_est_counts, favate.data$dS.mut.density,
-                                  method = "spearman")
-    } else { ## default is to plot the density of all mutations.
-        favate.result <- cor.test(favate.data$log_est_counts, favate.data$all.mut.density,
-                                  method = "spearman")
-    }
-    
-    pearson.r <- signif(favate.result$estimate,digits=3)
-    pearson.p.value <- signif(favate.result$p.value,digits=3)
-
-    lbl.rval <- paste("rho", "=", pearson.r)
-    lbl.p.value <- paste("p", "=", pearson.p.value)
-
-    if (muts.to.plot == "dN") {
-        favate.panel <- favate.data %>%
-            ggplot(aes(x = log_est_counts, y = dN.mut.density))
-    } else if (muts.to.plot == "dS") {
-        favate.panel <- favate.data %>%
-            ggplot(aes(x = log_est_counts, y = dS.mut.density))
-    } else { ## default is to plot the density of all mutations.
-        favate.panel <- favate.data %>%
-            ggplot(aes(x = log_est_counts, y = all.mut.density))
-
-    }
-
-    favate.panel <- favate.panel +
-        geom_point(color = my.color, alpha = 0.2) +
-        geom_smooth(method = 'lm', formula = y~x) +
-        theme_classic() +
-        ylab("Mutation density") +
-        xlab("log(1 + estimated mRNA counts)") +
-        ## annotate correlation on the figure.
-        annotate("text", x = lbl.xpos, y = rlbl.ypos, size=3,
-                 label = lbl.rval, fontface = 'bold.italic') +
-        ## annotate p-value on the figure.
-        annotate("text", x = lbl.xpos, y = plbl.ypos, size=3,
-                 label = lbl.p.value, fontface = 'bold.italic')
-
-    return(favate.panel)
-}
-
-S8FigA <- make.mut.density.favate.panel(rnaseq.with.hypermut.mutation.density,
-                              lbl.xpos=2,
-                              rlbl.ypos=0.06,
-                              plbl.ypos=0.07) + ggtitle("All mutations")
-
-S8FigB <- make.mut.density.favate.panel(rnaseq.with.hypermut.mutation.density,
-                              lbl.xpos=2,
-                              rlbl.ypos=0.028,
-                              plbl.ypos=0.03,
-                              muts.to.plot="dN") + ggtitle("Nonsynonymous mutations")
-
-S8FigC <- make.mut.density.favate.panel(rnaseq.with.hypermut.mutation.density,
-                              lbl.xpos=2,
-                              rlbl.ypos=0.012,
-                              plbl.ypos=0.015,
-                              muts.to.plot="dS") + ggtitle("Synonymous mutations")
-
-## This one is less relevant, so omit from S8Fig.
-favate.nonmut.plot <- make.mut.density.favate.panel(rnaseq.with.nonmut.mutation.density,
-                              lbl.xpos=2,
-                              rlbl.ypos=0.06,
-                              plbl.ypos=0.07) + ggtitle("All mutations in nonmutators")
-
-## Make the figure.
-S8Fig <- plot_grid(S8FigA, S8FigB, S8FigC, nrow = 1,
-                   labels = c('A', 'B', 'C', 'D'))
-ggsave("../results/thermostability/figures/S8Fig.pdf", S8Fig, height=5, width=9)
-
-#######################################
 ## Caglar et al. analysis of REL606 over time.
 ## Import RNA and protein abundance data from Caglar et al. (2017).
 ## make sure to check abundances during BOTH exponential and stationary phase.
@@ -562,43 +423,213 @@ make.mut.density.RNA.protein.expression.figure <- function(density.Caglar,
 }
 
 ## now make the main figure.
-Fig2 <- make.mut.density.RNA.protein.expression.figure(hypermut.density.Caglar)
+Fig2 <- make.mut.density.RNA.protein.expression.figure(hypermut.density.Caglar, method = "spearman")                                              
 ggsave("../results/thermostability/figures/Fig2.pdf", Fig2, height = 5, width = 9)
 
-## repeat, but using Spearman correlation.
-S1Fig <- make.mut.density.RNA.protein.expression.figure(hypermut.density.Caglar, method="spearman")
-ggsave("../results/thermostability/figures/S1Fig.pdf", S1Fig, height = 5, width = 9)
-
 ## now examine hypermutators when zero mutation genes are excluded.
+S1Fig <- make.mut.density.RNA.protein.expression.figure(
+    nozero.hypermut.density.Caglar, method = "spearman")
+ggsave("../results/thermostability/figures/S1Fig.pdf",
+       S1Fig, height = 5, width = 9)
+
+## now examine just nonsynonymous mutations in hypermutators.
 S2Fig <- make.mut.density.RNA.protein.expression.figure(
-    nozero.hypermut.density.Caglar)
+    hypermut.density.Caglar, muts.for.plot="dN", method = "spearman")
 ggsave("../results/thermostability/figures/S2Fig.pdf",
        S2Fig, height = 5, width = 9)
 
-## now examine just nonsynonymous mutations in hypermutators.
+## for comparison, examine just synonymous mutations in hypermutators.
+Fig3 <- make.mut.density.RNA.protein.expression.figure(
+    hypermut.density.Caglar, muts.for.plot="dS", method = "spearman")
+ggsave("../results/thermostability/figures/Fig3.pdf",
+       Fig3, height = 5, width = 9)
+## and examine synonymous mutations in hypermutators, when zeros are excluded.
 S3Fig <- make.mut.density.RNA.protein.expression.figure(
-    hypermut.density.Caglar, muts.for.plot="dN")
+    nozero.hypermut.density.Caglar, muts.for.plot="dS", method = "spearman")
 ggsave("../results/thermostability/figures/S3Fig.pdf",
        S3Fig, height = 5, width = 9)
 
-## for comparison, examine just synonymous mutations in hypermutators.
-S4Fig <- make.mut.density.RNA.protein.expression.figure(
-    hypermut.density.Caglar, muts.for.plot="dS")
-ggsave("../results/thermostability/figures/S4Fig.pdf",
-       S4Fig, height = 5, width = 9)
-## and examine synonymous mutations in hypermutators, when zeros are excluded.
-S5Fig <- make.mut.density.RNA.protein.expression.figure(
-    nozero.hypermut.density.Caglar, muts.for.plot="dS")
-ggsave("../results/thermostability/figures/S5Fig.pdf",
-       S5Fig, height = 5, width = 9)
-
-
 ## now examine nonmutators.
-S6Fig <- make.mut.density.RNA.protein.expression.figure(nonmut.density.Caglar)
-ggsave("../results/thermostability/figures/S6Fig.pdf", S6Fig, height = 5, width = 9)
-## repeat, using Spearman correlation.
-S7Fig <- make.mut.density.RNA.protein.expression.figure(nonmut.density.Caglar,method="spearman")
-ggsave("../results/thermostability/figures/S7Fig.pdf", S7Fig, height = 5, width = 9)
+S4Fig <- make.mut.density.RNA.protein.expression.figure(nonmut.density.Caglar, method = "spearman")
+ggsave("../results/thermostability/figures/S4Fig.pdf", S4Fig, height = 5, width = 9)
+
+
+## Favate et al. (2021) analysis of ancestral clones and 11 evolved 50K LTEE clones.
+
+Favate.TableS1 <- read.csv("../data/Favate2021_table_s1_read_counts.csv",
+                           as.is=TRUE, header=TRUE) %>%
+    select(repl, seqtype, line, target_id, est_counts, tpm) %>%
+    ## now, we need to match the target_id field to genes or IDs in the REL606 genome.
+    ## I'm not sure what the ERC_00XXX IDs are. Ignore those and the tRNAs for now.
+    mutate(locus_tag = target_id) %>%
+    filter(str_detect(locus_tag,"^ECB")) %>%
+    ## filter for genes that were used in the metagenomics data.
+    filter(locus_tag %in% REL606.genes$locus_tag)
+    
+## Two datasets to examine separately: ribosome profiling and RNAseq.
+## restrict analysis to evolved strains.
+
+## RNAseq data
+rnaseq.Favate.data <- Favate.TableS1 %>%
+    filter(seqtype == "rna") %>%
+    filter(!(line %in% c("REL606", "REL607"))) %>%
+        group_by(line, locus_tag) %>%
+    summarize(avg_est_counts = mean(est_counts,na.rm=TRUE),
+              avg_tpm = mean(tpm,na.rm=TRUE)) %>%
+    ungroup() %>%
+    mutate(log_est_counts = log(1+avg_est_counts))
+
+## Riboseq data
+riboseq.Favate.data <- Favate.TableS1 %>%
+    filter(seqtype == "ribo") %>%
+    filter(!(line %in% c("REL606", "REL607"))) %>%
+    group_by(line, locus_tag) %>%
+    summarize(avg_est_counts = mean(est_counts,na.rm=TRUE),
+              avg_tpm = mean(tpm,na.rm=TRUE)) %>%
+    ungroup() %>%
+    mutate(log_est_counts = log(1+avg_est_counts))
+
+## examine the correlations in the RNAseq data.
+rnaseq.with.nonmut.mutation.density <- rnaseq.Favate.data %>%
+    left_join(nonmut.mutation.densities)
+
+rnaseq.with.hypermut.mutation.density <- rnaseq.Favate.data %>%
+    left_join(hypermut.mutation.densities)
+
+rnaseq.nonmut.cor <- cor.test(rnaseq.with.nonmut.mutation.density$log_est_counts,
+                              rnaseq.with.nonmut.mutation.density$all.mut.density,
+                              method = "spearman")
+
+rnaseq.hypermut.cor <- cor.test(rnaseq.with.hypermut.mutation.density$log_est_counts,
+                                rnaseq.with.hypermut.mutation.density$all.mut.density,
+                                method = "spearman")
+rnaseq.hypermut.cor$p.value
+
+## examine the correlations in the riboseq data.
+riboseq.with.nonmut.mutation.density <- riboseq.Favate.data %>%
+    left_join(nonmut.mutation.densities)
+
+riboseq.with.hypermut.mutation.density <- riboseq.Favate.data %>%
+    left_join(hypermut.mutation.densities)
+
+riboseq.nonmut.cor <- cor.test(riboseq.with.nonmut.mutation.density$avg_est_counts,
+                               riboseq.with.nonmut.mutation.density$all.mut.density,
+                               method = "spearman")
+                                   
+riboseq.hypermut.cor <- cor.test(riboseq.with.hypermut.mutation.density$avg_est_counts,
+                                 riboseq.with.hypermut.mutation.density$all.mut.density,
+                                 method = "spearman")
+riboseq.hypermut.cor$p.value
+
+## now make a figure for this analysis.
+make.mut.density.favate.panel <- function(favate.data,
+                                          lbl.xpos, rlbl.ypos, plbl.ypos,
+                                          my.color="gray",
+                                          muts.to.plot="all") {
+    ## This is a helper function that plots a single panel.
+
+    ## annotate r and p-values on the panel.
+    if (muts.to.plot == "dN") {
+        favate.result <- cor.test(favate.data$log_est_counts, favate.data$dN.mut.density,
+                                  method = "spearman")
+    } else if (muts.to.plot == "dS") {
+        favate.result <- cor.test(favate.data$log_est_counts, favate.data$dS.mut.density,
+                                  method = "spearman")
+    } else { ## default is to plot the density of all mutations.
+        favate.result <- cor.test(favate.data$log_est_counts, favate.data$all.mut.density,
+                                  method = "spearman")
+    }
+    
+    pearson.r <- signif(favate.result$estimate,digits=3)
+    pearson.p.value <- signif(favate.result$p.value,digits=3)
+
+    lbl.rval <- paste("rho", "=", pearson.r)
+    lbl.p.value <- paste("p", "=", pearson.p.value)
+
+    if (muts.to.plot == "dN") {
+        favate.panel <- favate.data %>%
+            ggplot(aes(x = log_est_counts, y = dN.mut.density))
+    } else if (muts.to.plot == "dS") {
+        favate.panel <- favate.data %>%
+            ggplot(aes(x = log_est_counts, y = dS.mut.density))
+    } else { ## default is to plot the density of all mutations.
+        favate.panel <- favate.data %>%
+            ggplot(aes(x = log_est_counts, y = all.mut.density))
+
+    }
+
+    favate.panel <- favate.panel +
+        geom_point(color = my.color, alpha = 0.2) +
+        geom_smooth(method = 'lm', formula = y~x) +
+        theme_classic() +
+        ylab("Mutation density") +
+        xlab("log(1 + estimated mRNA counts)") +
+        ## annotate correlation on the figure.
+        annotate("text", x = lbl.xpos, y = rlbl.ypos, size=3,
+                 label = lbl.rval, fontface = 'bold.italic') +
+        ## annotate p-value on the figure.
+        annotate("text", x = lbl.xpos, y = plbl.ypos, size=3,
+                 label = lbl.p.value, fontface = 'bold.italic') +
+        ggtitle(unique(favate.data$line))
+
+    return(favate.panel)
+}
+
+make.favate.mut.density.RNA.expression.figure <- function(favate.data,
+                                                           muts.for.plot="all") {
+    ## makes a figure that combines all 11 panels.
+    ## generate a list of smaller panels, then pass
+    ## to cowplot::plot_grid using do.call().
+
+    ## pass plotting parameters through the use of partial function application.
+    if (muts.for.plot == "dN") {
+        lbl.x <- 2
+        rlbl.y <- 0.025
+        plbl.y <- 0.03
+
+    } else if (muts.for.plot == "dS") {
+        lbl.x <- 2
+        rlbl.y <- 0.012
+        plbl.y <- 0.015
+        
+    } else { ## default: plot all mutations.
+        lbl.x <- 2
+        rlbl.y <- 0.06
+        plbl.y <- 0.07
+    }
+
+    
+    mRNA.plot.func <- partial(.f = make.mut.density.favate.panel,
+                              lbl.xpos = lbl.x, rlbl.ypos = rlbl.y, plbl.ypos = plbl.y,
+                              muts.to.plot=muts.for.plot)
+    
+    mRNA.panels <- favate.data %>%
+        split(.$line) %>%
+        map(.f = mRNA.plot.func)
+    
+    ## fill in some parameters for plot_grid using partial function application,
+    ## and save the specialized versions.
+    plot_subfigure <- partial(.f = plot_grid, nrow = 4)
+    ## use do.call to unroll the panels as arguments for plot_grid.
+
+    mRNA.plots <- do.call(plot_subfigure, mRNA.panels)
+
+    big.fig <- plot_grid(mRNA.plots)
+    return(big.fig)
+}
+
+S5Fig <- make.favate.mut.density.RNA.expression.figure(
+    rnaseq.with.hypermut.mutation.density)
+ggsave("../results/thermostability/figures/S5Fig.pdf", S5Fig, height=9, width=6)
+
+S6Fig <- make.favate.mut.density.RNA.expression.figure(
+    rnaseq.with.hypermut.mutation.density, muts.for.plot="dN")
+ggsave("../results/thermostability/figures/S6Fig.pdf", S6Fig, height=9, width=6)
+
+S7Fig <- make.favate.mut.density.RNA.expression.figure(
+    rnaseq.with.hypermut.mutation.density, muts.for.plot="dS")
+ggsave("../results/thermostability/figures/S7Fig.pdf", S7Fig, height=9, width=6)
+
 
 ########################################################
 
@@ -646,6 +677,10 @@ make.mut.density.PPI.degree.panel <- function(PPI.data,
                            PPI.data$all.mut.density,
                            method = "spearman")
 
+    ## if the correlation is not significant, then the regression line is gray.
+    ## factor of (1/9) is a Bonferroni-correction for multiple tests.
+    my.regression.color <- ifelse(PPI.result$p.value < 0.05*(1/9), "blue", "light gray")
+    
     my.r <- signif(PPI.result$estimate,digits=3)
     my.p.value <- signif(PPI.result$p.value,digits=3)
 
@@ -655,7 +690,7 @@ make.mut.density.PPI.degree.panel <- function(PPI.data,
     PPI.panel <- PPI.data %>%
         ggplot(aes(x = Degree, y = all.mut.density)) +
         geom_point(color = my.color, alpha = 0.2) +
-        geom_smooth(method = 'lm', formula = y~x) +
+        geom_smooth(method = 'lm', formula = y~x, color = my.regression.color) +
         theme_classic() +
         ylab("Mutation density") +
         xlab("PPI degree") +
@@ -1019,11 +1054,11 @@ make.meltPoint.RNA.protein.expression.figure <- function(meltPoint.Caglar) {
     return(big.fig)
 }
 
-## Put both figures for the meltome analysis together for Figure S11.
-S11Fig <- plot_grid(plot_grid(hypermut.meltome.plot,NULL),
+## Put both figures for the meltome analysis together for Figure 4.
+Fig5 <- plot_grid(plot_grid(hypermut.meltome.plot,NULL),
                   make.meltPoint.RNA.protein.expression.figure(meltome.with.abundance),
                   labels = c('A','B'), ncol = 1,
                   rel_heights = c(1, 2))
                   
-ggsave("../results/thermostability/figures/S11Fig.pdf",
-       S11Fig, height = 6, width = 7)
+ggsave("../results/thermostability/figures/Fig5.pdf",
+       Fig5, height = 6, width = 7)
