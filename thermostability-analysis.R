@@ -243,7 +243,7 @@ make.mut.density.favate.panel <- function(favate.data,
     pearson.r <- signif(favate.result$estimate,digits=3)
     pearson.p.value <- signif(favate.result$p.value,digits=3)
 
-    lbl.rval <- paste("r", "=", pearson.r)
+    lbl.rval <- paste("rho", "=", pearson.r)
     lbl.p.value <- paste("p", "=", pearson.p.value)
 
     if (muts.to.plot == "dN") {
@@ -412,7 +412,7 @@ plot.mut.density.mRNA.anticorrelation <- function(my.data, my.method="spearman",
     my.r <- signif(mRNA.result$estimate,digits=3)
     my.p.value <- signif(mRNA.result$p.value,digits=3)
 
-    lbl.rval <- paste("r", "=", my.r)
+    lbl.rval <- paste("rho", "=", my.r)
     lbl.p.value <- paste("p", "=", my.p.value)
     
 
@@ -482,7 +482,7 @@ plot.mut.density.protein.anticorrelation <- function(my.data, my.method="spearma
     my.r <- signif(Protein.result$estimate,digits=3)
     my.p.value <- signif(Protein.result$p.value,digits=3)
 
-    lbl.rval <- paste("r", "=", my.r)
+    lbl.rval <- paste("rho", "=", my.r)
     lbl.p.value <- paste("p", "=", my.p.value)
 
 
@@ -601,130 +601,7 @@ S7Fig <- make.mut.density.RNA.protein.expression.figure(nonmut.density.Caglar,me
 ggsave("../results/thermostability/figures/S7Fig.pdf", S7Fig, height = 5, width = 9)
 
 ########################################################
-## Figure 3. 
 
-## Compare "divergence" in terms of number of observed mutations
-## per population to the correlation with protein abundance.
-
-## Compare to the theoretical expectation in Fig. 4 of
-## Protein Biophysics Explains Why Highly Abundant Proteins Evolve Slowly
-## by Serohijos et al. (2012).
-
-calc.pop.gene.mutation.densities <- function(gene.mutation.data, REL606.genes) {
-
-    keep.pop.zero.muts.for.merging <- function(pop.mut.density) {
-        ## This helper function joins the mut.density for a single population
-        ## to REL606.genes in order to preserve the Population label
-        ## for zero mutation genes.
-        ## REL606.genes is a global variable for this helper.
-        
-        ## CRITICAL STEP: replace NAs with zeros.
-        ## We need to keep track of genes that haven't been hit by any mutations
-        ## in a given mutation class (sv, indels, dN, etc.),
-        ## on a __per population__ basis.
-
-        full_join(REL606.genes, pop.mut.density) %>%
-            replace_na(list(mut.count = 0, density = 0,
-                            Population = unique(pop.mut.density$Population)))
-    }
-
-    population.factor.levels <- levels(gene.mutation.data$Population)
-    ## When we split on the population factor, it will pass ALL
-    ## levels, including ones that are not even in the data,
-    ## to the helper function keep.pop.zero.muts.for.merging.
-    ## For this reason, I change the Population column
-    ## from a factor to a character vector, apply the helper function,
-    ## and then change the Population column from a character vector
-    ## back into a factor.
-    ## This prevents the helper function from getting empty data frames
-    ## as inputs.
-    
-    pop.all.mutation.density <- pop.calc.gene.mutation.density(
-        gene.mutation.data,
-        c("missense", "sv", "synonymous", "noncoding", "indel", "nonsense")) %>%
-        ## Population column: Factor -> Character
-        mutate(Population = as.character(Population)) %>%
-        split(.$Population) %>%
-        map_dfr(.f = keep.pop.zero.muts.for.merging) %>%
-        rename(all.mut.count = mut.count) %>%
-        rename(all.mut.density = density)
-    
-    ## look at dN density per pop.
-    pop.dN.density <- pop.calc.gene.mutation.density(
-        gene.mutation.data,c("missense", "nonsense")) %>%
-        ## Population column: Factor -> Character
-        mutate(Population = as.character(Population)) %>%
-        split(.$Population) %>%
-        map_dfr(.f = keep.pop.zero.muts.for.merging) %>%
-        rename(dN.mut.count = mut.count) %>%
-        rename(dN.mut.density = density)
-    
-    ## look at dS density per pop.
-    pop.dS.density <- pop.calc.gene.mutation.density(
-        gene.mutation.data,c("synonymous")) %>%
-        ## Population column: Factor -> Character
-        mutate(Population = as.character(Population)) %>%
-        split(.$Population) %>%
-        map_dfr(.f = keep.pop.zero.muts.for.merging) %>%
-        rename(dS.mut.count = mut.count) %>%
-        rename(dS.mut.density = density)
-    
-    ## combine these into one dataframe.
-    pop.gene.mutation.densities <- pop.all.mutation.density %>%
-        full_join(pop.dN.density) %>%
-        full_join(pop.dS.density) %>%
-        as_tibble()
-
-    ## Population column: Character -> Factor
-    levels(pop.gene.mutation.densities$Population) <- population.factor.levels
-
-    
-    return(pop.gene.mutation.densities)
-}
-
-calc.correlation.helper <- function(pop.density.Caglar.subdf,my.method="spearman") {
-    my.test <- cor.test(pop.density.Caglar.subdf$Protein.mean,
-             pop.density.Caglar.subdf$all.mut.density,
-             method=my.method)
-    my.df <- data.frame(Population = unique(pop.density.Caglar.subdf$Population),
-                        growthTime_hr = unique(pop.density.Caglar.subdf$growthTime_hr),
-                        correlation = my.test$estimate)
-    return(my.df)
-}
-
-## count the number of observed mutations per population.
-total.muts.per.population <- gene.mutation.data %>%
-    group_by(Population) %>%
-    summarize(total.observed.muts = n()) %>%
-    ungroup()
-
-## calculate the density of mutations per gene per population.
-pop.density.Caglar <- calc.pop.gene.mutation.densities(gene.mutation.data,
-                                                       REL606.genes) %>%
-    ## use an inner join to exclude any genes with no protein/RNA data.
-    inner_join(Caglar.summary)
-
-## now calculate the correlation between abundance and density of mutations
-## per population and per timepoint.
-pop.mut.density.protein.abundance.correlation.df <- pop.density.Caglar %>%
-    split(list(.$growthTime_hr, .$Population)) %>%
-    map_dfr(.f = calc.correlation.helper) %>%
-    ## merge with the number of observed mutations per population
-    left_join(total.muts.per.population) %>%
-    mutate(is.Hypermutator = Population %in% hypermutator.pops)
-
-Fig3 <- ggplot(
-    data = pop.mut.density.protein.abundance.correlation.df,
-    aes(x=total.observed.muts, y = correlation,
-        color=Population, shape = is.Hypermutator)) +
-    geom_point() + theme_classic() + xlab("Total observed mutations") +
-    ylab("Correlation between protein abundance and mutation density") +
-    guides(shape = FALSE)
-
-ggsave("../results/thermostability/figures/Fig3.pdf",
-       Fig3, width=5, height=5)
-
-########################################################
 ## Figure 4.
 
 ## PPI network statistics analysis.
@@ -772,7 +649,7 @@ make.mut.density.PPI.degree.panel <- function(PPI.data,
     my.r <- signif(PPI.result$estimate,digits=3)
     my.p.value <- signif(PPI.result$p.value,digits=3)
 
-    lbl.rval <- paste("r", "=", my.r)
+    lbl.rval <- paste("rho", "=", my.r)
     lbl.p.value <- paste("p", "=", my.p.value)
     
     PPI.panel <- PPI.data %>%
