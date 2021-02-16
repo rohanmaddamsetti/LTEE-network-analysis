@@ -190,10 +190,11 @@ anc.cooper.with.hypermut.mutation.density <- anc.cooper.data %>%
     left_join(hypermut.mutation.densities)
 
 anc.cooper.nonmut.cor <- cor.test(anc.cooper.with.nonmut.mutation.density$mean_mRNA,
-         anc.cooper.with.nonmut.mutation.density$all.mut.density)
+                                  anc.cooper.with.nonmut.mutation.density$all.mut.density,
+                                  method="spearman")
 
 anc.cooper.hypermut.cor <- cor.test(anc.cooper.with.hypermut.mutation.density$mean_mRNA,
-                                    anc.cooper.with.hypermut.mutation.density$all.mut.density)
+                                    anc.cooper.with.hypermut.mutation.density$all.mut.density, method="spearman")
 anc.cooper.hypermut.cor$p.value
 
 
@@ -204,12 +205,12 @@ evol.cooper.with.hypermut.mutation.density <- evol.cooper.data %>%
     left_join(hypermut.mutation.densities)
 
 evol.cooper.nonmut.cor <- cor.test(evol.cooper.with.nonmut.mutation.density$mean_mRNA,
-         evol.cooper.with.nonmut.mutation.density$all.mut.density)
+                                   evol.cooper.with.nonmut.mutation.density$all.mut.density,
+                                   method="spearman")
 
 evol.cooper.hypermut.cor <- cor.test(evol.cooper.with.hypermut.mutation.density$mean_mRNA,
-                                     evol.cooper.with.hypermut.mutation.density$all.mut.density)
+                                     evol.cooper.with.hypermut.mutation.density$all.mut.density,method="spearman")
 evol.cooper.hypermut.cor$p.value
-
 
 
 ## now make a figure for this analysis.
@@ -221,7 +222,8 @@ make.mut.density.cooper.panel <- function(cooper.data,
 
     ## annotate r and p-values on the panel.
     ## default is to plot the density of all mutations.
-    cooper.result <- cor.test(cooper.data$mean_mRNA, cooper.data$all.mut.density)
+    cooper.result <- cor.test(cooper.data$mean_mRNA, cooper.data$all.mut.density,
+                              method="spearman")
     
     pearson.r <- signif(cooper.result$estimate,digits=3)
     pearson.p.value <- signif(cooper.result$p.value,digits=3)
@@ -309,10 +311,12 @@ rnaseq.with.hypermut.mutation.density <- rnaseq.Favate.data %>%
     left_join(hypermut.mutation.densities)
 
 rnaseq.nonmut.cor <- cor.test(rnaseq.with.nonmut.mutation.density$log_est_counts,
-         rnaseq.with.nonmut.mutation.density$all.mut.density)
+                              rnaseq.with.nonmut.mutation.density$all.mut.density,
+                              method = "spearman")
 
 rnaseq.hypermut.cor <- cor.test(rnaseq.with.hypermut.mutation.density$log_est_counts,
-                                rnaseq.with.hypermut.mutation.density$all.mut.density)
+                                rnaseq.with.hypermut.mutation.density$all.mut.density,
+                                method = "spearman")
 rnaseq.hypermut.cor$p.value
 
 ## examine the correlations in the riboseq data.
@@ -323,10 +327,12 @@ riboseq.with.hypermut.mutation.density <- riboseq.Favate.data %>%
     left_join(hypermut.mutation.densities)
 
 riboseq.nonmut.cor <- cor.test(riboseq.with.nonmut.mutation.density$avg_est_counts,
-                                   riboseq.with.nonmut.mutation.density$all.mut.density)
+                               riboseq.with.nonmut.mutation.density$all.mut.density,
+                               method = "spearman")
                                    
 riboseq.hypermut.cor <- cor.test(riboseq.with.hypermut.mutation.density$avg_est_counts,
-                                 riboseq.with.hypermut.mutation.density$all.mut.density)
+                                 riboseq.with.hypermut.mutation.density$all.mut.density,
+                                 method = "spearman")
 riboseq.hypermut.cor$p.value
 
 ## now make a figure for this analysis.
@@ -338,11 +344,14 @@ make.mut.density.favate.panel <- function(favate.data,
 
     ## annotate r and p-values on the panel.
     if (muts.to.plot == "dN") {
-        favate.result <- cor.test(favate.data$log_est_counts, favate.data$dN.mut.density)
+        favate.result <- cor.test(favate.data$log_est_counts, favate.data$dN.mut.density,
+                                  method = "spearman")
     } else if (muts.to.plot == "dS") {
-        favate.result <- cor.test(favate.data$log_est_counts, favate.data$dS.mut.density)
+        favate.result <- cor.test(favate.data$log_est_counts, favate.data$dS.mut.density,
+                                  method = "spearman")
     } else { ## default is to plot the density of all mutations.
-        favate.result <- cor.test(favate.data$log_est_counts, favate.data$all.mut.density)
+        favate.result <- cor.test(favate.data$log_est_counts, favate.data$all.mut.density,
+                                  method = "spearman")
     }
     
     pearson.r <- signif(favate.result$estimate,digits=3)
@@ -460,7 +469,7 @@ nozero.nonmut.density.Caglar <- inner_join(nozero.nonmut.mutation.densities,
 nozero.hypermut.density.Caglar <- inner_join(nozero.hypermut.mutation.densities,
                                              Caglar.summary)
 
-correlate.mut.density.with.timepoint <- function(density.Caglar, my.method="pearson") {
+correlate.mut.density.with.timepoint <- function(density.Caglar, my.method="spearman") {
 
     print.correlations.given.timepoint <- function(my.data) {
         my.t <- unique(my.data$growthTime_hr)
@@ -495,7 +504,7 @@ correlate.mut.density.with.timepoint(nozero.nonmut.density.Caglar)
 correlate.mut.density.with.timepoint(nozero.hypermut.density.Caglar)
 
 
-plot.mut.density.mRNA.anticorrelation <- function(my.data, my.method="pearson",
+plot.mut.density.mRNA.anticorrelation <- function(my.data, my.method="spearman",
                                                   muts.to.plot="all") {
     ## This is a helper function to plot an mRNA panel for the full figure.
     my.t <- unique(my.data$growthTime_hr)
@@ -509,16 +518,16 @@ plot.mut.density.mRNA.anticorrelation <- function(my.data, my.method="pearson",
         mRNA.result <- cor.test(my.data$mRNA.mean, my.data$all.mut.density, method=my.method)
     }
 
-    ## if the Pearson correlation is not significant, then the regression line is gray.
+    ## if the correlation is not significant, then the regression line is gray.
     ## factor of (1/9) is a Bonferroni-correction for multiple tests.
     my.color <- ifelse(mRNA.result$p.value < 0.05*(1/9), "blue", "light gray")
 
-    ## annotate r and p-values for Pearson correlations.
-    pearson.r <- signif(mRNA.result$estimate,digits=3)
-    pearson.p.value <- signif(mRNA.result$p.value,digits=3)
+    ## annotate r and p-values for correlations.
+    my.r <- signif(mRNA.result$estimate,digits=3)
+    my.p.value <- signif(mRNA.result$p.value,digits=3)
 
-    lbl.rval <- paste("r", "=", pearson.r)
-    lbl.p.value <- paste("p", "=", pearson.p.value)
+    lbl.rval <- paste("r", "=", my.r)
+    lbl.p.value <- paste("p", "=", my.p.value)
     
 
     if (muts.to.plot == "dN") {
@@ -560,7 +569,7 @@ plot.mut.density.mRNA.anticorrelation <- function(my.data, my.method="pearson",
     return(mRNA.plot)
 }
 
-plot.mut.density.protein.anticorrelation <- function(my.data, my.method="pearson",
+plot.mut.density.protein.anticorrelation <- function(my.data, my.method="spearman",
                                                      muts.to.plot="all") {
     ## This is a helper function to plot a protein panel for the full figure.
     my.t <- unique(my.data$growthTime_hr)
@@ -579,16 +588,16 @@ plot.mut.density.protein.anticorrelation <- function(my.data, my.method="pearson
                                    my.data$all.mut.density,method=my.method)  
     }
         
-    ## if the Pearson correlation is not significant, then the regression line is gray.
+    ## if the correlation is not significant, then the regression line is gray.
     ## factor of (1/9) is a Bonferroni-correction for multiple tests.
     my.color <- ifelse(Protein.result$p.value < 0.05*(1/9), "blue", "light gray")
 
-    ## annotate r and p-values for Pearson correlations.
-    pearson.r <- signif(Protein.result$estimate,digits=3)
-    pearson.p.value <- signif(Protein.result$p.value,digits=3)
+    ## annotate r and p-values for correlations.
+    my.r <- signif(Protein.result$estimate,digits=3)
+    my.p.value <- signif(Protein.result$p.value,digits=3)
 
-    lbl.rval <- paste("r", "=", pearson.r)
-    lbl.p.value <- paste("p", "=", pearson.p.value)
+    lbl.rval <- paste("r", "=", my.r)
+    lbl.p.value <- paste("p", "=", my.p.value)
 
 
     if (muts.to.plot == "dN") {
@@ -632,7 +641,7 @@ plot.mut.density.protein.anticorrelation <- function(my.data, my.method="pearson
 }
 
 make.mut.density.RNA.protein.expression.figure <- function(density.Caglar,
-                                                           method="pearson",
+                                                           method="spearman",
                                                            muts.for.plot="all") {
     ## makes a figure that combines all 18 panels.
     ## generate a list of smaller panels, then pass
@@ -787,7 +796,7 @@ calc.pop.gene.mutation.densities <- function(gene.mutation.data, REL606.genes) {
     return(pop.gene.mutation.densities)
 }
 
-calc.correlation.helper <- function(pop.density.Caglar.subdf,my.method="pearson") {
+calc.correlation.helper <- function(pop.density.Caglar.subdf,my.method="spearman") {
     my.test <- cor.test(pop.density.Caglar.subdf$Protein.mean,
              pop.density.Caglar.subdf$all.mut.density,
              method=my.method)
@@ -852,54 +861,12 @@ hypermut.PPI.cong <- cong.network.df %>%
 
 ## look at Zitnik network.
 
-## all are significant.
-cor.test(nonmut.PPI.zitnik$Degree, nonmut.PPI.zitnik$all.mut.density)
-cor.test(nonmut.PPI.zitnik$DegreeCentrality, nonmut.PPI.zitnik$all.mut.density)
-
-cor.test(nonmut.PPI.zitnik$Pagerank, nonmut.PPI.zitnik$all.mut.density)
-cor.test(nonmut.PPI.zitnik$HubScore, nonmut.PPI.zitnik$all.mut.density)
-cor.test(nonmut.PPI.zitnik$AuthorityScore, nonmut.PPI.zitnik$all.mut.density)
-cor.test(nonmut.PPI.zitnik$ClosenessCentrality, nonmut.PPI.zitnik$all.mut.density)
-cor.test(nonmut.PPI.zitnik$BetweenessCentrality, nonmut.PPI.zitnik$all.mut.density)
-cor.test(nonmut.PPI.zitnik$EigenvectorCentrality, nonmut.PPI.zitnik$all.mut.density)
-cor.test(nonmut.PPI.zitnik$IsArticulationPoint, nonmut.PPI.zitnik$all.mut.density)
-
-## These ones are significant.
-cor.test(hypermut.PPI.zitnik$Degree, hypermut.PPI.zitnik$all.mut.density)
-cor.test(hypermut.PPI.zitnik$DegreeCentrality, hypermut.PPI.zitnik$all.mut.density)
-
-cor.test(hypermut.PPI.zitnik$Pagerank, hypermut.PPI.zitnik$all.mut.density)
-cor.test(hypermut.PPI.zitnik$HubScore, hypermut.PPI.zitnik$all.mut.density)
-cor.test(hypermut.PPI.zitnik$AuthorityScore, hypermut.PPI.zitnik$all.mut.density)
-cor.test(hypermut.PPI.zitnik$ClosenessCentrality, hypermut.PPI.zitnik$all.mut.density)
-cor.test(hypermut.PPI.zitnik$BetweenessCentrality, hypermut.PPI.zitnik$all.mut.density)
-cor.test(hypermut.PPI.zitnik$EigenvectorCentrality, hypermut.PPI.zitnik$all.mut.density)
-## This last one is not significant.
-cor.test(hypermut.PPI.zitnik$IsArticulationPoint, hypermut.PPI.zitnik$all.mut.density)
+cor.test(nonmut.PPI.zitnik$Degree, nonmut.PPI.zitnik$all.mut.density,method="spearman")
+cor.test(hypermut.PPI.zitnik$Degree, hypermut.PPI.zitnik$all.mut.density,method="spearman")
 
 ## now look at Cong network.
-cor.test(nonmut.PPI.cong$Degree, nonmut.PPI.cong$all.mut.density) ## significant
-cor.test(nonmut.PPI.cong$DegreeCentrality, nonmut.PPI.cong$all.mut.density) ## significant
-
-cor.test(nonmut.PPI.cong$Pagerank, nonmut.PPI.cong$all.mut.density) ## significant
-cor.test(nonmut.PPI.cong$HubScore, nonmut.PPI.cong$all.mut.density) ## NS
-cor.test(nonmut.PPI.cong$AuthorityScore, nonmut.PPI.cong$all.mut.density) ## NS
-cor.test(nonmut.PPI.cong$ClosenessCentrality, nonmut.PPI.cong$all.mut.density) ## NS
-cor.test(nonmut.PPI.cong$BetweenessCentrality, nonmut.PPI.cong$all.mut.density) ## NS
-cor.test(nonmut.PPI.cong$EigenvectorCentrality, nonmut.PPI.cong$all.mut.density) ## NS
-cor.test(nonmut.PPI.cong$IsArticulationPoint, nonmut.PPI.cong$all.mut.density) ## NS
-
-
-cor.test(hypermut.PPI.cong$Degree, hypermut.PPI.cong$all.mut.density) ## significant
-cor.test(hypermut.PPI.cong$DegreeCentrality, hypermut.PPI.cong$all.mut.density) ## ditto
-
-cor.test(hypermut.PPI.cong$Pagerank, hypermut.PPI.cong$all.mut.density) ## NS
-cor.test(hypermut.PPI.cong$HubScore, hypermut.PPI.cong$all.mut.density) ## significant
-cor.test(hypermut.PPI.cong$AuthorityScore, hypermut.PPI.cong$all.mut.density) ## sig
-cor.test(hypermut.PPI.cong$ClosenessCentrality, hypermut.PPI.cong$all.mut.density) #sig
-cor.test(hypermut.PPI.cong$BetweenessCentrality, hypermut.PPI.cong$all.mut.density) ## NS
-cor.test(hypermut.PPI.cong$EigenvectorCentrality, hypermut.PPI.cong$all.mut.density) ## sig
-cor.test(hypermut.PPI.cong$IsArticulationPoint, hypermut.PPI.cong$all.mut.density) ## NS
+cor.test(nonmut.PPI.cong$Degree, nonmut.PPI.cong$all.mut.density, method="spearman") ##NS
+cor.test(hypermut.PPI.cong$Degree, hypermut.PPI.cong$all.mut.density, method="spearman") ## significant
 
 ## Summarize these results by plotting mutation density against degree distribution
 ## for both networks, and both nonmutators and hyper-mutators. These results are
@@ -913,13 +880,14 @@ make.mut.density.PPI.degree.panel <- function(PPI.data,
 
     ## annotate r and p-values on the panel.
     PPI.result <- cor.test(PPI.data$Degree,
-                           PPI.data$all.mut.density)
+                           PPI.data$all.mut.density,
+                           method = "spearman")
 
-    pearson.r <- signif(PPI.result$estimate,digits=3)
-    pearson.p.value <- signif(PPI.result$p.value,digits=3)
+    my.r <- signif(PPI.result$estimate,digits=3)
+    my.p.value <- signif(PPI.result$p.value,digits=3)
 
-    lbl.rval <- paste("r", "=", pearson.r)
-    lbl.p.value <- paste("p", "=", pearson.p.value)
+    lbl.rval <- paste("r", "=", my.r)
+    lbl.p.value <- paste("p", "=", my.p.value)
     
     PPI.panel <- PPI.data %>%
         ggplot(aes(x = Degree, y = all.mut.density)) +
@@ -1028,22 +996,26 @@ nonmut.proteome.vis.comp.df <- proteome.vis.df %>%
 hypermut.proteome.vis.comp.df <- proteome.vis.df %>%
     left_join(hypermut.mutation.densities)
 
-## positive correction with PPI when looking at nonmutator data.
+## no correlation with PPI when looking at nonmutator data.
 cor.test(nonmut.proteome.vis.comp.df$PPI_degree,
-         nonmut.proteome.vis.comp.df$all.mut.density)
+         nonmut.proteome.vis.comp.df$all.mut.density,
+         method = "spearman")
 
 ## negative correlation with PPI when
 ## looking at hypermutator data.
 cor.test(hypermut.proteome.vis.comp.df$PPI_degree,
-         hypermut.proteome.vis.comp.df$all.mut.density)
+         hypermut.proteome.vis.comp.df$all.mut.density,
+         method = "spearman")
 
-## negative correlation with contact density in nonmutators.
+## no correlation with contact density in nonmutators.
 cor.test(nonmut.proteome.vis.comp.df$contact_density,
-         nonmut.proteome.vis.comp.df$all.mut.density)
+         nonmut.proteome.vis.comp.df$all.mut.density,
+         method = "spearman")
 
-##  negative correlation with contact density in hypermutators.
+##  no correlation with contact density in hypermutators.
 cor.test(hypermut.proteome.vis.comp.df$contact_density,
-         hypermut.proteome.vis.comp.df$all.mut.density)
+         hypermut.proteome.vis.comp.df$all.mut.density,
+         method = "spearman")
 
 ## Let's make a figure to summarize these findings.
 make.ProteomeVis.contact.density.figure <- function(nonmut.proteome.vis.comp.df,
@@ -1061,22 +1033,24 @@ make.ProteomeVis.contact.density.figure <- function(nonmut.proteome.vis.comp.df,
 
     ## annotate r and p-values on the panel.
     nonmut.result <- cor.test(nonmut.proteome.vis.comp.df$contact_density,
-                           nonmut.proteome.vis.comp.df$all.mut.density)
+                              nonmut.proteome.vis.comp.df$all.mut.density,
+                              method = "spearman")
 
     hypermut.result <- cor.test(hypermut.proteome.vis.comp.df$contact_density,
-                           hypermut.proteome.vis.comp.df$all.mut.density)
+                                hypermut.proteome.vis.comp.df$all.mut.density,
+                                method = "spearman")
 
-    nonmut.pearson.r <- signif(nonmut.result$estimate,digits=3)
-    nonmut.pearson.p.value <- signif(nonmut.result$p.value,digits=3)
+    nonmut.r <- signif(nonmut.result$estimate,digits=3)
+    nonmut.p.value <- signif(nonmut.result$p.value,digits=3)
 
-    hypermut.pearson.r <- signif(hypermut.result$estimate,digits=3)
-    hypermut.pearson.p.value <- signif(hypermut.result$p.value,digits=3)
+    hypermut.r <- signif(hypermut.result$estimate,digits=3)
+    hypermut.p.value <- signif(hypermut.result$p.value,digits=3)
 
-    nonmut.lbl.rval <- paste("r", "=", nonmut.pearson.r)
-    nonmut.lbl.p.value <- paste("p", "=", nonmut.pearson.p.value)
+    nonmut.lbl.rval <- paste("r", "=", nonmut.r)
+    nonmut.lbl.p.value <- paste("p", "=", nonmut.p.value)
 
-    hypermut.lbl.rval <- paste("r", "=", hypermut.pearson.r)
-    hypermut.lbl.p.value <- paste("p", "=", hypermut.pearson.p.value)
+    hypermut.lbl.rval <- paste("r", "=", hypermut.r)
+    hypermut.lbl.p.value <- paste("p", "=", hypermut.p.value)
 
 
     ## label positions for each figure:
@@ -1202,11 +1176,13 @@ hypermut.density.meltome <- Ecoli.meltome %>%
 ## positive correlation between melting point and mutation density.
 ## these data exclude nonmelters (NA values).
 cor.test(hypermut.density.meltome$meltPoint,
-         hypermut.density.meltome$all.mut.density)
+         hypermut.density.meltome$all.mut.density,
+         method = "spearman")
 
 ## no such correlation in nonmutators.
 cor.test(nonmut.density.meltome$meltPoint,
-         nonmut.density.meltome$all.mut.density)
+         nonmut.density.meltome$all.mut.density,
+         method = "spearman")
 
 ## plot for the positive correlation between Tm and mutation density in hypermutators.
 hypermut.meltome.plot <- ggplot(hypermut.density.meltome,
@@ -1235,8 +1211,10 @@ correlate.meltPoint.with.timepoint <- function(meltPoint.Caglar) {
         my.data <- meltPoint.Caglar %>%
             filter(growthTime_hr == t)
         
-        mRNA.result <- cor.test(my.data$mRNA.mean, my.data$meltPoint)
-        Protein.result <- cor.test(my.data$Protein.mean, my.data$meltPoint)
+        mRNA.result <- cor.test(my.data$mRNA.mean, my.data$meltPoint,
+                                method = "spearman")
+        Protein.result <- cor.test(my.data$Protein.mean, my.data$meltPoint,
+                                   method = "spearman")
         print(paste("TIME:",t,'hrs'))
         print("mRNA abundance correlation with meltPoint:")
         print(mRNA.result)
@@ -1260,7 +1238,7 @@ plot.meltPoint.mRNA.anticorrelation <- function(my.data) {
     time.title <- paste0(as.character(my.t), "h")
 
     ## if the correlation is not significant, then the fill is gray.
-    mRNA.result <- cor.test(my.data$mRNA.mean, my.data$meltPoint)
+    mRNA.result <- cor.test(my.data$mRNA.mean, my.data$meltPoint, method = "spearman")
         ## factor of (1/9) is a Bonferroni-correction for multiple tests.
     my.fill <- ifelse(mRNA.result$p.value < 0.05*(1/9), "lightskyblue", "light gray")
     
@@ -1304,7 +1282,8 @@ plot.meltPoint.protein.anticorrelation <- function(my.data) {
     time.title <- paste0(as.character(my.t), "h")
 
     ## if the correlation is not significant, then the fill is gray.
-    Protein.result <- cor.test(my.data$Protein.mean, my.data$meltPoint)
+    Protein.result <- cor.test(my.data$Protein.mean, my.data$meltPoint,
+                               method = "spearman")
     ## factor of (1/9) is a Bonferroni-correction for multiple tests.
     my.fill <- ifelse(Protein.result$p.value < 0.05*(1/9), "moccasin", "light gray")
     
