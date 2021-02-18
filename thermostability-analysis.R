@@ -423,8 +423,10 @@ make.mut.density.RNA.protein.expression.figure <- function(density.Caglar,
 }
 
 ## now make the main figure.
-Fig2 <- make.mut.density.RNA.protein.expression.figure(hypermut.density.Caglar, method = "spearman")                                              
-ggsave("../results/thermostability/figures/Fig2.pdf", Fig2, height = 5, width = 9)
+Fig2 <- make.mut.density.RNA.protein.expression.figure(
+    hypermut.density.Caglar, method = "spearman")                                              
+ggsave("../results/thermostability/figures/Fig2.pdf",
+       Fig2, height = 5, width = 9)
 
 ## now examine hypermutators when zero mutation genes are excluded.
 S1Fig <- make.mut.density.RNA.protein.expression.figure(
@@ -443,6 +445,7 @@ Fig3 <- make.mut.density.RNA.protein.expression.figure(
     hypermut.density.Caglar, muts.for.plot="dS", method = "spearman")
 ggsave("../results/thermostability/figures/Fig3.pdf",
        Fig3, height = 5, width = 9)
+
 ## and examine synonymous mutations in hypermutators, when zeros are excluded.
 S3Fig <- make.mut.density.RNA.protein.expression.figure(
     nozero.hypermut.density.Caglar, muts.for.plot="dS", method = "spearman")
@@ -450,10 +453,13 @@ ggsave("../results/thermostability/figures/S3Fig.pdf",
        S3Fig, height = 5, width = 9)
 
 ## now examine nonmutators.
-S4Fig <- make.mut.density.RNA.protein.expression.figure(nonmut.density.Caglar, method = "spearman")
-ggsave("../results/thermostability/figures/S4Fig.pdf", S4Fig, height = 5, width = 9)
+S4Fig <- make.mut.density.RNA.protein.expression.figure(
+    nonmut.density.Caglar, method = "spearman")
+ggsave("../results/thermostability/figures/S4Fig.pdf",
+       S4Fig, height = 5, width = 9)
 
 
+#################################
 ## Favate et al. (2021) analysis of ancestral clones and 11 evolved 50K LTEE clones.
 
 Favate.TableS1 <- read.csv("../data/Favate2021_table_s1_read_counts.csv",
@@ -630,133 +636,6 @@ S7Fig <- make.favate.mut.density.RNA.expression.figure(
     rnaseq.with.hypermut.mutation.density, muts.for.plot="dS")
 ggsave("../results/thermostability/figures/S7Fig.pdf", S7Fig, height=9, width=6)
 
-
-########################################################
-
-## Figure 4.
-
-## PPI network statistics analysis.
-## to generate these files, run: python snap-ppi-analysis.py 
-zitnik.network.df <- read.csv("../results/thermostability/Zitnik_network_statistics.csv",as.is=TRUE,header=TRUE) %>% inner_join(REL606.genes)
-    
-cong.network.df <- read.csv("../results/thermostability/Cong_network_statistics.csv",as.is=TRUE,header=TRUE) %>% inner_join(REL606.genes)
-
-nonmut.PPI.zitnik <- zitnik.network.df %>%
-    left_join(nonmut.mutation.densities)
-
-hypermut.PPI.zitnik <- zitnik.network.df %>%
-left_join(hypermut.mutation.densities)
-
-nonmut.PPI.cong <- cong.network.df %>%
-    left_join(nonmut.mutation.densities)
-
-hypermut.PPI.cong <- cong.network.df %>%
-    left_join(hypermut.mutation.densities)
-
-## look at Zitnik network.
-
-cor.test(nonmut.PPI.zitnik$Degree, nonmut.PPI.zitnik$all.mut.density,method="spearman")
-cor.test(hypermut.PPI.zitnik$Degree, hypermut.PPI.zitnik$all.mut.density,method="spearman")
-
-## now look at Cong network.
-cor.test(nonmut.PPI.cong$Degree, nonmut.PPI.cong$all.mut.density, method="spearman") ##NS
-cor.test(hypermut.PPI.cong$Degree, hypermut.PPI.cong$all.mut.density, method="spearman") ## significant
-
-## Summarize these results by plotting mutation density against degree distribution
-## for both networks, and both nonmutators and hyper-mutators. These results are
-## consistent throughout, and even the non-significant correlations show the same,
-## consistent trends seen for degree distribution.
-
-make.mut.density.PPI.degree.panel <- function(PPI.data,
-                                              lbl.xpos, rlbl.ypos, plbl.ypos,
-                                              my.color="gray") {
-    ## This is a helper function that plots a single panel.
-
-    ## annotate r and p-values on the panel.
-    PPI.result <- cor.test(PPI.data$Degree,
-                           PPI.data$all.mut.density,
-                           method = "spearman")
-
-    ## if the correlation is not significant, then the regression line is gray.
-    ## factor of (1/9) is a Bonferroni-correction for multiple tests.
-    my.regression.color <- ifelse(PPI.result$p.value < 0.05*(1/9), "blue", "light gray")
-    
-    my.r <- signif(PPI.result$estimate,digits=3)
-    my.p.value <- signif(PPI.result$p.value,digits=3)
-
-    lbl.rval <- paste("rho", "=", my.r)
-    lbl.p.value <- paste("p", "=", my.p.value)
-    
-    PPI.panel <- PPI.data %>%
-        ggplot(aes(x = Degree, y = all.mut.density)) +
-        geom_point(color = my.color, alpha = 0.2) +
-        geom_smooth(method = 'lm', formula = y~x, color = my.regression.color) +
-        theme_classic() +
-        ylab("Mutation density") +
-        xlab("PPI degree") +
-        ## annotate correlation on the figure.
-        annotate("text", x = lbl.xpos, y = rlbl.ypos, size=3,
-                 label = lbl.rval, fontface = 'bold.italic') +
-        ## annotate p-value on the figure.
-        annotate("text", x = lbl.xpos, y = plbl.ypos, size=3,
-                 label = lbl.p.value, fontface = 'bold.italic')
-
-    return(PPI.panel)
-}
-
-make.mut.density.PPI.degree.figure <- function(nonmut.PPI.cong, nonmut.PPI.zitnik, 
-                                               hypermut.PPI.cong, hypermut.PPI.zitnik) {
-
-    ## label positions for each figure:
-    cong.xpos <- 10
-    zitnik.xpos <- 100
-
-    nonmut.r.ypos <- 0.01
-    nonmut.p.ypos <- 0.012
-    hypermut.r.ypos <- 0.03
-    hypermut.p.ypos <- 0.035
-    
-    panelA <- make.mut.density.PPI.degree.panel(nonmut.PPI.cong,
-                                                cong.xpos,
-                                                nonmut.r.ypos,
-                                                nonmut.p.ypos,
-                                                "lightsteelblue") +
-        ggtitle("Nonmutators")
-    
-    panelB <- make.mut.density.PPI.degree.panel(nonmut.PPI.zitnik,
-                                                zitnik.xpos,
-                                                nonmut.r.ypos,
-                                                nonmut.p.ypos,
-                                                "moccasin") +
-        ggtitle("Nonmutators")
-
-    panelC <- make.mut.density.PPI.degree.panel(hypermut.PPI.cong,
-                                                cong.xpos,
-                                                hypermut.r.ypos,
-                                                hypermut.p.ypos,
-                                                "lightsteelblue") +
-        ggtitle("Hypermutators")
-
-    panelD <- make.mut.density.PPI.degree.panel(hypermut.PPI.zitnik,
-                                                zitnik.xpos,
-                                                hypermut.r.ypos,
-                                                hypermut.p.ypos,
-                                                "moccasin") +
-        ggtitle("Hypermutators")
-
-    
-    fig <- plot_grid(panelA, panelB, panelC, panelD, nrow = 2,
-                        labels = c('A', 'B', 'C', 'D'))
-    return(fig)
-}
-
-Fig4 <- make.mut.density.PPI.degree.figure(nonmut.PPI.cong,
-                                           nonmut.PPI.zitnik,
-                                           hypermut.PPI.cong,
-                                           hypermut.PPI.zitnik)
-ggsave("../results/thermostability/figures/Fig4.pdf",
-       Fig4, width=4, height=4)
-
 ################################################################################
 ## Analyze E. coli data from the ProteomeVis database.
 ################################################################################
@@ -783,16 +662,29 @@ proteome.vis.download.df <- read.csv("../data/ProteomeVis-data/NODES_ecoli_TM_0.
 
 proteome.vis.df <- full_join(proteome.vis.inspect.df, proteome.vis.download.df) %>%
     left_join(REL606.to.ProteomeVis.df) %>%
-    filter(!(is.na(Gene))) %>% ## 1259 genes pass this filter.
-    ## remove outliers with few residues in contact.
-    ## 1255 proteins left after filtering.
-    filter(contact_density > 4) 
-
-nonmut.proteome.vis.comp.df <- proteome.vis.df %>%
-    left_join(nonmut.mutation.densities)
+    filter(!(is.na(Gene))) ## 1259 genes pass this filter.
     
-hypermut.proteome.vis.comp.df <- proteome.vis.df %>%
-    left_join(hypermut.mutation.densities)
+
+nonmut.proteome.vis.comp.df <- nonmut.mutation.densities %>%
+    left_join(proteome.vis.df) %>%
+    ## CRITICAL STEP: replace PPI_degree NAs with zeros.
+            replace_na(list(PPI_degree = 0))
+    
+hypermut.proteome.vis.comp.df <- hypermut.mutation.densities %>%
+    left_join(proteome.vis.df) %>%
+    ## CRITICAL STEP: replace PPI_degree NAs with zeros.
+    replace_na(list(PPI_degree = 0))
+
+
+## no correlation with contact density in nonmutators.
+cor.test(nonmut.proteome.vis.comp.df$contact_density,
+         nonmut.proteome.vis.comp.df$all.mut.density,
+         method = "spearman")
+
+##  no correlation with contact density in hypermutators.
+cor.test(hypermut.proteome.vis.comp.df$contact_density,
+         hypermut.proteome.vis.comp.df$all.mut.density,
+         method = "spearman")
 
 ## no correlation with PPI when looking at nonmutator data.
 cor.test(nonmut.proteome.vis.comp.df$PPI_degree,
@@ -805,15 +697,203 @@ cor.test(hypermut.proteome.vis.comp.df$PPI_degree,
          hypermut.proteome.vis.comp.df$all.mut.density,
          method = "spearman")
 
-## no correlation with contact density in nonmutators.
-cor.test(nonmut.proteome.vis.comp.df$contact_density,
+## significant negative correlation with abundance in hypermutators.
+cor.test(hypermut.proteome.vis.comp.df$abundance,
+         hypermut.proteome.vis.comp.df$all.mut.density,
+         method = "spearman")
+
+## nonsynonymous density has negative correlation with abundance in hypermutators.
+cor.test(hypermut.proteome.vis.comp.df$PPI_degree,
+         hypermut.proteome.vis.comp.df$dN.mut.density,
+         method = "spearman")
+
+## synonymous density has positive correlation with abundance in hypermutators.
+cor.test(hypermut.proteome.vis.comp.df$PPI_degree,
+         hypermut.proteome.vis.comp.df$dS.mut.density,
+         method = "spearman")
+
+## no correlation with abundance in nonmutators.
+cor.test(nonmut.proteome.vis.comp.df$abundance,
          nonmut.proteome.vis.comp.df$all.mut.density,
          method = "spearman")
 
-##  no correlation with contact density in hypermutators.
-cor.test(hypermut.proteome.vis.comp.df$contact_density,
-         hypermut.proteome.vis.comp.df$all.mut.density,
-         method = "spearman")
+## TODO: make all.mut, dN, dS mut figures for proteome vis abundance data.
+FigS8 <- ggplot(hypermut.proteome.vis)
+
+FigS9 <- ggplot(hypermut.proteome.vis)
+
+FigS10 <- ggplot(hypermut.proteome.vis)
+########################################################
+## Figure 4.
+
+## PPI network statistics analysis.
+## to generate these files, run: python snap-ppi-analysis.py 
+zitnik.network.df <- read.csv("../results/thermostability/Zitnik_network_statistics.csv",
+                              as.is=TRUE,header=TRUE) %>% inner_join(REL606.genes)
+    
+cong.network.df <- read.csv("../results/thermostability/Cong_network_statistics.csv",
+                            as.is=TRUE,header=TRUE) %>% inner_join(REL606.genes)
+
+
+nonmut.PPI.zitnik <- nonmut.mutation.densities %>%
+    left_join(zitnik.network.df) %>%
+    ## CRITICAL STEP: replace PPI Degree NAs with zeros.
+    replace_na(list(Degree = 0))
+
+hypermut.PPI.zitnik <- hypermut.mutation.densities %>%
+    left_join(zitnik.network.df) %>%
+    ## CRITICAL STEP: replace PPI Degree NAs with zeros.
+    replace_na(list(Degree = 0))
+
+
+nonmut.PPI.cong <- nonmut.mutation.densities %>%
+    left_join(cong.network.df) %>%
+    ## CRITICAL STEP: replace PPI Degree NAs with zeros.
+    replace_na(list(Degree = 0))
+
+hypermut.PPI.cong <- hypermut.mutation.densities %>%
+    left_join(cong.network.df) %>%
+    ## CRITICAL STEP: replace PPI Degree NAs with zeros.
+    replace_na(list(Degree = 0))
+
+## look at Zitnik network.
+cor.test(nonmut.PPI.zitnik$Degree, nonmut.PPI.zitnik$all.mut.density,method="spearman")
+cor.test(hypermut.PPI.zitnik$Degree, hypermut.PPI.zitnik$all.mut.density,method="spearman")
+
+## now look at Cong network.
+cor.test(nonmut.PPI.cong$Degree, nonmut.PPI.cong$all.mut.density, method="spearman")
+cor.test(hypermut.PPI.cong$Degree, hypermut.PPI.cong$all.mut.density, method="spearman")
+
+## Summarize these results by plotting mutation density against degree distribution
+## for both networks, and both nonmutators and hyper-mutators. These results are
+## consistent throughout, and even the non-significant correlations show the same,
+## consistent trends seen for degree distribution.
+
+make.mut.density.PPI.degree.panel <- function(PPI.data,
+                                              lbl.xpos, rlbl.ypos, plbl.ypos,
+                                              my.color="gray") {
+    ## This is a helper function that plots a single panel.
+
+    ## annotate r and p-values on the panel.
+    PPI.result <- cor.test(sqrt(PPI.data$Degree),
+                           PPI.data$all.mut.density,
+                           method = "spearman")
+
+    ## if the correlation is not significant, then the regression line is gray.
+    ## factor of (1/9) is a Bonferroni-correction for multiple tests.
+    my.regression.color <- ifelse(PPI.result$p.value < 0.05*(1/9), "blue", "light gray")
+    
+    my.r <- signif(PPI.result$estimate,digits=3)
+    my.p.value <- signif(PPI.result$p.value,digits=3)
+
+    lbl.rval <- paste("rho", "=", my.r)
+    lbl.p.value <- paste("p", "=", my.p.value)
+    
+    PPI.panel <- PPI.data %>%
+        ggplot(aes(x = sqrt(Degree), y = all.mut.density)) +
+        geom_point(color = my.color, alpha = 0.2) +
+        geom_smooth(method = 'lm', formula = y~x, color = my.regression.color) +
+        theme_classic() +
+        ylab("Mutation density") +
+        xlab("sqrt(PPI degree)") +
+        ylim(0, 0.05) +
+        ## annotate correlation on the figure.
+        annotate("text", x = lbl.xpos, y = rlbl.ypos, size=3,
+                 label = lbl.rval, fontface = 'bold.italic') +
+        ## annotate p-value on the figure.
+        annotate("text", x = lbl.xpos, y = plbl.ypos, size=3,
+                 label = lbl.p.value, fontface = 'bold.italic')
+
+    return(PPI.panel)
+}
+
+## make panels for ProteomeVis PPI correlations.
+make.mut.density.ProteomeVis.PPI.degree.panel <- function(ProteomeVis.data,
+                                              lbl.xpos, rlbl.ypos, plbl.ypos,
+                                              my.color="gray") {
+    ## This is a helper function that plots a single panel.
+
+    ## annotate r and p-values on the panel.
+    PPI.result <- cor.test(sqrt(ProteomeVis.data$PPI_degree),
+                           ProteomeVis.data$all.mut.density,
+                           method = "spearman")
+
+    ## if the correlation is not significant, then the regression line is gray.
+    ## factor of (1/9) is a Bonferroni-correction for multiple tests.
+    my.regression.color <- ifelse(PPI.result$p.value < 0.05*(1/9), "blue", "light gray")
+    
+    my.r <- signif(PPI.result$estimate,digits=3)
+    my.p.value <- signif(PPI.result$p.value,digits=3)
+
+    lbl.rval <- paste("rho", "=", my.r)
+    lbl.p.value <- paste("p", "=", my.p.value)
+    
+    PPI.panel <- ProteomeVis.data %>%
+        ggplot(aes(x = sqrt(PPI_degree), y = all.mut.density)) +
+        geom_point(color = my.color, alpha = 0.2) +
+        geom_smooth(method = 'lm', formula = y~x, color = my.regression.color) +
+        theme_classic() +
+        ylab("Mutation density") +
+        xlab("sqrt(PPI degree)") +
+        ylim(0, 0.05) +
+        ## annotate correlation on the figure.
+        annotate("text", x = lbl.xpos, y = rlbl.ypos, size=3,
+                 label = lbl.rval, fontface = 'bold.italic') +
+        ## annotate p-value on the figure.
+        annotate("text", x = lbl.xpos, y = plbl.ypos, size=3,
+                 label = lbl.p.value, fontface = 'bold.italic')
+
+    return(PPI.panel)
+}
+
+make.mut.density.PPI.degree.figure <- function(PPI.cong, PPI.zitnik, proteome.vis.df) {
+
+    ## label positions for each figure:
+    cong.xpos <- 2
+    zitnik.xpos <- 5
+
+    r.ypos <- 0.03
+    p.ypos <- 0.035
+    
+    panelA <- make.mut.density.PPI.degree.panel(
+        PPI.cong,
+        cong.xpos,
+        r.ypos,
+        p.ypos,
+        "lightsteelblue")
+    
+    panelB <- make.mut.density.PPI.degree.panel(
+        PPI.zitnik,
+        zitnik.xpos,
+        r.ypos,
+        p.ypos,
+        "moccasin")
+
+    panelC <- make.mut.density.ProteomeVis.PPI.degree.panel(
+        proteome.vis.df,
+        zitnik.xpos,
+        r.ypos,
+        p.ypos,
+        "brown")
+        
+    fig <- plot_grid(panelA, panelB, panelC, nrow = 1,
+                        labels = c('A', 'B', 'C'))
+    return(fig)
+}
+
+Fig4 <- make.mut.density.PPI.degree.figure(
+    hypermut.PPI.cong,
+    hypermut.PPI.zitnik,
+    hypermut.proteome.vis.comp.df)
+ggsave("../results/thermostability/figures/Fig4.pdf",
+       Fig4, width=6, height=2)
+
+FigS11 <- make.mut.density.PPI.degree.figure(
+    nonmut.PPI.cong,
+    nonmut.PPI.zitnik,
+    nonmut.proteome.vis.comp.df)
+ggsave("../results/thermostability/figures/FigS9.pdf",
+       FigS9, width=6, height=2)
 
 ############################################################################
 ## E. COLI MELTOME ATLAS DATA ANALYSIS
