@@ -482,7 +482,144 @@ S4Fig <- make.mut.density.RNA.protein.expression.figure(
 ggsave("../results/thermostability/figures/S4Fig.pdf",
        S4Fig, height = 5, width = 9)
 
-#################################
+##################################################################
+
+## Let's see how the strength of the correlation changes with divergence time.
+## Compare "divergence" in terms of generations to
+## correlation with protein abundance.
+
+## Compare to the theoretical expectation in Fig. 4 of
+## Protein Biophysics Explains Why Highly Abundant Proteins Evolve Slowly
+## by Serohijos et al. (2012).
+
+
+hypermutator.gene.mutation.data <- gene.mutation.data %>%
+    filter(Population %in% hypermutator.pops)
+
+hypermut.mutation.densities.60K <- calc.gene.mutation.densities(
+   filter(hypermutator.gene.mutation.data, t0 <= 60000),
+   REL606.genes) %>%
+    mutate(Cutoff = 60)
+
+hypermut.mutation.densities.50K <- calc.gene.mutation.densities(
+   filter(hypermutator.gene.mutation.data, t0 <= 50000),
+   REL606.genes) %>%
+    mutate(Cutoff = 50)
+
+hypermut.mutation.densities.40K <- calc.gene.mutation.densities(
+   filter(hypermutator.gene.mutation.data, t0 <= 40000),
+   REL606.genes) %>%
+    mutate(Cutoff = 40)
+
+hypermut.mutation.densities.30K <- calc.gene.mutation.densities(
+   filter(hypermutator.gene.mutation.data, t0 <= 30000),
+   REL606.genes) %>%
+    mutate(Cutoff = 30)
+
+hypermut.mutation.densities.20K <- calc.gene.mutation.densities(
+   filter(hypermutator.gene.mutation.data, t0 <= 20000),
+   REL606.genes) %>%
+    mutate(Cutoff = 20)
+
+hypermut.mutation.densities.10K <- calc.gene.mutation.densities(
+   filter(hypermutator.gene.mutation.data, t0 <= 10000),
+   REL606.genes) %>%
+    mutate(Cutoff = 10)
+
+divergence.mutation.densities <- rbind(hypermut.mutation.densities.60K,
+                                       hypermut.mutation.densities.50K,
+                                       hypermut.mutation.densities.40K,
+                                       hypermut.mutation.densities.30K,
+                                       hypermut.mutation.densities.20K,
+                                       hypermut.mutation.densities.10K)
+
+divergence.hypermut.density.Caglar <- inner_join(
+    divergence.mutation.densities,
+    Caglar.summary)
+
+calc.correlation.helper <- function(gen.density.Caglar.subdf,my.method="spearman",
+                                    muts.to.plot="all") {
+
+    if (muts.to.plot == "dN") {
+        my.test <- cor.test(gen.density.Caglar.subdf$Protein.mean,
+                        gen.density.Caglar.subdf$dN.mut.density,
+                        method=my.method)
+        
+    } else if (muts.to.plot == "dS") {
+        my.test <- cor.test(gen.density.Caglar.subdf$Protein.mean,
+                            gen.density.Caglar.subdf$dS.mut.density,
+                            method=my.method)
+
+        
+    } else { ## default is to plot the density of all mutations.
+        my.test <- cor.test(gen.density.Caglar.subdf$Protein.mean,
+                            gen.density.Caglar.subdf$all.mut.density,
+                            method=my.method)
+    }
+    
+    my.df <- data.frame(Cutoff = unique(gen.density.Caglar.subdf$Cutoff),
+                        growthTime_hr = unique(gen.density.Caglar.subdf$growthTime_hr),
+                        correlation = my.test$estimate)
+    return(my.df)
+}
+
+Fig5A.correlation.func <- partial(.f = calc.correlation.helper,
+                                  muts.to.plot = "all")
+Fig5B.correlation.func <- partial(.f = calc.correlation.helper,
+                                  muts.to.plot = "dN")
+Fig5C.correlation.func <- partial(.f = calc.correlation.helper,
+                                  muts.to.plot = "dS")
+
+## now calculate the correlation between abundance and density of mutations
+## per generation cutoff.
+Fig5A.df <- divergence.hypermut.density.Caglar %>%
+    split(list(.$growthTime_hr, .$Cutoff)) %>%
+    map_dfr(.f = Fig5A.correlation.func) %>%
+    mutate(`Growth Time (h)` = as.factor(growthTime_hr))
+
+Fig5B.df <- divergence.hypermut.density.Caglar %>%
+    split(list(.$growthTime_hr, .$Cutoff)) %>%
+    map_dfr(.f = Fig5B.correlation.func) %>%
+    mutate(`Growth Time (h)` = as.factor(growthTime_hr))
+
+Fig5C.df <- divergence.hypermut.density.Caglar %>%
+    split(list(.$growthTime_hr, .$Cutoff)) %>%
+    map_dfr(.f = Fig5C.correlation.func) %>%
+    mutate(`Growth Time (h)` = as.factor(growthTime_hr))
+
+Fig5A <- ggplot(
+    data = Fig5A.df,
+    aes(x=Cutoff, y = correlation, color = `Growth Time (h)`)) +
+    geom_point() + theme_classic() + xlab("Time (x 10,000 Generations)") +
+    ylab("Correlation between protein abundance and mutation density") +
+    ggtitle("All mutation types") + ylim(c(-0.15,0.15)) +
+    guides(color=FALSE)
+
+Fig5B <- ggplot(
+    data = Fig5B.df,
+    aes(x=Cutoff, y = correlation, color = `Growth Time (h)`)) +
+    geom_point() + theme_classic() + xlab("Time (x 10,000 Generations)") +
+    ylab("") +
+    ggtitle("Nonsynonymous mutations") + ylim(c(-0.15,0.15)) +
+    guides(color = FALSE)
+
+Fig5C <- ggplot(
+    data = Fig5C.df,
+    aes(x=Cutoff, y = correlation, color = `Growth Time (h)`)) +
+    geom_point() + theme_classic() + xlab("Time (x 10,000 Generations)") +
+    ylab("") +
+    ggtitle("Synonymous mutations") + ylim(c(-0.15,0.15))
+## get the legend from Fig5C
+Fig5.legend <- get_legend(Fig5C)
+## now cut it off from Fig5C, to plot separately.
+Fig5C <- Fig5C + guides(color = FALSE)
+
+
+Fig5 <- plot_grid(plot_grid(Fig5A, Fig5B, Fig5C, labels = c('A', 'B', 'C'), nrow = 1),
+                  Fig5.legend, rel_widths = c(1,0.1))
+ggsave("../results/thermostability/figures/Fig5.pdf", Fig5, width=12.5, height=5)
+
+##################################################################
 ## Favate et al. (2021) analysis of ancestral clones and 11 evolved 50K LTEE clones.
 
 Favate.TableS1 <- read.csv("../data/Favate2021_table_s1_read_counts.csv",
@@ -781,7 +918,6 @@ make.mut.density.ProteomeVis.panel <- function(ProteomeVis.comp.df,
         plbl.ypos <- 0.06
     }
 
-    
     ## annotate r and p-values on the panel.
     if (muts.to.plot == "dN") {
         ProteomeVis.result <- cor.test(ProteomeVis.comp.df$log_abundance,
@@ -848,9 +984,7 @@ S9Fig <- plot_grid(S9FigA, S9FigB, labels=c('A','B'))
 ggsave("../results/thermostability/figures/S9Fig.pdf", S9Fig, height=3, width=6)
 
 ########################################################
-## Figure 4.
-
-## PPI network statistics analysis.
+## Figure 6. PPI network statistics analysis.
 ## to generate these files, run: python snap-ppi-analysis.py 
 zitnik.network.df <- read.csv("../results/thermostability/Zitnik_network_statistics.csv",
                               as.is=TRUE,header=TRUE) %>% inner_join(REL606.genes)
@@ -1006,12 +1140,12 @@ make.mut.density.PPI.degree.figure <- function(PPI.cong, PPI.zitnik, proteome.vi
     return(fig)
 }
 
-Fig5 <- make.mut.density.PPI.degree.figure(
+Fig6 <- make.mut.density.PPI.degree.figure(
     hypermut.PPI.cong,
     hypermut.PPI.zitnik,
     hypermut.proteome.vis.comp.df)
-ggsave("../results/thermostability/figures/Fig5.pdf",
-       Fig5, width=6, height=2)
+ggsave("../results/thermostability/figures/Fig6.pdf",
+       Fig6, width=6, height=2)
 
 FigS10 <- make.mut.density.PPI.degree.figure(
     nonmut.PPI.cong,
