@@ -298,7 +298,7 @@ plot.mut.density.mRNA.anticorrelation <- function(my.data, my.method="spearman",
         coord_cartesian(xlim = c(0, 15)) +
         ggtitle(time.title)
 
-    if (my.color == "blue") { ## signifiacant correlation.
+    if (my.color == "blue") { ## significant correlation.
         ## annotate correlation on the figure.
         mRNA.plot <- mRNA.plot +
             annotate("text", x = 7, y = 0.03, size = 3,
@@ -591,8 +591,8 @@ Fig5A <- ggplot(
     data = Fig5A.df,
     aes(x=Cutoff, y = correlation, color = `Growth Time (h)`)) +
     geom_point() + theme_classic() + xlab("Time (x 10,000 Generations)") +
-    ylab("Correlation between protein abundance and mutation density") +
-    ggtitle("All mutation types") + ylim(c(-0.15,0.15)) +
+    ylab("Correlation between protein\nabundance and mutation density") +
+    ggtitle("All mutation types") + ylim(c(-0.12,0.1)) +
     guides(color=FALSE)
 
 Fig5B <- ggplot(
@@ -600,7 +600,7 @@ Fig5B <- ggplot(
     aes(x=Cutoff, y = correlation, color = `Growth Time (h)`)) +
     geom_point() + theme_classic() + xlab("Time (x 10,000 Generations)") +
     ylab("") +
-    ggtitle("Nonsynonymous mutations") + ylim(c(-0.15,0.15)) +
+    ggtitle("Nonsynonymous\nmutations") + ylim(c(-0.12,0.1)) +
     guides(color = FALSE)
 
 Fig5C <- ggplot(
@@ -608,16 +608,16 @@ Fig5C <- ggplot(
     aes(x=Cutoff, y = correlation, color = `Growth Time (h)`)) +
     geom_point() + theme_classic() + xlab("Time (x 10,000 Generations)") +
     ylab("") +
-    ggtitle("Synonymous mutations") + ylim(c(-0.15,0.15))
+    ggtitle("Synonymous\nmutations") + ylim(c(-0.12,0.1)) +
+    theme(legend.position="bottom")
 ## get the legend from Fig5C
 Fig5.legend <- get_legend(Fig5C)
 ## now cut it off from Fig5C, to plot separately.
 Fig5C <- Fig5C + guides(color = FALSE)
 
-
 Fig5 <- plot_grid(plot_grid(Fig5A, Fig5B, Fig5C, labels = c('A', 'B', 'C'), nrow = 1),
-                  Fig5.legend, rel_widths = c(1,0.1))
-ggsave("../results/thermostability/figures/Fig5.pdf", Fig5, width=12.5, height=5)
+                  Fig5.legend, rel_heights = c(1,0.2), nrow = 2)
+ggsave("../results/thermostability/figures/Fig5.pdf", Fig5, width=8, height=4)
 
 ##################################################################
 ## Favate et al. (2021) analysis of ancestral clones and 11 evolved 50K LTEE clones.
