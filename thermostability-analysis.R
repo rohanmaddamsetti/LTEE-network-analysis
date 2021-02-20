@@ -2,7 +2,7 @@
 
 ## get functions for dealing with LTEE metagenomics data.
 source("metagenomics-library.R")
-library(ggridges)
+
 ####################
 ## DATA PREPROCESSING
 
@@ -300,8 +300,9 @@ plot.mut.density.mRNA.anticorrelation <- function(my.data, my.method="spearman",
 
     if (my.color == "blue") { ## signifiacant correlation.
         ## annotate correlation on the figure.
-        mRNA.plot <- annotate("text", x = 7, y = 0.03, size = 3,
-                              label = lbl.rval, fontface = 'bold.italic') +
+        mRNA.plot <- mRNA.plot +
+            annotate("text", x = 7, y = 0.03, size = 3,
+                     label = lbl.rval, fontface = 'bold.italic') +
             ## annotate p-value on the figure.
             annotate("text", x = 7, y = 0.04, size = 3,
                      label = lbl.p.value, fontface = 'bold.italic')
@@ -376,13 +377,13 @@ plot.mut.density.protein.anticorrelation <- function(my.data, my.method="spearma
 
     if (my.color == "blue") { ## significant
         Protein.plot <- Protein.plot +
-        ## annotate correlation on the figure.
-        annotate("text", x = 5, y = 0.03, size=3,
-                 label = lbl.rval, fontface = 'bold.italic') +
-        ## annotate p-value on the figure.
-        annotate("text", x = 5, y = 0.04, size=3,
-                 label = lbl.p.value, fontface = 'bold.italic')
-  }
+            ## annotate correlation on the figure.
+            annotate("text", x = 5, y = 0.03, size=3,
+                     label = lbl.rval, fontface = 'bold.italic') +
+            ## annotate p-value on the figure.
+            annotate("text", x = 5, y = 0.04, size=3,
+                     label = lbl.p.value, fontface = 'bold.italic')
+    }
 
     ## use a conditional statement to label x-axis for the
     ## bottom center panel (168 hr).
@@ -432,7 +433,7 @@ make.mut.density.RNA.protein.expression.figure <- function(density.Caglar,
     return(complete.fig)
 }
 
-## now make the main figure.
+## now make the main set of figures.
 
 Fig2 <- make.mut.density.RNA.protein.expression.figure(
     hypermut.density.Caglar, method = "spearman", titlestring = "All mutation types")
@@ -453,20 +454,19 @@ Fig3 <- make.mut.density.RNA.protein.expression.figure(
 ggsave("../results/thermostability/figures/Fig3.pdf",
        Fig3, height = 5, width = 9)
 
-## show nonsynonymous mutations in hypermutators, when zeros are excluded.
-S2Fig <- make.mut.density.RNA.protein.expression.figure(
-    nozero.hypermut.density.Caglar, muts.for.plot="dN", method = "spearman",
-    titlestring = "Nonsynonymous mutations; zero-mutation genes excluded")
-ggsave("../results/thermostability/figures/S2Fig.pdf",
-       S2Fig, height = 5, width = 9)
-
-
 ## for comparison, examine just synonymous mutations in hypermutators.
 Fig4 <- make.mut.density.RNA.protein.expression.figure(
     hypermut.density.Caglar, muts.for.plot="dS", method = "spearman",
     titlestring = "Synonymous mutations")
 ggsave("../results/thermostability/figures/Fig4.pdf",
        Fig4, height = 5, width = 9)
+
+## show nonsynonymous mutations in hypermutators, when zeros are excluded.
+S2Fig <- make.mut.density.RNA.protein.expression.figure(
+    nozero.hypermut.density.Caglar, muts.for.plot="dN", method = "spearman",
+    titlestring = "Nonsynonymous mutations; zero-mutation genes excluded")
+ggsave("../results/thermostability/figures/S2Fig.pdf",
+       S2Fig, height = 5, width = 9)
 
 ## and examine synonymous mutations in hypermutators, when zeros are excluded.
 S3Fig <- make.mut.density.RNA.protein.expression.figure(
@@ -481,7 +481,6 @@ S4Fig <- make.mut.density.RNA.protein.expression.figure(
     titlestring = "All mutation types; observed mutations in nonmutator populations")
 ggsave("../results/thermostability/figures/S4Fig.pdf",
        S4Fig, height = 5, width = 9)
-
 
 #################################
 ## Favate et al. (2021) analysis of ancestral clones and 11 evolved 50K LTEE clones.
@@ -719,7 +718,6 @@ hypermut.proteome.vis.comp.df <- hypermut.mutation.densities %>%
     left_join(proteome.vis.df) %>%
     ## CRITICAL STEP: replace PPI_degree NAs with zeros.
     replace_na(list(PPI_degree = 0))
-
 
 ## no correlation with contact density in nonmutators.
 cor.test(nonmut.proteome.vis.comp.df$contact_density,
@@ -1021,308 +1019,3 @@ FigS10 <- make.mut.density.PPI.degree.figure(
     nonmut.proteome.vis.comp.df)
 ggsave("../results/thermostability/figures/FigS10.pdf",
        FigS10, width=6, height=2)
-
-############################################################################
-## E. COLI MELTOME ATLAS DATA ANALYSIS
-
-categorize.by.meltPoint <- function(meltome) {
-    ## Categories of thermal stability from the Meltome Atlas paper:
-    ## "For the purpose of the subsequent analysis,
-    ## we defined four categories of thermal stability.
-    ## We distinguish proteins with low Tm (AUC<0.35),
-    ## medium Tm (AUC 0.35–0.65), high Tm (AUC>0.65),
-    ## and nonmelters (no Tm)."
-
-    meltPoint.quantile.to.category <- function(quantile.num) {
-        if (quantile.num == 1) {
-            return("low")
-        } else if (quantile.num == 2) {
-            return("medium")
-        } else if (quantile.num == 3) {
-            return("high")
-        } else {
-            return("NA")
-        }
-    }
-    
-    ## I sort and then divide the data with measured meltPoints
-    ## into thirds to get the low Tm, medium Tm, and high Tm categories.
-    data.with.meltPoint <- meltome %>%
-        filter(!is.na(meltPoint)) %>%
-        arrange(meltPoint) %>%
-        mutate(meltPoint.quantile = ntile(meltPoint,3)) %>%
-        mutate(Tm.category = sapply(meltPoint.quantile,
-                                    meltPoint.quantile.to.category)) %>%
-        select(-meltPoint.quantile)
-
-    ## merge back into the original data including nonmelters,
-    ## and categorize the nonmelters.
-    meltome.with.Tm.category <- meltome %>%
-        left_join(data.with.meltPoint) %>%
-        mutate(Tm.category = ifelse(is.na(meltPoint), "nonmelter", Tm.category)) %>%
-        mutate(Tm.category = fct_relevel(Tm.category, c("low","medium","high","nonmelter")))
-    return(meltome.with.Tm.category)
-}
-
-## These data were written out by filter-meltome-atlas.R.
-## Run that script in order to generate '../results/thermostability/Ecoli-meltome.csv'.
-Ecoli.meltome <- read.csv("../results/thermostability/Ecoli-meltome.csv") %>%
-    rename(Gene = gene_name) %>%
-    select(run_name, Gene, meltPoint) %>%
-    distinct() %>%
-    left_join(REL606.genes) %>%
-    filter(!is.na(locus_tag)) %>%
-    ## bin genes into low Tm, medium Tm, high Tm, and nonmelters.
-    categorize.by.meltPoint()
-
-## to check correctness, plot the distribution of meltPoints in each Tm category.
-## This should be a supplementary figure, if this strategies is used for other plots.
-S11Fig <- ggplot(Ecoli.meltome,
-                               aes(x = meltPoint, fill = Tm.category)) +
-    xlab("Melting point") + ylab("Count") +
-    geom_histogram(bins=100) + theme_classic() + guides(fill = FALSE)
-ggsave("../results/thermostability/figures/S12Fig.pdf",
-       S11Fig, height=3, width = 3)
-
-## examine the nonmelter proteins.
-nonmelters <- Ecoli.meltome %>% filter(is.na(meltPoint)) %>%
-    select(-run_name) %>% distinct() %>%
-    ungroup()
-## examine the melter proteins.
-melters <- Ecoli.meltome %>% filter(!is.na(meltPoint)) %>%
-    select(-run_name) %>% distinct() %>%
-    ungroup()
-
-
-## do a STRING analysis of the nonmelters.
-## print out to file.
-write.csv(nonmelters,file="../results/thermostability/nonmelters.csv")
-## STRING shows that oxidative phosphorylation, and ribosome are
-## enriched KEGG pathways for non-melters.
-
-## examine nonmutators and hypermutators separately, as usual.
-nonmut.density.meltome <- Ecoli.meltome %>%
-    left_join(nonmut.mutation.densities)
-
-hypermut.density.meltome <- Ecoli.meltome %>%
-    left_join(hypermut.mutation.densities)
-
-## weak positive correlation between melting point and mutation density.
-cor.test(hypermut.density.meltome$meltPoint,
-         hypermut.density.meltome$all.mut.density,
-         method = "spearman")
-
-## weak negative correlation in nonmutators.
-cor.test(nonmut.density.meltome$meltPoint,
-         nonmut.density.meltome$all.mut.density,
-         method = "spearman")
-
-## plot for the positive correlation between Tm and mutation density in hypermutators.
-S12Fig <- ggplot(hypermut.density.meltome,
-                                aes(x = all.mut.density,
-                                    y = Tm.category)) +
-    stat_density_ridges(quantile_lines = TRUE, color = "white", fill = "dark gray") +
-    theme_classic() +
-    xlab("Mutation density") +
-    ylab(bquote(T[m]~" category"))
-ggsave("../results/thermostability/figures/S12Fig.pdf",
-       S12Fig, height = 2, width = 4)
-
-
-## on average, nonmelters have a higher mutation density in the hypermutators.
-## there is no such pattern in the nonmutators.
-h1 <- filter(hypermut.density.meltome, Tm.category == "nonmelter")$all.mut.density
-h2 <- filter(hypermut.density.meltome, Tm.category != "nonmelter")$all.mut.density
-mean(h1)
-mean(h2)
-## This is statistically significant.
-wilcox.test(h1,h2)
-
-
-
-## exclude non-melters for now.
-correlate.meltPoint.with.timepoint <- function(meltPoint.Caglar) {
-    for (t in sort(unique(meltPoint.Caglar$growthTime_hr))) {
-        my.data <- meltPoint.Caglar %>%
-            filter(growthTime_hr == t)
-        
-        mRNA.result <- cor.test(my.data$mRNA.mean, my.data$meltPoint,
-                                method = "spearman")
-        Protein.result <- cor.test(my.data$Protein.mean, my.data$meltPoint,
-                                   method = "spearman")
-        print(paste("TIME:",t,'hrs'))
-        print("mRNA abundance correlation with meltPoint:")
-        print(mRNA.result)
-        print("Protein abundance correlation with meltPoint:")
-        print(Protein.result)
-    }
-}
-
-## Now compare mRNA and protein abundance at each timepoint to
-## Tm.
-meltome.with.abundance <- Ecoli.meltome %>%
-    left_join(Caglar.summary)
-## IMPORTANT RESULT: melting temperature, excluding non-melters,
-## is negatively correlated with protein and RNA abundance,
-## especially during growth phase, but also during starvation.
-correlate.meltPoint.with.timepoint(meltome.with.abundance)
-
-
-plot.meltPoint.mRNA.anticorrelation <- function(my.data) {
-    ## This is a helper function to plot an mRNA panel for the full figure.
-    my.t <- unique(my.data$growthTime_hr)
-    time.title <- paste0(as.character(my.t), "h")
-
-    ## if the correlation is significant, AND if nonmelters' abundance
-    ## is less than melters, then the fill is lightskyblue.
-    mRNA.result <- cor.test(my.data$mRNA.mean, my.data$meltPoint, method = "spearman")
-
-    median1 <- median(filter(my.data, Tm.category == "nonmelter")$mRNA.mean)
-    median2 <- median(filter(my.data, Tm.category == "high")$mRNA.mean)
-    
-    ## factor of (1/9) is a Bonferroni-correction for multiple tests.
-    my.fill <- ifelse((mRNA.result$p.value < 0.05*(1/9)) && (median1 < median2),
-                      "lightskyblue", "light gray")
-
-    my.r <- signif(mRNA.result$estimate,digits=3)
-    my.p.value <- signif(mRNA.result$p.value,digits=3)
-
-    lbl.rval <- paste("rho", "=", my.r)
-    lbl.p.value <- paste("p", "=", my.p.value)
-
-    lbl.xpos <- 11
-    rlbl.ypos <- 0.75
-    plbl.ypos <- 5.2
-    
-    
-    mRNA.plot <- my.data %>%
-        ggplot(aes(x = mRNA.mean, y = Tm.category)) +
-        stat_density_ridges(quantile_lines = TRUE, fill = my.fill) +
-        theme_classic() +
-        coord_cartesian(xlim = c(0, 15)) +
-        ggtitle(time.title)
-
-    if (my.fill == "lightskyblue") {
-        mRNA.plot <- mRNA.plot +
-            ## annotate correlation on the figure.
-            annotate("text", x = lbl.xpos, y = rlbl.ypos, size=3,
-                     label = lbl.rval, fontface = 'bold.italic') +
-            ## annotate p-value on the figure.
-            annotate("text", x = lbl.xpos, y = plbl.ypos, size=3,
-                     label = lbl.p.value, fontface = 'bold.italic')
-    }
-
-    ## use some conditional statements to label x-axis for the
-    ## bottom center panel (168 hr) and to label y-axis for the
-    ## left center panel (6 hr).
-    my.xlabel <- ifelse(my.t == 168, "mRNA","")
-    ## have to use the full if else statement when using bquote
-    ## because ifelse() is a vectorized construct than can't take
-    ## language objects.
-    if(my.t == 6) {
-        my.ylabel <- bquote(T[m]~" category")
-    } else {
-        my.ylabel <- ""
-    }
-    
-    mRNA.plot <- mRNA.plot +
-        xlab(my.xlabel) +
-        ylab(my.ylabel)
-    
-    ## use more conditional statements to only label y-axis categories
-    ## for plots on the left-hand side of the big figure.
-    do.not.label.yaxis <- TRUE ##ifelse(!(my.t %in% c(3,6,48)),TRUE,FALSE)
-    if (do.not.label.yaxis) {
-        mRNA.plot <- mRNA.plot + theme(axis.text.y = element_blank())
-    }
-    
-    return(mRNA.plot)
-}
-
-plot.meltPoint.protein.anticorrelation <- function(my.data) {
-    ## This is a helper function to plot a protein panel for the full figure.
-    my.t <- unique(my.data$growthTime_hr)
-    time.title <- paste0(as.character(my.t), "h")
-
-    ## if the correlation is significant, AND if nonmelters' abundance
-    ## is significantly different from melters, then the fill is moccasin.
-    Protein.result <- cor.test(my.data$Protein.mean, my.data$meltPoint,
-                               method = "spearman")
-
-    median1 <- median(filter(my.data, Tm.category == "nonmelter")$mRNA.mean)
-    median2 <- median(filter(my.data, Tm.category == "high")$mRNA.mean)
-    
-    ## factor of (1/9) is a Bonferroni-correction for multiple tests.
-    my.fill <- ifelse((Protein.result$p.value < 0.05*(1/9)) && (median1 < median2),
-                      "moccasin", "light gray")
-
-    my.r <- signif(Protein.result$estimate,digits=3)
-    my.p.value <- signif(Protein.result$p.value,digits=3)
-
-    lbl.rval <- paste("rho", "=", my.r)
-    lbl.p.value <- paste("p", "=", my.p.value)
-
-    lbl.xpos <- 7.4
-    rlbl.ypos <- 0.75
-    plbl.ypos <- 5.4
-
-
-    Protein.plot <- my.data %>%
-        ggplot(aes(x = Protein.mean, y = Tm.category)) +
-        stat_density_ridges(quantile_lines = TRUE, fill = my.fill) +
-        theme_classic() +
-        coord_cartesian(xlim = c(0, 10)) +
-        scale_x_continuous(breaks=c(0,5,10)) +
-        ggtitle(time.title) +
-        ylab("") ## no need for ylabel since the mRNA subfigure will be on the left.
-
-    if (my.fill == "moccasin") {
-        Protein.plot <- Protein.plot +
-            ## annotate correlation on the figure.
-            annotate("text", x = lbl.xpos, y = rlbl.ypos, size=3,
-                     label = lbl.rval, fontface = 'bold.italic') +
-            ## annotate p-value on the figure.
-            annotate("text", x = lbl.xpos, y = plbl.ypos, size=3,
-                     label = lbl.p.value, fontface = 'bold.italic')
-    }
-    
-    ## use a conditional statement to label x-axis for the
-    ## bottom center panel (168 hr).
-    my.xlabel <- ifelse(my.t == 168, "Protein","")
-    Protein.plot <- Protein.plot + xlab(my.xlabel)
-    ## y-axis categories are labeled on the left-hand side of the big figure.
-    Protein.plot <- Protein.plot + theme(axis.text.y = element_blank())
-    
-    return(Protein.plot)
-}
-
-make.meltPoint.RNA.protein.expression.figure <- function(meltPoint.Caglar) {
-    ## makes a figure that combines all panels.
-    ## generate a list of smaller panels, then pass
-    ## to cowplot::plot_grid using do.call().
-    
-    mRNA.panels <- meltPoint.Caglar %>%
-        split(.$growthTime_hr) %>%
-        map(.f = plot.meltPoint.mRNA.anticorrelation)
-    
-    protein.panels <- meltPoint.Caglar %>%
-        split(.$growthTime_hr) %>%
-        map(.f = plot.meltPoint.protein.anticorrelation)
-
-    ## fill in some parameters for plot_grid using partial function application,
-    ## and save the specialized versions.
-    plot_subfigure <- partial(.f = plot_grid, nrow = 3)
-    ## use do.call to unroll the panels as arguments for plot_grid.
-
-    ## make two 3x3 subfigures for the mRNA and protein correlations.
-    mRNA.plots <- do.call(plot_subfigure, mRNA.panels)
-    protein.plots <- do.call(plot_subfigure, protein.panels)
-
-    big.fig <- plot_grid(mRNA.plots, protein.plots)
-    return(big.fig)
-}
-
-## Meltome analysis figure.
-Fig6 <- make.meltPoint.RNA.protein.expression.figure(meltome.with.abundance)
-ggsave("../results/thermostability/figures/Fig6.pdf",
-       Fig6, height = 8, width = 11)
