@@ -714,7 +714,6 @@ cor.test(cong.resilience.with.fitness.df$mean.resilience,
 ## LTEE.genomes.KO.metadata
 
 
-
 ## Get essential and near-essential genes reported in
 ## Supplementary Table 1 of Couce et al. 2017.
 ## I manually fixed the names of a couple genes in this dataset.
@@ -738,7 +737,7 @@ nonessential.50K.A.clone.KO.data <- LTEE.50K.A.clone.KO.data %>%
 
 essential.length <- sum(essential.genes$gene_length) ## 499180 bp
 nonessential.length <- sum(nonessential.genes$gene_length) ## 3462963 bp.
-essential.target.prob <- essential.gene.length/(essential.length + nonessential.length)
+essential.target.prob <- essential.length/(essential.length + nonessential.length)
 
 ## 1) essential genes are rarely disrupted in the 50K genomes (p = 1.27e-16).
 essential.binom.test <- binom.test(x = nrow(essential.50K.A.clone.KO.data),
@@ -820,8 +819,15 @@ cong.essentiality.plot <- ggplot(essentiality.cong.degree.df,
                                    aes(x = isEssential, y = Degree)) +
     geom_boxplot() + theme_classic()
 
-
 ## IMPORTANT TODO:
+
+## 3) calculate how resilience changes for all single gene
+## knockouts in the REL606 genome. make a histogram of resilience
+## for the genes, and color essential genes in red, and do a wilcox
+## test on a difference between the two distributions.
+
+
+## IMPORTANT TODO examine resilience in the MAE genomes:
 
 ## 3) calculate how resilience changes for all single gene
 ## knockouts in the REL606 genome. make a histogram of resilience

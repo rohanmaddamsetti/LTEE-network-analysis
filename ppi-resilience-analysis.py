@@ -295,6 +295,54 @@ def GraphResilience(G):
     return resilience
 
 
+def single_KO_resilience_df(G, g_to_node, KO_list, reps=100):
+    '''
+    Input:
+    a starting graph G representing nodes and edges in the LTEE ancestor REL606, 
+    a dictionary of genes to nodes,
+    a list of genes to knockout (this will be all genes in REL606).
+
+    For every node in the graph:
+        generate a subgraph without that node.
+        calculate network resilience for the subgraph.
+    return a DataFrame with of the 'strain' with the gene knocked out, and the resilience
+    statistic of the subgraph without that node.
+   
+    If the gene does not encode a node in the graph, give it the REL606 resilience value.
+ 
+    '''
+    REL606_resilience = sum((GraphResilience(G) for x in range(reps)))/float(reps)
+
+    clone_col = []
+    resilience = []
+
+    for gene in KO_list:
+        clone = gene + "_knockout"
+        clone_col.append(clone) ## to ensure that clone and resilience values match up.
+        my_resilience = REL606_resilience ## default value, if the gene is not in the graph.
+        if gene in g_to_node:
+            knocked_out_node = g_to_node[gene]
+            ''' now filter the node from the REL606 graph. '''
+            ## make a subgraph G2 that omits the KO'ed node.
+            NIdV = snap.TIntV()
+            for n in G.Nodes():
+                NId = n.GetId()
+                if NId == knocked_out_node:
+                    continue ## skip the KO'ed node.
+                NIdV.Add(NId)
+            G2 = snap.GetSubGraph(G, NIdV)
+            ## calculate this clone's resilience. default is 100 replicates.
+            ## save memory by using a generator comprehension.
+            my_resilience = sum((GraphResilience(G2) for x in range(reps)))/float(reps)
+        print(my_resilience)
+        resilience.append(my_resilience)
+        
+    strain_col = ['REL606'] + clone_col
+    resilience_col = [REL606_resilience] + resilience
+    resilience_results = pd.DataFrame.from_dict({'strain': strain_col, 'resilience': resilience_col})
+    return resilience_results
+
+
 def resilience_df(LTEE_strain_to_KO_dict, G, g_to_node, KO_list=None, reps=100):
     '''
     Input:
@@ -442,8 +490,19 @@ def main():
             outf = outf_path(outdir, "Cong_PPI_across_pops_randomized_resilience", taskID)
         results = resilience_df(LTEE_strain_to_knockouts, G, g_to_node,
                                 KO_list=all_LTEE_KO_genes)
+    elif args.analysis == 5:
+        ''' calculate the resilience of all single gene knockouts in REL606.
+        for simplicity, I just have to calculate the single gene knockouts for the genes
+        in the PPI datasets; the remaining genes will be equal to the REL606 resilience value.        
+        '''
+        if args.dataset == "zitnik":
+            outf = outf_path(outdir, "Zitnik_PPI_single_KO_resilience", taskID)
+        else:
+            outf = outf_path(outdir, "Cong_PPI_single_KO_resilience", taskID)
+        results = single_KO_resilience_df(G, g_to_node, list(REL606_genes))
+
     else:
-        raise AssertionError("analysis parameter ranges from 1-4.")
+        raise AssertionError("analysis parameter ranges from 1-5.")
     ## write results to file.
     results.to_csv(outf)
 
