@@ -689,3 +689,141 @@ cor.test(zitnik.resilience.with.fitness.df$mean.resilience,
 
 cor.test(cong.resilience.with.fitness.df$mean.resilience,
          cong.resilience.with.fitness.df$mean.Fitness)
+
+#########################################################################################
+
+## Analysis of essential genes and PPI network resilience.
+
+## 1) take essential genes in REL606 from Couce paper,
+## and count the number of knockout mutations in those genes
+## in the 50K clone A genomes. do a one-sided binomial test
+## for purifying selection.
+
+## 2) compare the PPI degree for essential genes,
+## compared to the remainder of the genes in the genome.
+
+## 3) calculate how resilience changes for all single gene
+## knockouts in the REL606 genome. make a histogram of resilience
+## for the genes, and color essential genes in red, and do a wilcox
+## test on a difference between the two distributions.
+
+#########################################################################################
+
+## data structures for KO mutations in the LTEE genomes.
+## LTEE.genomes.KO.muts
+## LTEE.genomes.KO.metadata
+
+
+
+## Get essential and near-essential genes reported in
+## Supplementary Table 1 of Couce et al. 2017.
+## I manually fixed the names of a couple genes in this dataset.
+## The original names are in the "Name" column, and updated names
+## are in the "Gene" column.
+essential.genes <- read.csv("../data/Couce2017-LTEE-essential.csv") %>%
+    inner_join(REL606.genes) %>% filter(!(is.na(locus_tag)))
+
+nonessential.genes <- REL606.genes %>%
+    filter(!(Gene %in% essential.genes$Gene))
+
+essential.gene.regex <- reduce(essential.genes$Gene, .f = partial(paste, sep = '|'))
+
+## 44 KO mutations affected essential genes in 50K clone A genomes.
+essential.50K.A.clone.KO.data <- LTEE.50K.A.clone.KO.data %>%
+    filter(str_detect(gene_list, essential.gene.regex))
+
+## 897 KO mutations did not affect any essential genes in  50K clone A genomes.
+nonessential.50K.A.clone.KO.data <- LTEE.50K.A.clone.KO.data %>%
+    filter(!str_detect(gene_list, essential.gene.regex))
+
+essential.length <- sum(essential.genes$gene_length) ## 499180 bp
+nonessential.length <- sum(nonessential.genes$gene_length) ## 3462963 bp.
+essential.target.prob <- essential.gene.length/(essential.length + nonessential.length)
+
+## 1) essential genes are rarely disrupted in the 50K genomes (p = 1.27e-16).
+essential.binom.test <- binom.test(x = nrow(essential.50K.A.clone.KO.data),
+                                   n = nrow(essential.50K.A.clone.KO.data) +
+                                       nrow(nonessential.50K.A.clone.KO.data),
+                                   p = essential.target.prob,
+                                   alternative="less")
+
+## Nevertheless, a significant proportion of genes under positive selection
+## in the LTEE are essential genes, as reported in Maddamsetti et al. (2017).
+
+## get mutation parallelism in the LTEE genomes published in Tenaillon et al. (2016).
+## for comparison to essential genes.
+nonmut.genomics <- read.csv('../data/tenaillon2016-nonmutator-parallelism.csv') %>%
+    ## make sure these genes pass the filters on REL606.genes.
+    filter(Gene.name %in% REL606.genes$Gene) %>%
+    mutate(isEssential = Gene.name %in% essential.genes$Gene)
+
+hypermut.genomics <- read.csv('../data/tenaillon2016-mutator-parallelism.csv') %>%
+    ## make sure these genes pass the filters on REL606.genes.
+    filter(Gene.name %in% REL606.genes$Gene) %>%
+    mutate(isEssential = Gene.name %in% essential.genes$Gene)
+
+top.nonmut.genomics <- slice_max(nonmut.genomics, n = 50, order_by = G.score)
+top.hypermut.genomics <- slice_max(hypermut.genomics, n = 50, order_by = G.score)
+
+## 21 out of 50 top non-mut genes are essential.
+nonmut.top.hit.essential <- essential.genes %>%
+    filter(Gene %in% top.nonmut.genomics$Gene.name)
+## what about the hypermutators? 3 out of 50 top hypermut genes.
+hypermut.top.hit.essential <- essential.genes %>%
+    filter(Gene %in% top.hypermut.genomics$Gene.name)
+
+## what about the bottom 50 genes?
+bottom.nonmut.genomics <- slice_min(nonmut.genomics, n = 50, order_by = G.score)
+bottom.hypermut.genomics <- slice_min(hypermut.genomics, n = 50, order_by = G.score)
+
+nonmut.bottom.hit.essential <- essential.genes %>%
+    filter(Gene %in% bottom.nonmut.genomics$Gene.name)
+## what about the hypermutators? 3 out of 50 top hypermut genes.
+hypermut.bottom.hit.essential <- essential.genes %>%
+    filter(Gene %in% bottom.hypermut.genomics$Gene.name)
+
+hypermut.negative.G <- hypermut.genomics %>% filter(G.score < 0)
+
+
+## TODO: make a plot or report the G-score distribution for essential genes?
+## interesting possibility-- look at genes with negative G scores in the
+## hypermutators.
+
+nonmut.G.essentiality.plot <- ggplot(nonmut.genomics,
+                                     aes(x = isEssential,
+                                         y = G.score)) +
+    geom_violin() + theme_classic()
+
+hypermut.G.essentiality.plot <- ggplot(hypermut.genomics,
+                                     aes(x = isEssential,
+                                         y = G.score)) +
+    geom_violin() + theme_classic()
+
+hypermut.negativeG.essentiality.plot <- ggplot(hypermut.negative.G,
+                                     aes(x = isEssential,
+                                         y = G.score)) +
+    geom_boxplot() + theme_classic()
+
+
+## 2) compare the PPI degree for essential genes,
+## compared to the remainder of the genes in the genome.
+essentiality.zitnik.degree.df <- zitnik.degree.df %>%
+    mutate(isEssential = Gene %in% essential.genes$Gene)
+essentiality.cong.degree.df <- cong.degree.df %>%
+    mutate(isEssential = Gene %in% essential.genes$Gene)
+
+zitnik.essentiality.plot <- ggplot(essentiality.zitnik.degree.df,
+                                   aes(x = isEssential, y = Degree)) +
+    geom_boxplot() + theme_classic()
+
+cong.essentiality.plot <- ggplot(essentiality.cong.degree.df,
+                                   aes(x = isEssential, y = Degree)) +
+    geom_boxplot() + theme_classic()
+
+
+## IMPORTANT TODO:
+
+## 3) calculate how resilience changes for all single gene
+## knockouts in the REL606 genome. make a histogram of resilience
+## for the genes, and color essential genes in red, and do a wilcox
+## test on a difference between the two distributions.
