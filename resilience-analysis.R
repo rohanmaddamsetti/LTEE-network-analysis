@@ -819,17 +819,124 @@ cong.essentiality.plot <- ggplot(essentiality.cong.degree.df,
                                    aes(x = isEssential, y = Degree)) +
     geom_boxplot() + theme_classic()
 
-## IMPORTANT TODO:
 
 ## 3) calculate how resilience changes for all single gene
 ## knockouts in the REL606 genome. make a histogram of resilience
 ## for the genes, and color essential genes in red, and do a wilcox
 ## test on a difference between the two distributions.
 
+cong.single.KO.resilience.df <- read.csv("../results/resilience/resilience-analysis-runs/Cong_PPI_single_KO_resilience_Rep999.csv") %>%
+    filter(strain != 'REL606') %>%
+    mutate(Gene = str_split_fixed(strain, "_", n = 2)[,1]) %>%
+    mutate(isEssential = Gene %in% essential.genes$Gene)
 
-## IMPORTANT TODO examine resilience in the MAE genomes:
+cong.single.KO.essentiality.plot <- ggplot(cong.single.KO.resilience.df,
+                                           aes(x = isEssential, y = resilience)) +
+    theme_classic() +
+    geom_violin(color = 'red') +
+    geom_jitter(alpha = 0.2)
 
-## 3) calculate how resilience changes for all single gene
-## knockouts in the REL606 genome. make a histogram of resilience
-## for the genes, and color essential genes in red, and do a wilcox
-## test on a difference between the two distributions.
+mean(filter(cong.single.KO.resilience.df, isEssential == TRUE)$resilience)
+mean(filter(cong.single.KO.resilience.df, isEssential == FALSE)$resilience)
+wilcox.test(x = filter(cong.single.KO.resilience.df, isEssential == TRUE)$resilience,
+            y = filter(cong.single.KO.resilience.df, isEssential == FALSE)$resilience)
+## This result is very strong, and unexpected:
+## single-gene knockouts are much more likely to INCREASE network resilience than
+## decrease network resilience. In addition, a single knockout of an essential genes
+## has on average a stronger positive effect on network resilience than knocking out
+## a non-essential gene, at least in the Cong dataset.
+
+## IMPORTANT TODO: repeat this analysis for the Zitnik dataset.
+
+zitnik.single.KO.resilience.df <- read.csv("../results/resilience/resilience-analysis-runs/Zitnik_PPI_single_KO_resilience_Rep999.csv") %>%
+    filter(strain != 'REL606') %>%
+    mutate(Gene = str_split_fixed(strain, "_", n = 2)[,1]) %>%
+    mutate(isEssential = Gene %in% essential.genes$Gene)
+
+zitnik.single.KO.essentiality.plot <- ggplot(zitnik.single.KO.resilience.df,
+                                             aes(x = isEssential, y = resilience)) +
+    theme_classic() +
+    geom_violin(color = 'red') +
+    geom_jitter(alpha = 0.2)
+
+mean(filter(zitnik.single.KO.resilience.df, isEssential == TRUE)$resilience)
+mean(filter(zitnik.single.KO.resilience.df, isEssential == FALSE)$resilience)
+wilcox.test(x = filter(zitnik.single.KO.resilience.df, isEssential == TRUE)$resilience,
+            y = filter(zitnik.single.KO.resilience.df, isEssential == FALSE)$resilience)
+
+##################################################
+## IMPORTANT TODO: repeat this analysis, on the 50K clone A genomes.
+## do we see the same trend, or is it reversed (i.e. essential genes tend to reduce
+## resilience when removed).
+##################################################
+
+
+## examine resilience in the MAE genomes.
+## not enough evidence to make any definite conclusions in comparison to the LTEE.
+## might need a 60,000 generation MAE experiment to do so!
+
+cong.MAE.resilience.df <- read.csv("../results/resilience/resilience-analysis-runs/Cong_PPI_MAE_resilience_Rep999.csv") %>%
+    filter(strain != "REL606") %>%
+    mutate(log.resilience=log(resilience)) %>%
+    ## annotate the MAE genomes.
+    mutate(time = 13750) %>%
+    mutate(Generation=time/10000) %>%
+    mutate(Treatment = "actual data") %>%
+    mutate(mutator_status = "non-mutator") %>%
+    mutate(dataset = "Cong") %>%
+    mutate(run_type = "MAE_genome_resilience") %>%
+    mutate(population = "MAE")
+
+cong.LTEE.10to20K.resilience.df <- big.cong.resilience.df %>%
+    filter(run_type == "LTEE_genome_resilience") %>%
+    filter(Generation >= 1) %>%
+    filter(Generation <= 2)
+
+cong.LTEE.to.MAE.comparison.df <- cong.MAE.resilience.df %>%
+    full_join(cong.LTEE.10to20K.resilience.df)
+
+## make the comparison plot.
+cong.MAE.LTEE.comp.plot <- ggplot(cong.LTEE.to.MAE.comparison.df,
+                                  aes(x = Generation,
+                                      y = resilience,
+                                      color = population,
+                                      shape = mutator_status)) +
+    theme_classic() +
+    ylab("PPI network resilience") +
+    xlab("Time (x 10,000 generations)") +
+    geom_jitter(size = 0.5)
+
+
+zitnik.MAE.resilience.df <- read.csv("../results/resilience/resilience-analysis-runs/Zitnik_PPI_MAE_resilience_Rep999.csv") %>%
+    filter(strain != "REL606") %>%
+    mutate(log.resilience=log(resilience)) %>%
+    ## annotate the MAE genomes.
+    mutate(time = 13750) %>%
+    mutate(Generation=time/10000) %>%
+    mutate(Treatment = "actual data") %>%
+    mutate(mutator_status = "non-mutator") %>%
+    mutate(dataset = "Zitnik") %>%
+    mutate(run_type = "MAE_genome_resilience") %>%
+    mutate(population = "MAE")
+
+
+zitnik.LTEE.10to20K.resilience.df <- big.zitnik.resilience.df %>%
+    filter(run_type == "LTEE_genome_resilience") %>%
+    filter(Generation >= 1) %>%
+    filter(Generation <= 2)
+
+zitnik.LTEE.to.MAE.comparison.df <- zitnik.MAE.resilience.df %>%
+    full_join(zitnik.LTEE.10to20K.resilience.df)
+
+
+## make the comparison plot.
+zitnik.MAE.LTEE.comp.plot <- ggplot(zitnik.LTEE.to.MAE.comparison.df,
+                                  aes(x = Generation,
+                                      y = resilience,
+                                      color = population,
+                                      shape = mutator_status)) +
+    theme_classic() +
+    ylab("PPI network resilience") +
+    xlab("Time (x 10,000 generations)") +
+    geom_jitter(size = 0.5)
+

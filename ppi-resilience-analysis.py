@@ -32,7 +32,7 @@ import os
 try:
     taskID = os.environ['SLURM_ARRAY_TASK_ID']
 except:
-    taskID = '999'
+    taskID = "999"
 
 import snap
 from math import log
@@ -54,7 +54,7 @@ def outf_path(outdir, outf_name, taskID):
 def get_REL606_column_set(col):
     REL606_ID_file = "../results/REL606_IDs.csv"
     column_set = set()
-    with open(REL606_ID_file, "r") as REL606_fh:
+    with open(REL606_ID_file, 'r') as REL606_fh:
         for i,l in enumerate(REL606_fh):
             if i == 0: continue
             ldata = l.split(',')
@@ -70,7 +70,7 @@ def get_REL606_gene_set():
 def get_REL606_column_dict(key_col,val_col):
     REL606_ID_file = "../results/REL606_IDs.csv"
     col_dict = {}
-    with open(REL606_ID_file, "r") as REL606_fh:
+    with open(REL606_ID_file, 'r') as REL606_fh:
         for i,l in enumerate(REL606_fh):
             if i == 0: continue
             ldata = l.split(',')
@@ -80,6 +80,34 @@ def get_REL606_column_dict(key_col,val_col):
 
 def get_REL606_blattner_to_gene_dict():
     return get_REL606_column_dict(2,0)
+
+
+def get_MAE_genome_knockout_muts(no_deletions=False):
+    ''' this function imports MAE knockout mutation data.
+    MAE genomes were downloaded from:
+    github.com/barricklab/LTEE-Ecoli/MAE-clone-curated.
+    These were then annotated with gdtools-annotate-MAE-genomes.sh,
+    and joined and filtered using make-MAE-KO-mutation-table.R.
+    '''
+    MAE_knockout_muts = pd.read_csv("../results/resilience/annotated-MAE-clone-curated/all-MAE-KO-mutations.csv")
+    if no_deletions:
+        ## then filter out large deletions.
+        LTEE_knockout_muts = LTEE_knockout_muts[~LTEE_knockout_muts['mutation_category'].str.contains("large_deletion")]
+    return MAE_knockout_muts
+
+def MAE_strain_to_KO_genes(MAE_knockout_muts):
+    ''' return a dict of MAE strain to set of knocked out genes in that strain. '''
+    MAE_strain_KO_dict = {}
+    MAE_metadata = MAE_knockout_muts[['strain']].drop_duplicates()
+    MAE_strains = list(MAE_metadata['strain'])
+    for clone in MAE_strains:
+        clone_knockout_muts = MAE_knockout_muts[MAE_knockout_muts['strain']==clone]
+        ## split genes_inactivated into a list of entries (which are lists)
+        KO_list_of_lists = [x.split(',') for x in clone_knockout_muts['genes_inactivated']]
+        ## and then flatten the list of lists into a set of knocked out genes.
+        knocked_out_genes = {item for sublist in KO_list_of_lists for item in sublist}
+        MAE_strain_KO_dict[clone] = knocked_out_genes
+    return MAE_strain_KO_dict
 
 
 def get_LTEE_genome_knockout_muts(no_deletions=False):
@@ -433,7 +461,9 @@ def main():
     LTEE_pop_to_knockouts = make_LTEE_pop_to_KO_dict(LTEE_strain_to_knockouts, LTEE_strain_to_pop)
     LTEE_genomes_KO_gene_list = [KO for KOset in LTEE_pop_to_knockouts.values() for KO in KOset]    
     all_LTEE_KO_genes = list(set(LTEE_genomes_KO_gene_list))
-        
+
+    MAE_knockouts_df = get_MAE_genome_knockout_muts(args.noDeletions)
+    MAE_strain_to_knockouts = MAE_strain_to_KO_genes(MAE_knockouts_df)
     
     if args.dataset == "zitnik":
         ''' Import protein-protein interaction network from 
@@ -455,14 +485,14 @@ def main():
         G, g_to_node, node_to_g = create_graph_and_dicts(good_edge_f,
                                                          nodeSet=REL606_genes)
     if args.analysis == 1: 
-        ## analyze the resilience of evolved LTEE genomes.
+        ''' analyze the resilience of evolved LTEE genomes.'''
         if args.dataset == "zitnik":
             outf = outf_path(outdir, "Zitnik_PPI_LTEE_genome_resilience", taskID)
         else:
             outf = outf_path(outdir, "Cong_PPI_LTEE_genome_resilience", taskID)
         results = resilience_df(LTEE_strain_to_knockouts, G, g_to_node)
     elif args.analysis == 2:
-        ## calculate randomized resilience of genomes, set of all genes in REL606.
+        ''' calculate randomized resilience of genomes, set of all genes in REL606.'''
         if args.dataset == "zitnik":
             outf = outf_path(outdir, "Zitnik_PPI_all_genes_randomized_resilience", taskID)
         else:
@@ -472,7 +502,7 @@ def main():
     elif args.analysis == 3:
         ''' calculate randomized resilience of genomes,
         using the list of all genes KO'ed in the LTEE genomics data.
-        This preferential samples genes based on the number of times 
+        This preferentially samples genes based on the number of times 
         that KO mutations in that gene was observed across populations.
         '''
         if args.dataset == 'zitnik':
@@ -500,9 +530,16 @@ def main():
         else:
             outf = outf_path(outdir, "Cong_PPI_single_KO_resilience", taskID)
         results = single_KO_resilience_df(G, g_to_node, list(REL606_genes))
+    elif args.analysis == 6:
+        ''' calculate the resilience of the MAE genomes. '''
+        if args.dataset == "zitnik":
+            outf = outf_path(outdir, "Zitnik_PPI_MAE_resilience", taskID)
+        else:
+            outf = outf_path(outdir, "Cong_PPI_MAE_resilience", taskID)
+        results = resilience_df(MAE_strain_to_knockouts, G, g_to_node)
 
     else:
-        raise AssertionError("analysis parameter ranges from 1-5.")
+        raise AssertionError("analysis parameter ranges from 1-6.")
     ## write results to file.
     results.to_csv(outf)
 
