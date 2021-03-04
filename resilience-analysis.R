@@ -282,7 +282,7 @@ LTEE.genomes.KO.metadata <- LTEE.genomes.KO.muts %>%
     full_join(REL606.metadata) %>%
     mutate(Generation=time/10000) %>%
     ## This for changing the ordering of populations in plots.
-    mutate(population=factor(population,levels=c(nonmutator.pops,hypermutator.pops)))
+    mutate(population=factor(population,levels = LTEE.pop.vec))
 
 ## import metadata for genes in the REL606 genomes.
 REL606.genes <- read.csv("../results/REL606_IDs.csv")
@@ -871,6 +871,110 @@ wilcox.test(x = filter(zitnik.single.KO.resilience.df, isEssential == TRUE)$resi
 ##################################################
 
 
+cong.single.KO.Ara.plus1.df <- read.csv("../results/resilience/resilience-analysis-runs/Cong_PPI_single_KO_resilience_Ara+1_Rep999.csv") %>%
+    filter(strain != 'REL11392') %>%
+    mutate(Gene = str_split_fixed(strain, "_", n = 2)[,1]) %>%
+    mutate(isEssential = Gene %in% essential.genes$Gene) %>%
+    mutate(population = "Ara+1")
+
+cong.single.KO.Ara.plus2.df <- read.csv("../results/resilience/resilience-analysis-runs/Cong_PPI_single_KO_resilience_Ara+2_Rep999.csv") %>%
+    filter(strain != 'REL11342') %>%
+    mutate(Gene = str_split_fixed(strain, "_", n = 2)[,1]) %>%
+    mutate(isEssential = Gene %in% essential.genes$Gene) %>%
+    mutate(population = "Ara+2")
+
+cong.single.KO.Ara.plus3.df <- read.csv("../results/resilience/resilience-analysis-runs/Cong_PPI_single_KO_resilience_Ara+3_Rep999.csv") %>%
+    filter(strain != 'REL11345') %>%
+    mutate(Gene = str_split_fixed(strain, "_", n = 2)[,1]) %>%
+    mutate(isEssential = Gene %in% essential.genes$Gene) %>%
+    mutate(population = "Ara+3")
+
+cong.single.KO.Ara.plus4.df <- read.csv("../results/resilience/resilience-analysis-runs/Cong_PPI_single_KO_resilience_Ara+4_Rep999.csv") %>%
+    filter(strain != 'REL11348') %>%
+    mutate(Gene = str_split_fixed(strain, "_", n = 2)[,1]) %>%
+    mutate(isEssential = Gene %in% essential.genes$Gene) %>%
+    mutate(population = "Ara+4")
+
+cong.single.KO.Ara.plus5.df <- read.csv("../results/resilience/resilience-analysis-runs/Cong_PPI_single_KO_resilience_Ara+5_Rep999.csv") %>%
+    filter(strain != 'REL11367') %>%
+    mutate(Gene = str_split_fixed(strain, "_", n = 2)[,1]) %>%
+    mutate(isEssential = Gene %in% essential.genes$Gene) %>%
+    mutate(population = "Ara+5")
+
+cong.single.KO.Ara.plus6.df <- read.csv("../results/resilience/resilience-analysis-runs/Cong_PPI_single_KO_resilience_Ara+6_Rep999.csv") %>%
+    filter(strain != 'REL11370') %>%
+    mutate(Gene = str_split_fixed(strain, "_", n = 2)[,1]) %>%
+    mutate(isEssential = Gene %in% essential.genes$Gene) %>%
+    mutate(population = "Ara+6")
+
+
+cong.single.KO.Ara.minus1.df <- read.csv("../results/resilience/resilience-analysis-runs/Cong_PPI_single_KO_resilience_Ara-1_Rep999.csv") %>%
+    filter(strain != 'REL11330') %>%
+    mutate(Gene = str_split_fixed(strain, "_", n = 2)[,1]) %>%
+    mutate(isEssential = Gene %in% essential.genes$Gene) %>%
+    mutate(population = "Ara-1")
+
+cong.single.KO.Ara.minus2.df <- read.csv("../results/resilience/resilience-analysis-runs/Cong_PPI_single_KO_resilience_Ara-2_Rep999.csv") %>%
+    filter(strain != 'REL11333') %>%
+    mutate(Gene = str_split_fixed(strain, "_", n = 2)[,1]) %>%
+    mutate(isEssential = Gene %in% essential.genes$Gene) %>%
+    mutate(population = "Ara-2")
+
+cong.single.KO.Ara.minus3.df <- read.csv("../results/resilience/resilience-analysis-runs/Cong_PPI_single_KO_resilience_Ara-3_Rep999.csv") %>%
+    filter(strain != 'REL11364') %>%
+    mutate(Gene = str_split_fixed(strain, "_", n = 2)[,1]) %>%
+    mutate(isEssential = Gene %in% essential.genes$Gene) %>%
+    mutate(population = "Ara-3")
+
+cong.single.KO.Ara.minus4.df <- read.csv("../results/resilience/resilience-analysis-runs/Cong_PPI_single_KO_resilience_Ara-4_Rep999.csv") %>%
+    filter(strain != 'REL11336') %>%
+    mutate(Gene = str_split_fixed(strain, "_", n = 2)[,1]) %>%
+    mutate(isEssential = Gene %in% essential.genes$Gene) %>%
+    mutate(population = "Ara-4")
+
+cong.single.KO.Ara.minus5.df <- read.csv("../results/resilience/resilience-analysis-runs/Cong_PPI_single_KO_resilience_Ara-5_Rep999.csv") %>%
+    filter(strain != 'REL11339') %>%
+    mutate(Gene = str_split_fixed(strain, "_", n = 2)[,1]) %>%
+    mutate(isEssential = Gene %in% essential.genes$Gene) %>%
+    mutate(population = "Ara-5")
+
+cong.single.KO.Ara.minus6.df <- read.csv("../results/resilience/resilience-analysis-runs/Cong_PPI_single_KO_resilience_Ara-6_Rep999.csv") %>%
+    filter(strain != 'REL11389 ') %>%
+    mutate(Gene = str_split_fixed(strain, "_", n = 2)[,1]) %>%
+    mutate(isEssential = Gene %in% essential.genes$Gene) %>%
+    mutate(population = "Ara-6")
+
+cong.singleKO.50K.df <- rbind(cong.single.KO.Ara.plus1.df,
+                              cong.single.KO.Ara.plus2.df,
+                              cong.single.KO.Ara.plus3.df,
+                              cong.single.KO.Ara.plus4.df,
+                              cong.single.KO.Ara.plus5.df,
+                              cong.single.KO.Ara.plus6.df,
+                              cong.single.KO.Ara.minus1.df,
+                              cong.single.KO.Ara.minus2.df,
+                              cong.single.KO.Ara.minus3.df,
+                              cong.single.KO.Ara.minus4.df,
+                              cong.single.KO.Ara.minus5.df,
+                              cong.single.KO.Ara.minus6.df) %>%
+    ## This for changing the ordering of populations in plots.
+    mutate(population=factor(population,levels = LTEE.pop.vec))
+
+
+
+cong.single.KO.50K.essentiality.plot <- ggplot(cong.singleKO.50K.df,
+                                           aes(x = isEssential, y = resilience)) +
+    theme_classic() +
+    geom_jitter(alpha = 0.2) +
+    geom_violin(color = 'red') +
+    facet_wrap(.~population)
+
+mean(filter(cong.single.KO.resilience.df, isEssential == TRUE)$resilience)
+mean(filter(cong.single.KO.resilience.df, isEssential == FALSE)$resilience)
+wilcox.test(x = filter(cong.single.KO.resilience.df, isEssential == TRUE)$resilience,
+            y = filter(cong.single.KO.resilience.df, isEssential == FALSE)$resilience)
+
+
+#########################################################################################
 ## examine resilience in the MAE genomes.
 ## not enough evidence to make any definite conclusions in comparison to the LTEE.
 ## might need a 60,000 generation MAE experiment to do so!
