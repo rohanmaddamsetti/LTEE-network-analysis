@@ -465,8 +465,6 @@ def main():
     LTEE_genomes_KO_gene_list = [KO for KOset in LTEE_pop_to_knockouts.values() for KO in KOset]    
     all_LTEE_KO_genes = list(set(LTEE_genomes_KO_gene_list))
 
-    MAE_knockouts_df = get_MAE_genome_knockout_muts(args.noDeletions)
-    MAE_strain_to_knockouts = MAE_strain_to_KO_genes(MAE_knockouts_df)
     
     if args.dataset == "zitnik":
         ''' Import protein-protein interaction network from 
@@ -575,6 +573,9 @@ def main():
 
     elif args.analysis == 7:
         ''' calculate the resilience of the MAE genomes. '''
+        MAE_knockouts_df = get_MAE_genome_knockout_muts(args.noDeletions)
+        MAE_strain_to_knockouts = MAE_strain_to_KO_genes(MAE_knockouts_df)
+    
         if args.dataset == "zitnik":
             outf = outf_path(outdir, "Zitnik_PPI_MAE_resilience", taskID)
         else:
