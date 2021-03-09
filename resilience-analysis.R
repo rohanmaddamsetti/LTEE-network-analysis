@@ -751,31 +751,35 @@ essential.binom.test <- binom.test(x = nrow(essential.50K.A.clone.KO.data),
 
 ## get mutation parallelism in the LTEE genomes published in Tenaillon et al. (2016).
 ## for comparison to essential genes.
+## order by positive G scores.
 nonmut.genomics <- read.csv('../data/tenaillon2016-nonmutator-parallelism.csv') %>%
     ## make sure these genes pass the filters on REL606.genes.
     filter(Gene.name %in% REL606.genes$Gene) %>%
-    mutate(isEssential = Gene.name %in% essential.genes$Gene)
+    mutate(isEssential = Gene.name %in% essential.genes$Gene) %>%
+    arrange(desc(G.score))
 
+## genes with negative G-scores are the most interesting--
+## could indicate purifying selection.
 hypermut.genomics <- read.csv('../data/tenaillon2016-mutator-parallelism.csv') %>%
     ## make sure these genes pass the filters on REL606.genes.
     filter(Gene.name %in% REL606.genes$Gene) %>%
-    mutate(isEssential = Gene.name %in% essential.genes$Gene)
+    mutate(isEssential = Gene.name %in% essential.genes$Gene) %>%
+    arrange(G.score)
 
-top.nonmut.genomics <- slice_max(nonmut.genomics, n = 50, order_by = G.score)
+## These are the 54 genes with highest G-score and 2 or more observed nonsynonymous
+## mutations
+top.nonmut.genomics <- slice_max(nonmut.genomics, n = 54, order_by = G.score)
+## no criterion here, so just take 50.
 top.hypermut.genomics <- slice_max(hypermut.genomics, n = 50, order_by = G.score)
 
-## 21 out of 50 top non-mut genes are essential.
+## 22 out of 54 top non-mut genes are essential.
 nonmut.top.hit.essential <- essential.genes %>%
     filter(Gene %in% top.nonmut.genomics$Gene.name)
 ## calculate the probability of this outcome by chance (hypergeometric distribution),
 ## using a 2x2 contingency table and Fisher's exact test.
 ## 541 essential and nearly-essential genes, out of 4112 in REL606.genes.
 ## the p-value (tail probability).
-fisher.test(matrix(c(21,541-21,50-21,4112-541-50+21),2))
-## The exact probability (NOT the tail probability or p-value)
-choose(541,21)*choose(4112-541,50-21)/choose(4112,50)
-
-
+fisher.test(matrix(c(22,541-22,54-22,4112-541-54+22),2))
 
 
 ## what about the hypermutators? 3 out of 50 top hypermut genes.
