@@ -767,8 +767,14 @@ top.hypermut.genomics <- slice_max(hypermut.genomics, n = 50, order_by = G.score
 ## 21 out of 50 top non-mut genes are essential.
 nonmut.top.hit.essential <- essential.genes %>%
     filter(Gene %in% top.nonmut.genomics$Gene.name)
-## calculate the probability of this outcome by chance (hypergeometric distribution):
+## calculate the probability of this outcome by chance (hypergeometric distribution),
+## using a 2x2 contingency table and Fisher's exact test.
+## 541 essential and nearly-essential genes, out of 4112 in REL606.genes.
+## the p-value (tail probability).
+fisher.test(matrix(c(21,541-21,50-21,4112-541-50+21),2))
+## The exact probability (NOT the tail probability or p-value)
 choose(541,21)*choose(4112-541,50-21)/choose(4112,50)
+
 
 
 
@@ -905,7 +911,7 @@ single.KO.analysis <- function(zitnik.single.KO.data, cong.single.KO.data,
         rel_heights = c(0.1, 1)
     )
     
-    ggsave(outf, Fig, height = 6, width = 7)
+    ggsave(outf, Fig, height = 6, width = 5)
     
 
     ## For REL606:
