@@ -834,8 +834,7 @@ wilcox.test(filter(essentiality.cong.degree.df,isEssential==TRUE)$Degree,
 
 ## 3) calculate how resilience changes for all single gene
 ## knockouts in the REL606 genome. make a histogram of resilience
-## for the genes, and color essential genes in red, and do a wilcox
-## test on a difference between the two distributions.
+## for the genes, and do a wilcoxon test on a difference between the two distributions.
 
 zitnik.single.KO.resilience.data <- read.csv("../results/resilience/resilience-analysis-runs/Zitnik_PPI_single_KO_resilience_Rep999.csv")
 
@@ -848,14 +847,14 @@ single.KO.analysis <- function(zitnik.single.KO.data, cong.single.KO.data,
     zitnik.base.resilience <- zitnik.single.KO.data %>% filter(strain == base.strain)
     cong.base.resilience <- cong.single.KO.data %>% filter(strain == base.strain)
 
-    zitnik.single.KO.resilience.df <- zitnik.single.KO.resilience.data %>%
+    zitnik.single.KO.resilience.df <- zitnik.single.KO.data %>%
         filter(strain != base.strain) %>%
         mutate(Gene = str_split_fixed(strain, "_", n = 2)[,1]) %>%
         mutate(isEssentialKO = Gene %in% essential.genes$Gene) %>%
         mutate(Essentiality = ifelse(isEssentialKO, "Essential gene disruption", "Non-essential gene disruption")) %>%
         mutate(Dataset = "Zitnik")
     
-    cong.single.KO.resilience.df <- cong.single.KO.resilience.data %>%
+    cong.single.KO.resilience.df <- cong.single.KO.data %>%
         filter(strain != base.strain) %>%
         mutate(Gene = str_split_fixed(strain, "_", n = 2)[,1]) %>%
         mutate(isEssentialKO = Gene %in% essential.genes$Gene) %>%
@@ -864,8 +863,8 @@ single.KO.analysis <- function(zitnik.single.KO.data, cong.single.KO.data,
     
     title <- ggdraw() + 
         draw_label(
-            paste0(c("Gene disruptions increase resilience of the ", base.strain,
-                     " PPI network")),
+            paste0("Single-gene disruptions of the ", base.strain,
+                     " PPI network"),
             fontface = 'bold',
             x = 0,
             hjust = 0
@@ -879,8 +878,9 @@ single.KO.analysis <- function(zitnik.single.KO.data, cong.single.KO.data,
     panelA <- ggplot(zitnik.single.KO.resilience.df,
                      aes(x = Essentiality, y = resilience)) +
         theme_classic() +
+        xlab("") + ## remove x-axis label.
         ylab("PPI network resilience") +
-        geom_jitter(alpha = 0.2) +
+        geom_jitter(alpha = 0.2, height = 0) +
         geom_hline(yintercept = zitnik.base.resilience$resilience,
                    color = 'red', linetype = "dashed") +
         ggtitle("Zitnik PPI dataset")
@@ -888,9 +888,10 @@ single.KO.analysis <- function(zitnik.single.KO.data, cong.single.KO.data,
     panelB <- ggplot(cong.single.KO.resilience.df,
                      aes(x = Essentiality,
                          y = resilience)) +
+        xlab("") + ## remove x-axis label.
         ylab("PPI network resilience") +
         theme_classic() +
-        geom_jitter(alpha = 0.2) +
+        geom_jitter(alpha = 0.2, height = 0) +
         geom_hline(yintercept = cong.base.resilience$resilience,
                    color = 'red', linetype = "dashed") +
         ggtitle("Cong PPI dataset")
@@ -904,14 +905,17 @@ single.KO.analysis <- function(zitnik.single.KO.data, cong.single.KO.data,
         rel_heights = c(0.1, 1)
     )
     
-    ggsave(outf, Fig, height = 6, width = 6)
+    ggsave(outf, Fig, height = 6, width = 7)
     
-    ## This result is very strong, and unexpected:
-    
+
+    ## For REL606:
     ## single-gene knockouts are much more likely to INCREASE network resilience than
     ## decrease network resilience. In addition, a single knockout of an essential genes
     ## has on average a stronger positive effect on network resilience than knocking out
     ## a non-essential gene. This pattern holds for both datasets.
+
+    ## The patterns are idiosyncratic and not always consistent across datasets for the
+    ## 50,000 generations LTEE clones.
     print("mean of Zitnik single essential KO resilience")
     print(mean(filter(zitnik.single.KO.resilience.df, isEssentialKO == TRUE)$resilience))
     print("mean of Zitnik single non-essential KO resilience")
@@ -923,9 +927,7 @@ single.KO.analysis <- function(zitnik.single.KO.data, cong.single.KO.data,
     print("mean of Cong single non-essential KO resilience")
     print(mean(filter(cong.single.KO.resilience.df, isEssentialKO == FALSE)$resilience))
     print(
-        wilcox.test(x = filter(cong.single.KO.resilience.df, isEssentialKO == TRUE)$resilience,
-                    y = filter(cong.single.KO.resilience.df, isEssentialKO == FALSE)$resilience))
-
+        wilcox.test(x = filter(cong.single.KO.resilience.df, isEssentialKO == TRUE)$resilience, y = filter(cong.single.KO.resilience.df, isEssentialKO == FALSE)$resilience))
     
 }
 
@@ -941,225 +943,253 @@ single.KO.analysis(zitnik.single.KO.resilience.data,
 ## resilience when removed).
 ##################################################
 
+## Ara+1 REL11392 PPI network.
+zitnik.single.KO.Ara.plus1.data <- read.csv("../results/resilience/resilience-analysis-runs/Zitnik_PPI_single_KO_resilience_Ara+1_Rep999.csv") %>%
+    mutate(population = "Ara+1") %>%
+    mutate(starting_clone = "REL11392")
 
-cong.single.KO.Ara.plus1.df <- read.csv("../results/resilience/resilience-analysis-runs/Cong_PPI_single_KO_resilience_Ara+1_Rep999.csv") %>%
-    filter(strain != 'REL11392') %>%
+cong.single.KO.Ara.plus1.data <- read.csv("../results/resilience/resilience-analysis-runs/Cong_PPI_single_KO_resilience_Ara+1_Rep999.csv") %>%
+    mutate(population = "Ara+1") %>%
+    mutate(starting_clone = "REL11392")
+
+## Ara+2 REL11342 PPI network.
+zitnik.single.KO.Ara.plus2.data <- read.csv("../results/resilience/resilience-analysis-runs/Zitnik_PPI_single_KO_resilience_Ara+2_Rep999.csv") %>%
+    mutate(population = "Ara+2") %>%
+    mutate(starting_clone = "REL11342")
+
+cong.single.KO.Ara.plus2.data <- read.csv("../results/resilience/resilience-analysis-runs/Cong_PPI_single_KO_resilience_Ara+2_Rep999.csv") %>%
+    mutate(population = "Ara+2") %>%
+    mutate(starting_clone = "REL11342")
+
+## Ara+3 REL11345 PPI network.
+zitnik.single.KO.Ara.plus3.data <- read.csv("../results/resilience/resilience-analysis-runs/Zitnik_PPI_single_KO_resilience_Ara+3_Rep999.csv") %>%
+    mutate(population = "Ara+3") %>%
+    mutate(starting_clone = "REL11345")
+
+cong.single.KO.Ara.plus3.data <- read.csv("../results/resilience/resilience-analysis-runs/Cong_PPI_single_KO_resilience_Ara+3_Rep999.csv") %>%
+    mutate(population = "Ara+3") %>%
+    mutate(starting_clone = "REL11345")
+
+## Ara+4 REL11348 PPI network.
+zitnik.single.KO.Ara.plus4.data <- read.csv("../results/resilience/resilience-analysis-runs/Zitnik_PPI_single_KO_resilience_Ara+4_Rep999.csv") %>%
+    mutate(population = "Ara+4") %>%
+    mutate(starting_clone = "REL11348")
+
+cong.single.KO.Ara.plus4.data <- read.csv("../results/resilience/resilience-analysis-runs/Cong_PPI_single_KO_resilience_Ara+4_Rep999.csv") %>%
+    mutate(population = "Ara+4") %>%
+    mutate(starting_clone = "REL11348")
+
+## Ara+5 REL11367 PPI network.
+zitnik.single.KO.Ara.plus5.data <- read.csv("../results/resilience/resilience-analysis-runs/Zitnik_PPI_single_KO_resilience_Ara+5_Rep999.csv") %>%
+    mutate(population = "Ara+5") %>%
+    mutate(starting_clone = "REL11367")
+
+cong.single.KO.Ara.plus5.data <- read.csv("../results/resilience/resilience-analysis-runs/Cong_PPI_single_KO_resilience_Ara+5_Rep999.csv") %>%
+    mutate(population = "Ara+5") %>%
+    mutate(starting_clone = "REL11367")
+
+## Ara+6 REL11370 PPI network.
+zitnik.single.KO.Ara.plus6.data <- read.csv("../results/resilience/resilience-analysis-runs/Zitnik_PPI_single_KO_resilience_Ara+6_Rep999.csv") %>%
+    mutate(population = "Ara+6") %>%
+    mutate(starting_clone = "REL11370")
+
+cong.single.KO.Ara.plus6.data <- read.csv("../results/resilience/resilience-analysis-runs/Cong_PPI_single_KO_resilience_Ara+6_Rep999.csv") %>%
+    mutate(population = "Ara+6") %>%
+    mutate(starting_clone = "REL11370")
+
+## Ara-1 REL11330 PPI network.
+zitnik.single.KO.Ara.minus1.data <- read.csv("../results/resilience/resilience-analysis-runs/Zitnik_PPI_single_KO_resilience_Ara-1_Rep999.csv") %>%
+    mutate(population = "Ara-1") %>%
+    mutate(starting_clone = "REL11330")
+
+cong.single.KO.Ara.minus1.data <- read.csv("../results/resilience/resilience-analysis-runs/Cong_PPI_single_KO_resilience_Ara-1_Rep999.csv") %>%
+    mutate(population = "Ara-1") %>%
+    mutate(starting_clone = "REL11330")
+
+## Ara-2 REL11333 PPI network.
+zitnik.single.KO.Ara.minus2.data <- read.csv("../results/resilience/resilience-analysis-runs/Zitnik_PPI_single_KO_resilience_Ara-2_Rep999.csv") %>%
+    mutate(population = "Ara-2") %>%
+    mutate(starting_clone = "REL11333")
+
+cong.single.KO.Ara.minus2.data <- read.csv("../results/resilience/resilience-analysis-runs/Cong_PPI_single_KO_resilience_Ara-2_Rep999.csv") %>%
+    mutate(population = "Ara-2") %>%
+    mutate(starting_clone = "REL11333")
+
+## Ara-3 REL11364 PPI network.
+zitnik.single.KO.Ara.minus3.data <- read.csv("../results/resilience/resilience-analysis-runs/Zitnik_PPI_single_KO_resilience_Ara-3_Rep999.csv") %>%
+    mutate(population = "Ara-3") %>%
+    mutate(starting_clone = "REL11364")
+
+cong.single.KO.Ara.minus3.data <- read.csv("../results/resilience/resilience-analysis-runs/Cong_PPI_single_KO_resilience_Ara-3_Rep999.csv") %>%
+    mutate(population = "Ara-3") %>%
+    mutate(starting_clone = "REL11364")
+
+## Ara-4 REL11336 PPI network.
+zitnik.single.KO.Ara.minus4.data <- read.csv("../results/resilience/resilience-analysis-runs/Zitnik_PPI_single_KO_resilience_Ara-4_Rep999.csv") %>%
+    mutate(population = "Ara-4") %>%
+    mutate(starting_clone = "REL11336")
+
+cong.single.KO.Ara.minus4.data <- read.csv("../results/resilience/resilience-analysis-runs/Cong_PPI_single_KO_resilience_Ara-4_Rep999.csv") %>%
+    mutate(population = "Ara-4") %>%
+    mutate(starting_clone = "REL11336")
+
+## Ara-5 REL11339 PPI network.
+zitnik.single.KO.Ara.minus5.data <- read.csv("../results/resilience/resilience-analysis-runs/Zitnik_PPI_single_KO_resilience_Ara-5_Rep999.csv") %>%
+    mutate(population = "Ara-5") %>%
+    mutate(starting_clone = "REL11339")
+
+cong.single.KO.Ara.minus5.data <- read.csv("../results/resilience/resilience-analysis-runs/Cong_PPI_single_KO_resilience_Ara-5_Rep999.csv") %>%
+    mutate(population = "Ara-5") %>%
+    mutate(starting_clone = "REL11339")
+
+## Ara-6 REL11389 PPI network.
+zitnik.single.KO.Ara.minus6.data <- read.csv("../results/resilience/resilience-analysis-runs/Zitnik_PPI_single_KO_resilience_Ara-6_Rep999.csv") %>%
+    mutate(population = "Ara-6") %>%
+    mutate(starting_clone = "REL11389")
+
+cong.single.KO.Ara.minus6.data <- read.csv("../results/resilience/resilience-analysis-runs/Cong_PPI_single_KO_resilience_Ara-6_Rep999.csv") %>%
+    mutate(population = "Ara-6") %>%
+    mutate(starting_clone = "REL11389")
+
+zitnik.single.KO.50K.data <- rbind(
+    zitnik.single.KO.Ara.plus1.data,
+    zitnik.single.KO.Ara.plus2.data,
+    zitnik.single.KO.Ara.plus3.data,
+    zitnik.single.KO.Ara.plus4.data,
+    zitnik.single.KO.Ara.plus5.data,
+    zitnik.single.KO.Ara.plus6.data,
+    zitnik.single.KO.Ara.minus1.data,
+    zitnik.single.KO.Ara.minus2.data,
+    zitnik.single.KO.Ara.minus3.data,
+    zitnik.single.KO.Ara.minus4.data,
+    zitnik.single.KO.Ara.minus5.data,
+    zitnik.single.KO.Ara.minus6.data
+)
+
+cong.single.KO.50K.data <- rbind(
+    cong.single.KO.Ara.plus1.data,
+    cong.single.KO.Ara.plus2.data,
+    cong.single.KO.Ara.plus3.data,
+    cong.single.KO.Ara.plus4.data,
+    cong.single.KO.Ara.plus5.data,
+    cong.single.KO.Ara.plus6.data,
+    cong.single.KO.Ara.minus1.data,
+    cong.single.KO.Ara.minus2.data,
+    cong.single.KO.Ara.minus3.data,
+    cong.single.KO.Ara.minus4.data,
+    cong.single.KO.Ara.minus5.data,
+    cong.single.KO.Ara.minus6.data
+)
+
+
+## get the initial resilience values for each 50K clone.
+zitnik.base.resilience.df <- zitnik.single.KO.50K.data %>%
+    filter(!str_detect(strain, "_knockout"))
+## get the initial resilience values for each 50K clone.
+cong.base.resilience.df <- cong.single.KO.50K.data %>%
+    filter(!str_detect(strain, "_knockout"))
+
+
+zitnik.single.KO.50K.resilience.df <- zitnik.single.KO.50K.data %>%
+    filter(!(strain %in% zitnik.base.resilience.df$strain)) %>%
     mutate(Gene = str_split_fixed(strain, "_", n = 2)[,1]) %>%
-    mutate(isEssential = Gene %in% essential.genes$Gene) %>%
-    mutate(population = "Ara+1")
+    mutate(isEssentialKO = Gene %in% essential.genes$Gene) %>%
+    mutate(Essentiality = ifelse(isEssentialKO, "Essential", "Non-essential")) %>%
+    mutate(Dataset = "Zitnik")
 
-cong.single.KO.Ara.plus2.df <- read.csv("../results/resilience/resilience-analysis-runs/Cong_PPI_single_KO_resilience_Ara+2_Rep999.csv") %>%
-    filter(strain != 'REL11342') %>%
+cong.single.KO.50K.resilience.df <- cong.single.KO.50K.data %>%
+    filter(!(strain %in% cong.base.resilience.df$strain)) %>%
     mutate(Gene = str_split_fixed(strain, "_", n = 2)[,1]) %>%
-    mutate(isEssential = Gene %in% essential.genes$Gene) %>%
-    mutate(population = "Ara+2")
-
-cong.single.KO.Ara.plus3.df <- read.csv("../results/resilience/resilience-analysis-runs/Cong_PPI_single_KO_resilience_Ara+3_Rep999.csv") %>%
-    filter(strain != 'REL11345') %>%
-    mutate(Gene = str_split_fixed(strain, "_", n = 2)[,1]) %>%
-    mutate(isEssential = Gene %in% essential.genes$Gene) %>%
-    mutate(population = "Ara+3")
-
-cong.single.KO.Ara.plus4.df <- read.csv("../results/resilience/resilience-analysis-runs/Cong_PPI_single_KO_resilience_Ara+4_Rep999.csv") %>%
-    filter(strain != 'REL11348') %>%
-    mutate(Gene = str_split_fixed(strain, "_", n = 2)[,1]) %>%
-    mutate(isEssential = Gene %in% essential.genes$Gene) %>%
-    mutate(population = "Ara+4")
-
-cong.single.KO.Ara.plus5.df <- read.csv("../results/resilience/resilience-analysis-runs/Cong_PPI_single_KO_resilience_Ara+5_Rep999.csv") %>%
-    filter(strain != 'REL11367') %>%
-    mutate(Gene = str_split_fixed(strain, "_", n = 2)[,1]) %>%
-    mutate(isEssential = Gene %in% essential.genes$Gene) %>%
-    mutate(population = "Ara+5")
-
-cong.single.KO.Ara.plus6.df <- read.csv("../results/resilience/resilience-analysis-runs/Cong_PPI_single_KO_resilience_Ara+6_Rep999.csv") %>%
-    filter(strain != 'REL11370') %>%
-    mutate(Gene = str_split_fixed(strain, "_", n = 2)[,1]) %>%
-    mutate(isEssential = Gene %in% essential.genes$Gene) %>%
-    mutate(population = "Ara+6")
+    mutate(isEssentialKO = Gene %in% essential.genes$Gene) %>%
+    mutate(Essentiality = ifelse(isEssentialKO, "Essential", "Non-essential")) %>%
+    mutate(Dataset = "Cong")
 
 
-cong.single.KO.Ara.minus1.df <- read.csv("../results/resilience/resilience-analysis-runs/Cong_PPI_single_KO_resilience_Ara-1_Rep999.csv") %>%
-    filter(strain != 'REL11330') %>%
-    mutate(Gene = str_split_fixed(strain, "_", n = 2)[,1]) %>%
-    mutate(isEssential = Gene %in% essential.genes$Gene) %>%
-    mutate(population = "Ara-1")
+calc.delta.resilience <- function(pop.df) {
+    ## This function calculates the differences between
+    ## the mean of the resilience of essential KOs and
+    ## the mean of the resilience of non-essential KOs.
+    essential.mean <- mean(filter(pop.df, isEssentialKO == TRUE)$resilience)
+    nonessential.mean <- mean(filter(pop.df, isEssentialKO == FALSE)$resilience)
+    delta.mean <- essential.mean - nonessential.mean
+    pop <- unique(pop.df$population)
+    return.df <- data.frame(essential.mean.resilience = essential.mean,
+                            nonessential.mean.resilience = nonessential.mean,
+                            delta = delta.mean, population = pop)
+    return(return.df)
+}
 
-cong.single.KO.Ara.minus2.df <- read.csv("../results/resilience/resilience-analysis-runs/Cong_PPI_single_KO_resilience_Ara-2_Rep999.csv") %>%
-    filter(strain != 'REL11333') %>%
-    mutate(Gene = str_split_fixed(strain, "_", n = 2)[,1]) %>%
-    mutate(isEssential = Gene %in% essential.genes$Gene) %>%
-    mutate(population = "Ara-2")
+## calculate the mean difference between essential and non-essential KOs on resilience.
+zitnik.essential.KO.50K.delta.df <- zitnik.single.KO.50K.resilience.df %>%
+    split(.$population) %>%
+    map_dfr(.f = calc.delta.resilience)
+## calculate the mean difference between essential and non-essential KOs on resilience.
+cong.essential.KO.50K.delta.df <- cong.single.KO.50K.resilience.df %>%
+    split(.$population) %>%
+    map_dfr(.f = calc.delta.resilience)
 
-cong.single.KO.Ara.minus3.df <- read.csv("../results/resilience/resilience-analysis-runs/Cong_PPI_single_KO_resilience_Ara-3_Rep999.csv") %>%
-    filter(strain != 'REL11364') %>%
-    mutate(Gene = str_split_fixed(strain, "_", n = 2)[,1]) %>%
-    mutate(isEssential = Gene %in% essential.genes$Gene) %>%
-    mutate(population = "Ara-3")
+## for both dataset, 10/12 populations have a negative difference, indicating
+## that knockouts of essential genes, overall have a more negative effect
+## on interactome resilience. However, the magnitude of the difference is small--
+## < 0.001 in all cases.
 
-cong.single.KO.Ara.minus4.df <- read.csv("../results/resilience/resilience-analysis-runs/Cong_PPI_single_KO_resilience_Ara-4_Rep999.csv") %>%
-    filter(strain != 'REL11336') %>%
-    mutate(Gene = str_split_fixed(strain, "_", n = 2)[,1]) %>%
-    mutate(isEssential = Gene %in% essential.genes$Gene) %>%
-    mutate(population = "Ara-4")
+## calculate Wilcoxon signed-rank test to do a nonparametric paired sample test.
+wilcox.test(zitnik.essential.KO.50K.delta.df$essential.mean.resilience,
+            zitnik.essential.KO.50K.delta.df$nonessential.mean.resilience,
+            paired = TRUE, alternative = "less")
 
-cong.single.KO.Ara.minus5.df <- read.csv("../results/resilience/resilience-analysis-runs/Cong_PPI_single_KO_resilience_Ara-5_Rep999.csv") %>%
-    filter(strain != 'REL11339') %>%
-    mutate(Gene = str_split_fixed(strain, "_", n = 2)[,1]) %>%
-    mutate(isEssential = Gene %in% essential.genes$Gene) %>%
-    mutate(population = "Ara-5")
-
-cong.single.KO.Ara.minus6.df <- read.csv("../results/resilience/resilience-analysis-runs/Cong_PPI_single_KO_resilience_Ara-6_Rep999.csv") %>%
-    filter(strain != 'REL11389 ') %>%
-    mutate(Gene = str_split_fixed(strain, "_", n = 2)[,1]) %>%
-    mutate(isEssential = Gene %in% essential.genes$Gene) %>%
-    mutate(population = "Ara-6")
-
-cong.singleKO.50K.df <- rbind(cong.single.KO.Ara.plus1.df,
-                              cong.single.KO.Ara.plus2.df,
-                              cong.single.KO.Ara.plus3.df,
-                              cong.single.KO.Ara.plus4.df,
-                              cong.single.KO.Ara.plus5.df,
-                              cong.single.KO.Ara.plus6.df,
-                              cong.single.KO.Ara.minus1.df,
-                              cong.single.KO.Ara.minus2.df,
-                              cong.single.KO.Ara.minus3.df,
-                              cong.single.KO.Ara.minus4.df,
-                              cong.single.KO.Ara.minus5.df,
-                              cong.single.KO.Ara.minus6.df) %>%
-    ## This for changing the ordering of populations in plots.
-    mutate(population=factor(population,levels = LTEE.pop.vec))
+wilcox.test(cong.essential.KO.50K.delta.df$essential.mean.resilience,
+            cong.essential.KO.50K.delta.df$nonessential.mean.resilience,
+            paired = TRUE, alternative = "less")
 
 
+S1Fig.title <- ggdraw() + 
+    draw_label(
+        "Single-gene disruptions of the 50,000 generation PPI networks",
+        fontface = 'bold',
+        x = 0,
+        hjust = 0
+    ) +
+    theme(
+        ## add margin on the left of the drawing canvas,
+        ## so title is aligned with left edge of first plot
+        plot.margin = margin(0, 0, 0, 7)
+    )
 
-cong.single.KO.50K.essentiality.plot <- ggplot(cong.singleKO.50K.df,
-                                           aes(x = isEssential, y = resilience)) +
+S1Fig.panelA <- ggplot(zitnik.single.KO.50K.resilience.df,
+                       aes(x = Essentiality, y = resilience)) +
     theme_classic() +
-    geom_jitter(alpha = 0.2) +
-    geom_violin(color = 'red') +
-    facet_wrap(.~population, nrow=4)
+    ylab("PPI network resilience") +
+    xlab("Type of disrupted gene") +
+    facet_wrap(.~population,nrow=4) +
+    geom_jitter(alpha = 0.1, height = 0, color = "moccasin") +
+    geom_hline(data = zitnik.base.resilience.df,
+               aes(yintercept = resilience),
+               color = 'red', linetype = "dotted") +
+    ggtitle("Zitnik PPI dataset")
 
-
-## in the 50K genomes, knocking out essential genes results in
-## less resilient networks than knocking out
-## nonessential genes in the Cong PPI dataset.
-
-## CRITICAL TODO: treat populations as the unit of replication, not gene KO.
-
-mean(filter(cong.singleKO.50K.df, isEssential == TRUE)$resilience)
-mean(filter(cong.singleKO.50K.df, isEssential == FALSE)$resilience)
-wilcox.test(x = filter(cong.singleKO.50K.df, isEssential == TRUE)$resilience,
-            y = filter(cong.singleKO.50K.df, isEssential == FALSE)$resilience)
-
-
-########################################################
-## Now do the same analysis, for the Zitnik PPI dataset.
-
-zitnik.single.KO.Ara.plus1.df <- read.csv("../results/resilience/resilience-analysis-runs/Zitnik_PPI_single_KO_resilience_Ara+1_Rep999.csv") %>%
-    filter(strain != 'REL11392') %>%
-    mutate(Gene = str_split_fixed(strain, "_", n = 2)[,1]) %>%
-    mutate(isEssential = Gene %in% essential.genes$Gene) %>%
-    mutate(population = "Ara+1")
-
-zitnik.single.KO.Ara.plus2.df <- read.csv("../results/resilience/resilience-analysis-runs/Zitnik_PPI_single_KO_resilience_Ara+2_Rep999.csv") %>%
-    filter(strain != 'REL11342') %>%
-    mutate(Gene = str_split_fixed(strain, "_", n = 2)[,1]) %>%
-    mutate(isEssential = Gene %in% essential.genes$Gene) %>%
-    mutate(population = "Ara+2")
-
-zitnik.single.KO.Ara.plus3.df <- read.csv("../results/resilience/resilience-analysis-runs/Zitnik_PPI_single_KO_resilience_Ara+3_Rep999.csv") %>%
-    filter(strain != 'REL11345') %>%
-    mutate(Gene = str_split_fixed(strain, "_", n = 2)[,1]) %>%
-    mutate(isEssential = Gene %in% essential.genes$Gene) %>%
-    mutate(population = "Ara+3")
-
-zitnik.single.KO.Ara.plus4.df <- read.csv("../results/resilience/resilience-analysis-runs/Zitnik_PPI_single_KO_resilience_Ara+4_Rep999.csv") %>%
-    filter(strain != 'REL11348') %>%
-    mutate(Gene = str_split_fixed(strain, "_", n = 2)[,1]) %>%
-    mutate(isEssential = Gene %in% essential.genes$Gene) %>%
-    mutate(population = "Ara+4")
-
-zitnik.single.KO.Ara.plus5.df <- read.csv("../results/resilience/resilience-analysis-runs/Zitnik_PPI_single_KO_resilience_Ara+5_Rep999.csv") %>%
-    filter(strain != 'REL11367') %>%
-    mutate(Gene = str_split_fixed(strain, "_", n = 2)[,1]) %>%
-    mutate(isEssential = Gene %in% essential.genes$Gene) %>%
-    mutate(population = "Ara+5")
-
-zitnik.single.KO.Ara.plus6.df <- read.csv("../results/resilience/resilience-analysis-runs/Zitnik_PPI_single_KO_resilience_Ara+6_Rep999.csv") %>%
-    filter(strain != 'REL11370') %>%
-    mutate(Gene = str_split_fixed(strain, "_", n = 2)[,1]) %>%
-    mutate(isEssential = Gene %in% essential.genes$Gene) %>%
-    mutate(population = "Ara+6")
-
-
-zitnik.single.KO.Ara.minus1.df <- read.csv("../results/resilience/resilience-analysis-runs/Zitnik_PPI_single_KO_resilience_Ara-1_Rep999.csv") %>%
-    filter(strain != 'REL11330') %>%
-    mutate(Gene = str_split_fixed(strain, "_", n = 2)[,1]) %>%
-    mutate(isEssential = Gene %in% essential.genes$Gene) %>%
-    mutate(population = "Ara-1")
-
-zitnik.single.KO.Ara.minus2.df <- read.csv("../results/resilience/resilience-analysis-runs/Zitnik_PPI_single_KO_resilience_Ara-2_Rep999.csv") %>%
-    filter(strain != 'REL11333') %>%
-    mutate(Gene = str_split_fixed(strain, "_", n = 2)[,1]) %>%
-    mutate(isEssential = Gene %in% essential.genes$Gene) %>%
-    mutate(population = "Ara-2")
-
-zitnik.single.KO.Ara.minus3.df <- read.csv("../results/resilience/resilience-analysis-runs/Zitnik_PPI_single_KO_resilience_Ara-3_Rep999.csv") %>%
-    filter(strain != 'REL11364') %>%
-    mutate(Gene = str_split_fixed(strain, "_", n = 2)[,1]) %>%
-    mutate(isEssential = Gene %in% essential.genes$Gene) %>%
-    mutate(population = "Ara-3")
-
-zitnik.single.KO.Ara.minus4.df <- read.csv("../results/resilience/resilience-analysis-runs/Zitnik_PPI_single_KO_resilience_Ara-4_Rep999.csv") %>%
-    filter(strain != 'REL11336') %>%
-    mutate(Gene = str_split_fixed(strain, "_", n = 2)[,1]) %>%
-    mutate(isEssential = Gene %in% essential.genes$Gene) %>%
-    mutate(population = "Ara-4")
-
-zitnik.single.KO.Ara.minus5.df <- read.csv("../results/resilience/resilience-analysis-runs/Zitnik_PPI_single_KO_resilience_Ara-5_Rep999.csv") %>%
-    filter(strain != 'REL11339') %>%
-    mutate(Gene = str_split_fixed(strain, "_", n = 2)[,1]) %>%
-    mutate(isEssential = Gene %in% essential.genes$Gene) %>%
-    mutate(population = "Ara-5")
-
-zitnik.single.KO.Ara.minus6.df <- read.csv("../results/resilience/resilience-analysis-runs/Zitnik_PPI_single_KO_resilience_Ara-6_Rep999.csv") %>%
-    filter(strain != 'REL11389 ') %>%
-    mutate(Gene = str_split_fixed(strain, "_", n = 2)[,1]) %>%
-    mutate(isEssential = Gene %in% essential.genes$Gene) %>%
-    mutate(population = "Ara-6")
-
-zitnik.single.KO.50K.df <- rbind(zitnik.single.KO.Ara.plus1.df,
-                              zitnik.single.KO.Ara.plus2.df,
-                              zitnik.single.KO.Ara.plus3.df,
-                              zitnik.single.KO.Ara.plus4.df,
-                              zitnik.single.KO.Ara.plus5.df,
-                              zitnik.single.KO.Ara.plus6.df,
-                              zitnik.single.KO.Ara.minus1.df,
-                              zitnik.single.KO.Ara.minus2.df,
-                              zitnik.single.KO.Ara.minus3.df,
-                              zitnik.single.KO.Ara.minus4.df,
-                              zitnik.single.KO.Ara.minus5.df,
-                              zitnik.single.KO.Ara.minus6.df) %>%
-    ## This for changing the ordering of populations in plots.
-    mutate(population=factor(population,levels = LTEE.pop.vec))
-
-
-
-zitnik.single.KO.50K.essentiality.plot <- ggplot(zitnik.single.KO.50K.df,
-                                           aes(x = isEssential, y = resilience)) +
+S1Fig.panelB <- ggplot(cong.single.KO.50K.resilience.df,
+                       aes(x = Essentiality, y = resilience)) +
     theme_classic() +
-    geom_jitter(alpha = 0.2) +
-    geom_violin(color = 'red') +
-    facet_wrap(.~population,nrow=4)
+    ylab("PPI network resilience") +
+    xlab("Type of disrupted gene") +
+    facet_wrap(.~population,nrow=4) +
+    geom_jitter(alpha = 0.1, height = 0, color = "lightskyblue") +
+    geom_hline(data = cong.base.resilience.df,
+               aes(yintercept = resilience),
+               color = 'red', linetype = "dotted") +
+    ggtitle("Cong PPI dataset")
 
-## CRITICAL TODO: do a more appropriate analysis, using populations as the
-## unit of replication.
-mean(filter(zitnik.single.KO.50K.df, isEssential == TRUE)$resilience)
-mean(filter(zitnik.single.KO.50K.df, isEssential == FALSE)$resilience)
-wilcox.test(x = filter(zitnik.single.KO.50K.df, isEssential == TRUE)$resilience,
-            y = filter(zitnik.single.KO.50K.df, isEssential == FALSE)$resilience)
+S1Fig.panels <- plot_grid(S1Fig.panelA, S1Fig.panelB, ncol = 2)
 
-
+S1Fig <- plot_grid(
+    S1Fig.title, S1Fig.panels,
+    ncol = 1,
+    ## rel_heights values control vertical title margins
+    rel_heights = c(0.1, 1)
+)
+    
+ggsave("../results/resilience/figures/S1Fig.pdf", S1Fig, height = 6, width = 12)
 
 #########################################################################################
 ## examine resilience in the MAE genomes.
