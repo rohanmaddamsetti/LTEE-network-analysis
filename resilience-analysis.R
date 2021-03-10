@@ -906,7 +906,7 @@ single.KO.analysis <- function(zitnik.single.KO.data, cong.single.KO.data,
                    color = 'red', linetype = "dashed") +
         ggtitle("Cong PPI dataset")
     
-    panels <- plot_grid(panelA, panelB, ncol = 1)
+    panels <- plot_grid(panelA, panelB, labels = c('A','B'), ncol = 1)
     
     Fig <- plot_grid(
         title, panels,
@@ -1200,16 +1200,16 @@ S1Fig.panelB <- ggplot(cong.single.KO.50K.resilience.df,
                color = 'red', linetype = "dotted") +
     ggtitle("Cong PPI dataset")
 
-S1Fig.panels <- plot_grid(S1Fig.panelA, S1Fig.panelB, ncol = 2)
+S1Fig.panels <- plot_grid(S1Fig.panelA, S1Fig.panelB, labels = c('A', 'B'), ncol = 1)
 
 S1Fig <- plot_grid(
     S1Fig.title, S1Fig.panels,
     ncol = 1,
     ## rel_heights values control vertical title margins
-    rel_heights = c(0.1, 1)
+    rel_heights = c(0.05, 1)
 )
     
-ggsave("../results/resilience/figures/S1Fig.pdf", S1Fig, height = 6, width = 12)
+ggsave("../results/resilience/figures/S1Fig.pdf", S1Fig, height = 8, width = 6)
 
 #########################################################################################
 ## examine resilience in the MAE genomes.
