@@ -948,7 +948,7 @@ single.KO.analysis(zitnik.single.KO.resilience.data,
                    "../results/resilience/figures/Fig4.pdf")
 
 ##################################################
-## Supplementary Figures S1-S12: repeat this analysis, on the 50K clone A genomes.
+## Supplementary Figure S1: repeat this analysis, on the 50K clone A genomes.
 ## do we see the same trend, or is it reversed (i.e. essential genes tend to reduce
 ## resilience when removed).
 ##################################################
@@ -1094,25 +1094,35 @@ cong.single.KO.50K.data <- rbind(
 
 ## get the initial resilience values for each 50K clone.
 zitnik.base.resilience.df <- zitnik.single.KO.50K.data %>%
-    filter(!str_detect(strain, "_knockout"))
+    filter(!str_detect(strain, "_knockout")) %>%
+    ## This for changing the ordering of populations in plots.
+    mutate(population=factor(population,levels = LTEE.pop.vec))
+
 ## get the initial resilience values for each 50K clone.
 cong.base.resilience.df <- cong.single.KO.50K.data %>%
-    filter(!str_detect(strain, "_knockout"))
-
+    filter(!str_detect(strain, "_knockout")) %>%
+    ## This for changing the ordering of populations in plots.
+    mutate(population=factor(population,levels = LTEE.pop.vec))
 
 zitnik.single.KO.50K.resilience.df <- zitnik.single.KO.50K.data %>%
     filter(!(strain %in% zitnik.base.resilience.df$strain)) %>%
     mutate(Gene = str_split_fixed(strain, "_", n = 2)[,1]) %>%
     mutate(isEssentialKO = Gene %in% essential.genes$Gene) %>%
     mutate(Essentiality = ifelse(isEssentialKO, "Essential", "Non-essential")) %>%
-    mutate(Dataset = "Zitnik")
+    mutate(Dataset = "Zitnik") %>%
+    ## This for changing the ordering of populations in plots.
+    mutate(population=factor(population,levels = LTEE.pop.vec))
+
 
 cong.single.KO.50K.resilience.df <- cong.single.KO.50K.data %>%
     filter(!(strain %in% cong.base.resilience.df$strain)) %>%
     mutate(Gene = str_split_fixed(strain, "_", n = 2)[,1]) %>%
     mutate(isEssentialKO = Gene %in% essential.genes$Gene) %>%
     mutate(Essentiality = ifelse(isEssentialKO, "Essential", "Non-essential")) %>%
-    mutate(Dataset = "Cong")
+    mutate(Dataset = "Cong") %>%
+    ## This for changing the ordering of populations in plots.
+    mutate(population=factor(population,levels = LTEE.pop.vec))
+
 
 
 calc.delta.resilience <- function(pop.df) {
