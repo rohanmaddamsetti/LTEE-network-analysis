@@ -766,20 +766,21 @@ hypermut.genomics <- read.csv('../data/tenaillon2016-mutator-parallelism.csv') %
     mutate(isEssential = Gene.name %in% essential.genes$Gene) %>%
     arrange(G.score)
 
-## These are the 54 genes with highest G-score and 2 or more observed nonsynonymous
-## mutations
-top.nonmut.genomics <- slice_max(nonmut.genomics, n = 54, order_by = G.score)
+## These are the 57 genes with 2 or more observed nonsynonymous
+## mutations (see Maddamsetti et al. 2017).
+top.nonmut.genomics <- nonmut.genomics %>% filter(Observed.nonsynonymous.mutation > 1)
+
 ## no criterion here, so just take 50.
 top.hypermut.genomics <- slice_max(hypermut.genomics, n = 50, order_by = G.score)
 
-## 22 out of 54 top non-mut genes are essential.
+## 23 out of 57 non-mut genes with 2 or more observed nonsynonymous mutations are essential.
 nonmut.top.hit.essential <- essential.genes %>%
     filter(Gene %in% top.nonmut.genomics$Gene.name)
 ## calculate the probability of this outcome by chance (hypergeometric distribution),
 ## using a 2x2 contingency table and Fisher's exact test.
 ## 541 essential and nearly-essential genes, out of 4112 in REL606.genes.
 ## the p-value (tail probability).
-fisher.test(matrix(c(22,541-22,54-22,4112-541-54+22),2))
+fisher.test(matrix(c(23,541-23,57-23,4112-541-57+23),2))
 
 
 ## what about the hypermutators? 3 out of 50 top hypermut genes.
