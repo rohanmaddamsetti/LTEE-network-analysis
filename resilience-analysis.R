@@ -690,8 +690,7 @@ cor.test(zitnik.resilience.with.fitness.df$mean.resilience,
 cor.test(cong.resilience.with.fitness.df$mean.resilience,
          cong.resilience.with.fitness.df$mean.Fitness, method = "spearman")
 
-#########################################################################################
-
+################################################################################
 ## Analysis of essential genes and PPI network resilience.
 
 ## 1) take essential genes in REL606 from Couce paper,
@@ -703,16 +702,7 @@ cor.test(cong.resilience.with.fitness.df$mean.resilience,
 ## compared to the remainder of the genes in the genome.
 
 ## 3) calculate how resilience changes for all single gene
-## knockouts in the REL606 genome. make a histogram of resilience
-## for the genes, and color essential genes in red, and do a wilcox
-## test on a difference between the two distributions.
-
-#########################################################################################
-
-## data structures for KO mutations in the LTEE genomes.
-## LTEE.genomes.KO.muts
-## LTEE.genomes.KO.metadata
-
+## knockouts in the REL606 genome, and the 50K clones.
 
 ## Get essential and near-essential genes reported in
 ## Supplementary Table 1 of Couce et al. 2017.
@@ -946,10 +936,10 @@ single.KO.analysis <- function(zitnik.single.KO.data, cong.single.KO.data,
 single.KO.analysis(zitnik.single.KO.resilience.data,
                    cong.single.KO.resilience.data,
                    "REL606",
-                   "../results/resilience/figures/Fig4.pdf")
+                   "../results/resilience/figures/S1Fig.pdf")
 
 ##################################################
-## Supplementary Figure S1: repeat this analysis, on the 50K clone A genomes.
+## Supplementary Figure S2: repeat this analysis, on the 50K clone A genomes.
 ## do we see the same trend, or is it reversed (i.e. essential genes tend to reduce
 ## resilience when removed).
 ##################################################
@@ -1164,7 +1154,7 @@ wilcox.test(cong.essential.KO.50K.delta.df$essential.mean.resilience,
             paired = TRUE, alternative = "less")
 
 
-S1Fig.title <- ggdraw() + 
+S2Fig.title <- ggdraw() + 
     draw_label(
         "Single-gene disruptions of the 50,000 generation PPI networks",
         fontface = 'bold',
@@ -1177,7 +1167,7 @@ S1Fig.title <- ggdraw() +
         plot.margin = margin(0, 0, 0, 7)
     )
 
-S1Fig.panelA <- ggplot(zitnik.single.KO.50K.resilience.df,
+S2Fig.panelA <- ggplot(zitnik.single.KO.50K.resilience.df,
                        aes(x = Essentiality, y = resilience)) +
     theme_classic() +
     ylab("PPI network resilience") +
@@ -1189,7 +1179,7 @@ S1Fig.panelA <- ggplot(zitnik.single.KO.50K.resilience.df,
                color = 'red', linetype = "dotted") +
     ggtitle("Zitnik PPI dataset")
 
-S1Fig.panelB <- ggplot(cong.single.KO.50K.resilience.df,
+S2Fig.panelB <- ggplot(cong.single.KO.50K.resilience.df,
                        aes(x = Essentiality, y = resilience)) +
     theme_classic() +
     ylab("PPI network resilience") +
@@ -1201,16 +1191,16 @@ S1Fig.panelB <- ggplot(cong.single.KO.50K.resilience.df,
                color = 'red', linetype = "dotted") +
     ggtitle("Cong PPI dataset")
 
-S1Fig.panels <- plot_grid(S1Fig.panelA, S1Fig.panelB, labels = c('A', 'B'), ncol = 1)
+S2Fig.panels <- plot_grid(S2Fig.panelA, S2Fig.panelB, labels = c('A', 'B'), ncol = 1)
 
-S1Fig <- plot_grid(
-    S1Fig.title, S1Fig.panels,
+S2Fig <- plot_grid(
+    S2Fig.title, S2Fig.panels,
     ncol = 1,
     ## rel_heights values control vertical title margins
     rel_heights = c(0.05, 1)
 )
     
-ggsave("../results/resilience/figures/S1Fig.pdf", S1Fig, height = 8, width = 6)
+ggsave("../results/resilience/figures/S2Fig.pdf", S2Fig, height = 8, width = 6)
 
 #########################################################################################
 ## examine resilience in the MAE genomes.
