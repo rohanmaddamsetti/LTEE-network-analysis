@@ -181,7 +181,9 @@ KOed.50K.metabolic.enzymes <- rbind(KOed.50K.BiGG.core.genes,
                                 KOed.50K.generalist.genes) %>%
     inner_join(REL606.genes)
 
-write.csv(KOed.50K.metabolic.enzymes, "../results/metabolic-enzymes/KOed-metabolic-enzymes-in-LTEE-50K-A-clones.csv")
+write.csv(KOed.50K.metabolic.enzymes,
+          "../results/metabolic-enzymes/KOed-metabolic-enzymes-in-LTEE-50K-A-clones.csv",
+          row.names = FALSE)
 
 ########################################################
 ## METABOLIC ENZYME STIMS ANALYSIS.
