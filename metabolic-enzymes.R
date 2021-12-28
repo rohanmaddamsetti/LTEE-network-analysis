@@ -149,8 +149,15 @@ KOed.50K.A.clone.genes.df <- KOed.genes.in.LTEE.50K.A.clones %>%
     enframe() %>%
     unnest_longer(value) %>%
     rename(Population = name) %>%
-    rename(Gene = value)
-    
+    rename(Gene = value) %>%
+    ## add metadata.
+    inner_join(REL606.genes)
+
+## write to file, so that these gene knockouts can be used for dynamic
+## FBA analysis with COMETS.
+write.csv(KOed.50K.A.clone.genes.df,
+          "../results/metabolic-enzymes/KOed-genes-in-LTEE-50K-A-clones.csv",
+          row.names = FALSE)
 
 ## KO'ed BiGG core genes
 KOed.50K.BiGG.core.genes <- KOed.50K.A.clone.genes.df %>%
@@ -173,14 +180,12 @@ KOed.50K.generalist.genes <- KOed.50K.A.clone.genes.df %>%
     filter(Gene %in% generalist.enzymes$Gene) %>%
     mutate(MetabolicClass = "Generalist")
 
-## combine these tables, add metadata, and write to file, so that these
+## combine these tables, and write to file, so that these
 ## gene knockouts can be used for dynamic FBA analysis with COMETS.
 KOed.50K.metabolic.enzymes <- rbind(KOed.50K.BiGG.core.genes,
                                 KOed.50K.superessential.genes,
                                 KOed.50K.specialist.genes,
-                                KOed.50K.generalist.genes) %>%
-    inner_join(REL606.genes)
-
+                                KOed.50K.generalist.genes) 
 write.csv(KOed.50K.metabolic.enzymes,
           "../results/metabolic-enzymes/KOed-metabolic-enzymes-in-LTEE-50K-A-clones.csv",
           row.names = FALSE)
