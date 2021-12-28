@@ -6,7 +6,7 @@
 source("metagenomics-library.R")
 library(UpSetR)
 ####################
-## DATA PREPROCESSING
+## (METAGENOMIC) DATA PREPROCESSING
 
 ## get the lengths of all genes in REL606.
 ## This excludes genes in repetitive regions of the genome.
@@ -33,6 +33,7 @@ REL606.genes <- REL606.genes %>%
 ## factor type and setting the levels.
 nonmutator.pops <- c("Ara-5", "Ara-6", "Ara+1", "Ara+2", "Ara+4", "Ara+5")
 hypermutator.pops <- c("Ara-1", "Ara-2", "Ara-3", "Ara-4", "Ara+3", "Ara+6")
+LTEE.pop.vec <- c(nonmutator.pops, hypermutator.pops)
 
 ## import genes in the table created by:
 ## conda activate ltee-metagenomix
@@ -45,7 +46,7 @@ gene.mutation.data <- read.csv(
     ## This for changing the ordering of populations in plots.
     mutate(Population = factor(
                Population,
-               levels = c(nonmutator.pops, hypermutator.pops))) %>%
+               levels = LTEE.pop.vec)) %>%
     inner_join(REL606.genes) %>%
     filter(Gene!='intergenic')
 
@@ -65,7 +66,125 @@ nonmutator.data <- gene.mutation.data %>%
                              levels = nonmutator.pops))
 
 ########################################################
-## METABOLIC ENZYME ANALYSIS.
+## METABOLIC ENZYME DATASETS
+########################################################
+
+## BiGG Models E. coli core.
+BiGG.core <- read.csv("../results/metabolic-enzymes/BiGG-Model-Ecoli_core.csv") %>%
+    mutate(blattner = BiGG.ID) %>%
+    left_join(REL606.genes)
+
+## superessential metabolic reactions reported by Barve and Wagner (2012).
+superessential.rxns.df <- read.csv("../results/metabolic-enzymes/Barve2012-S6-superessential.csv") %>%
+    inner_join(REL606.genes)
+
+## Look at specialist and generalist enzymes in Nam et al. (2012):
+## Network context and selection in the evolution of enzyme specificity.
+
+## 1157 genes.
+Nam.df <- read.csv("../results/metabolic-enzymes/Nam2012_Database_S1.csv") %>%
+    left_join(REL606.genes) %>% filter(!is.na(Gene))
+
+specialist.enzymes <- Nam.df %>% filter(Class=="Spec.")
+generalist.enzymes <- Nam.df %>% filter(Class=="Gen.")
+
+########################################################
+## KNOCKOUTS OF METABOLIC ENZYMES IN 50K GENOMES
+########################################################
+
+## Question: have any of the BiGG core, superessential,
+## or specialist/generalist enzymes been knocked out in any of the
+## 50K LTEE A clones?
+
+make.list.of.strain.to.KOed.genes <- function(LTEE.KO.data) {
+## make a list of strain to vectors of KO'ed genes.
+
+    strip.and.split <- function(x) {
+        ## remove [square brackets] and split on commas.
+        str_replace_all(x, c("\\[" = "",  "\\]" = "")) %>%
+            str_split(",")        
+    }
+    
+    ## This is a helper function that does the string manipulation
+    ## to extract and concatenate genes from rows of the dataframe
+    ## to return a vector of genes.
+    KO.df.to.KO.vec <- function(strain.df) {
+        parsed.gene.list <- sapply(strain.df$gene_list, strip.and.split)
+        reduce(parsed.gene.list, .f = c ) %>% unique()
+    }
+    
+    LTEE.KO.data %>%
+        ## for easy plotting, split on population.
+        ## CRITICAL ASSUMPTION: one strain per population.
+        split(.$population) %>%
+        map(.f = KO.df.to.KO.vec)
+}
+
+
+LTEE.50K.A.clone.KO.muts <- read.csv(
+    "../data/LTEE-264-genomes-SNP-nonsense-small-indel-MOB-large-deletions.csv") %>%
+    select(-X) %>% ## drop this indexing column.
+    ## filter out intergenic mutations.
+    filter(!str_detect(gene_position, "intergenic")) %>%
+    ## 50,000 generations only
+    filter(time == 50000) %>%
+    ## and A clone only.
+    filter(clone == 'A')
+
+LTEE.50K.A.clone.KO.metadata <- LTEE.50K.A.clone.KO.muts %>%
+    select(population,time,strain,clone,mutator_status) %>%
+    distinct() %>%
+    mutate(Generation=time/10000) %>%
+    ## This for changing the ordering of populations in plots.
+    mutate(population=factor(population,levels = LTEE.pop.vec))
+
+
+## make a data structure for genes affected by KO mutations in 50K A clones.
+KOed.genes.in.LTEE.50K.A.clones <- LTEE.50K.A.clone.KO.muts %>%
+    select(population, strain, clone, gene_list) %>%
+    make.list.of.strain.to.KOed.genes()
+
+## turn this data structure into a data.frame.
+KOed.50K.A.clone.genes.df <- KOed.genes.in.LTEE.50K.A.clones %>%
+    enframe() %>%
+    unnest_longer(value) %>%
+    rename(Population = name) %>%
+    rename(Gene = value)
+    
+
+## KO'ed BiGG core genes
+KOed.50K.BiGG.core.genes <- KOed.50K.A.clone.genes.df %>%
+    filter(Gene %in% BiGG.core$Gene) %>%
+    mutate(MetabolicClass = "BiGG_core")
+
+## KO'ed superessential genes
+KOed.50K.superessential.genes <- KOed.50K.A.clone.genes.df %>%
+    filter(Gene %in% superessential.rxns.df$Gene) %>%
+    mutate(MetabolicClass = "Superessential")
+
+## KO'ed specialist and generalist enzymes in Nam et al. (2012):
+## Network context and selection in the evolution of enzyme specificity.
+
+KOed.50K.specialist.genes <- KOed.50K.A.clone.genes.df %>%
+    filter(Gene %in% specialist.enzymes$Gene) %>%
+    mutate(MetabolicClass = "Specialist")
+
+KOed.50K.generalist.genes <- KOed.50K.A.clone.genes.df %>%
+    filter(Gene %in% generalist.enzymes$Gene) %>%
+    mutate(MetabolicClass = "Generalist")
+
+## combine these tables, add metadata, and write to file, so that these
+## gene knockouts can be used for dynamic FBA analysis with COMETS.
+KOed.50K.metabolic.enzymes <- rbind(KOed.50K.BiGG.core.genes,
+                                KOed.50K.superessential.genes,
+                                KOed.50K.specialist.genes,
+                                KOed.50K.generalist.genes) %>%
+    inner_join(REL606.genes)
+
+write.csv(KOed.50K.metabolic.enzymes, "../results/metabolic-enzymes/KOed-metabolic-enzymes-in-LTEE-50K-A-clones.csv")
+
+########################################################
+## METABOLIC ENZYME STIMS ANALYSIS.
 ########################################################
 
 ## Run STIMS on BiGG Models E. coli core.
@@ -135,7 +254,6 @@ BiGG.core.pvals <- calc.traj.pvals(gene.mutation.data, REL606.genes, unique(BiGG
 
 #####################################################################################
 ## examine superessential metabolic reactions reported by Barve and Wagner (2012).
-superessential.rxns.df <- read.csv("../results/metabolic-enzymes/Barve2012-S6-superessential.csv") %>% inner_join(REL606.genes)
 
 ## plot just the hypermutator populations.
 superessential.hypermut.data <- hypermutator.data %>%
@@ -212,13 +330,6 @@ save_plot("../results/metabolic-enzymes/S1Fig.pdf",S1Fig, base_height=7,base_asp
 ################################################################
 ## Look at specialist and generalist enzymes in Nam et al. (2012):
 ## Network context and selection in the evolution of enzyme specificity.
-
-## 1157 genes.
-Nam.df <- read.csv("../results/metabolic-enzymes/Nam2012_Database_S1.csv") %>%
-    left_join(REL606.genes) %>% filter(!is.na(Gene))
-
-specialist.enzymes <- Nam.df %>% filter(Class=="Spec.")
-generalist.enzymes <- Nam.df %>% filter(Class=="Gen.")
 
 ## plot just the hypermutator populations.
 specialist.hypermut.data <- hypermutator.data %>%
