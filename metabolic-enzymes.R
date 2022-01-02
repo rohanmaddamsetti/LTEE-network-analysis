@@ -89,12 +89,8 @@ specialist.enzymes <- Nam.df %>% filter(Class=="Spec.")
 generalist.enzymes <- Nam.df %>% filter(Class=="Gen.")
 
 ########################################################
-## KNOCKOUTS OF METABOLIC ENZYMES IN 50K GENOMES
+## KNOCKOUTS OF METABOLIC ENZYMES IN 50K LTEE GENOMES
 ########################################################
-
-## Question: have any of the BiGG core, superessential,
-## or specialist/generalist enzymes been knocked out in any of the
-## 50K LTEE A clones?
 
 make.list.of.strain.to.KOed.genes <- function(LTEE.KO.data) {
 ## make a list of strain to vectors of KO'ed genes.
@@ -120,32 +116,21 @@ make.list.of.strain.to.KOed.genes <- function(LTEE.KO.data) {
         map(.f = KO.df.to.KO.vec)
 }
 
-
-LTEE.50K.A.clone.KO.muts <- read.csv(
-    "../data/LTEE-264-genomes-SNP-nonsense-small-indel-MOB-large-deletions.csv") %>%
+## We need this to remove "KO'ed genes" that were deleted after an amplification,
+## preserving overall copy number.
+AMPed.50K.A.clone.genes.df <- read.csv(
+    "../data/LTEE-264-genomes-large-amplifications.csv") %>%
     select(-X) %>% ## drop this indexing column.
-    ## filter out intergenic mutations.
-    filter(!str_detect(gene_position, "intergenic")) %>%
     ## 50,000 generations only
     filter(time == 50000) %>%
     ## and A clone only.
-    filter(clone == 'A')
-
-LTEE.50K.A.clone.KO.metadata <- LTEE.50K.A.clone.KO.muts %>%
-    select(population,time,strain,clone,mutator_status) %>%
-    distinct() %>%
-    mutate(Generation=time/10000) %>%
-    ## This for changing the ordering of populations in plots.
-    mutate(population=factor(population,levels = LTEE.pop.vec))
-
-
-## make a data structure for genes affected by KO mutations in 50K A clones.
-KOed.genes.in.LTEE.50K.A.clones <- LTEE.50K.A.clone.KO.muts %>%
+    filter(clone == 'A') %>%
+    ## make a dataframe for genes affected by AMP mutations in 50K A clones.
     select(population, strain, clone, gene_list) %>%
-    make.list.of.strain.to.KOed.genes()
-
-## turn this data structure into a data.frame.
-KOed.50K.A.clone.genes.df <- KOed.genes.in.LTEE.50K.A.clones %>%
+    ## make a data structure for genes affected by AMP mutations in 50K A clones.
+    ## This function should still work even though its a misnomer here.
+    make.list.of.strain.to.KOed.genes() %>%
+    ## turn this data structure into a data.frame.
     enframe() %>%
     unnest_longer(value) %>%
     rename(Population = name) %>%
@@ -153,42 +138,76 @@ KOed.50K.A.clone.genes.df <- KOed.genes.in.LTEE.50K.A.clones %>%
     ## add metadata.
     inner_join(REL606.genes)
 
-## write to file, so that these gene knockouts can be used for dynamic
-## FBA analysis with COMETS.
-write.csv(KOed.50K.A.clone.genes.df,
-          "../results/metabolic-enzymes/KOed-genes-in-LTEE-50K-A-clones.csv",
+## get candidate KO mutations, process, and filter for those in amplifications.
+KOed.50K.A.clone.genes.df <- read.csv(
+    "../data/LTEE-264-genomes-SNP-nonsense-small-indel-MOB-large-deletions.csv") %>%
+    select(-X) %>% ## drop this indexing column.
+    ## filter out intergenic mutations.
+    filter(!str_detect(gene_position, "intergenic")) %>%
+    ## 50,000 generations only
+    filter(time == 50000) %>%
+    ## and A clone only.
+    filter(clone == 'A') %>%
+## make a dataframe for genes affected by KO mutations in 50K A clones.
+    select(population, strain, clone, gene_list) %>%
+    ## make a data structure for genes affected by KO mutations in 50K A clones.
+    make.list.of.strain.to.KOed.genes() %>%
+    ## turn this data structure into a data.frame.
+    enframe() %>%
+    unnest_longer(value) %>%
+    rename(Population = name) %>%
+    rename(Gene = value) %>%
+    ## add metadata.
+    inner_join(REL606.genes) %>%
+    ## ABSOLUTELY CRITICAL: remove all "KO" mutations that were previously duplicated.
+    anti_join(AMPed.50K.A.clone.genes.df)
+
+
+## Use the Favate et al. (2021) Riboseq/RNAseq data to cross-check.
+## Import separately for cross-checking in the end.
+favate.data <- read.csv("../data/Favate2021_table_s1_read_counts.csv") %>%
+    ## ignore REL606 and REL607 data.
+    filter(!(line %in% c("REL606", "REL607"))) %>%
+    group_by(line, target_id, eff_length, length) %>%
+    summarize(total_est_counts = sum(est_counts)) %>%
+    rename(Population = line) %>%
+    rename(locus_tag = target_id)
+
+## IMPORTANT: Ara+6 is not represented in these data, due to contamination.
+favate.no.expression.df <- favate.data %>%
+    ## require no transcription or translation in any replicate.
+    filter(total_est_counts == 0) %>%
+    as_tibble() %>%
+    ## I'm not sure what the ERC_00XXX IDs are. Ignore those and the tRNAs for now.
+    filter(str_detect(locus_tag,"^ECB")) %>%
+    inner_join(REL606.genes) %>%
+    ## remove unnecessary columns before joining to the KO dataset from genomics.
+    select(-eff_length, -length, -total_est_counts)
+
+## combine the genomics, RNAseq, and Riboseq data to generate the table of genes
+## to remove from the 50K metabolic networks.
+## There must be no expression, and use the KOs to get Ara+6.
+inactive.50K.A.clone.genes.df <- left_join(
+    favate.no.expression.df, KOed.50K.A.clone.genes.df)
+
+## write to file, so that these gene knockouts can be used for FBA.
+write.csv(inactive.50K.A.clone.genes.df,
+          "../results/metabolic-enzymes/inactive-genes-in-LTEE-50K-A-clones.csv",
           row.names = FALSE)
 
-## KO'ed BiGG core genes
-KOed.50K.BiGG.core.genes <- KOed.50K.A.clone.genes.df %>%
-    filter(Gene %in% BiGG.core$Gene) %>%
-    mutate(MetabolicClass = "BiGG_core")
+## This is quite interesting: several genes with premature stops are still
+## being expressed, some at quite high levels. This could represent the
+## evolution of genes by removing extraneous C-terminal domains.
+## worth exploring in future work.
+expressed.putative.KOs <- anti_join(
+    KOed.50K.A.clone.genes.df, favate.no.expression.df) %>%
+    filter(Population != "Ara+6") %>%
+    left_join(favate.data) %>%
+    select(-eff_length, -length) %>%
+    ## reorder the columns
+    select(Population, Gene, total_est_counts, product, locus_tag,
+           blattner, gene_length, start, end, strand)
 
-## KO'ed superessential genes
-KOed.50K.superessential.genes <- KOed.50K.A.clone.genes.df %>%
-    filter(Gene %in% superessential.rxns.df$Gene) %>%
-    mutate(MetabolicClass = "Superessential")
-
-## KO'ed specialist and generalist enzymes in Nam et al. (2012):
-## Network context and selection in the evolution of enzyme specificity.
-
-KOed.50K.specialist.genes <- KOed.50K.A.clone.genes.df %>%
-    filter(Gene %in% specialist.enzymes$Gene) %>%
-    mutate(MetabolicClass = "Specialist")
-
-KOed.50K.generalist.genes <- KOed.50K.A.clone.genes.df %>%
-    filter(Gene %in% generalist.enzymes$Gene) %>%
-    mutate(MetabolicClass = "Generalist")
-
-## combine these tables, and write to file, so that these
-## gene knockouts can be used for dynamic FBA analysis with COMETS.
-KOed.50K.metabolic.enzymes <- rbind(KOed.50K.BiGG.core.genes,
-                                KOed.50K.superessential.genes,
-                                KOed.50K.specialist.genes,
-                                KOed.50K.generalist.genes) 
-write.csv(KOed.50K.metabolic.enzymes,
-          "../results/metabolic-enzymes/KOed-metabolic-enzymes-in-LTEE-50K-A-clones.csv",
-          row.names = FALSE)
 
 ########################################################
 ## METABOLIC ENZYME STIMS ANALYSIS.

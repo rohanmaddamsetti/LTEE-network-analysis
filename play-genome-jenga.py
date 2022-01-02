@@ -17,7 +17,7 @@ from os import path
 import random
 
 
-def play_genome_jenga1(basic_model, cutoff = 0.01):
+def play_genome_jenga1(basic_model, cutoff = 0.000005):
     """
 
     This version completely removes genes from the model.
@@ -68,7 +68,7 @@ def play_genome_jenga1(basic_model, cutoff = 0.01):
     return evolved_model
 
 
-def play_genome_jenga2(basic_model, cutoff = 0.01):
+def play_genome_jenga2(basic_model, cutoff = 0.000005):
     """
 
     This version inactivates genes in the model, but does not
@@ -147,7 +147,23 @@ def main():
         BiGG_model_dir, "iECB_1328.json"))
     REL606_model.id = "REL606"
 
-    evolved_model = play_jenga1(REL606_model)
+    ## to simulate DM25, we need to add an excess of thiamine to the
+    ## default minimal glucose-limited medium
+    ## (no thiamine is in the core_model).
+    K12_medium = K12_model.medium
+    K12_medium['EX_thm_e'] = 1000.0
+    K12_model.medium = K12_medium
+
+    REL606_medium = REL606_model.medium
+    REL606_medium['EX_thm_e'] = 1000.0
+    REL606_model.medium = REL606_medium
+    
+    ## effective population size (transfer bottleneck) of LTEE
+    Neff = 5000000.0
+    neutral_cutoff = 0.000005
+    assert neutral_cutoff = float(1.0)/float(Neff)
+    
+    evolved_model = play_genome_jenga1(REL606_model, neutral_cutoff)
     return
 
 
