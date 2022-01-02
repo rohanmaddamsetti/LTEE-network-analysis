@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 
 """
-play-jenga.py by Rohan Maddamsetti.
+play-genome-jenga.py by Rohan Maddamsetti.
 
-This script generates minimal metabolic networks,
+This script generates a minimal metabolic network,
 using the method described in Pal et al. (2006) in Nature,
 and referenced by Hosseini et al. in PNAS.
 
@@ -17,34 +17,7 @@ from os import path
 import random
 
 
-def generate_LTEE_clone_cobra_models(KOed_genes_df, basic_model,
-                                     using_locus_tag=False):
-    LTEE_cobra_models = {}
-    nonmutator_pops = ["Ara-5", "Ara-6", "Ara+1", "Ara+2", "Ara+4", "Ara+5"]
-    mutator_pops = ["Ara-1", "Ara-2", "Ara-3", "Ara-4", "Ara+3", "Ara+6"]
-    LTEE_pop_vec = nonmutator_pops + mutator_pops
-    model_genes = [x.id for x in basic_model.genes]
-    for LTEE_pop in LTEE_pop_vec:
-        cur_KO_model = basic_model.copy()
-        cur_KO_model.id = LTEE_pop + "_50K_A_clone"
-        is_cur_pop = (KOed_genes_df["Population"] == LTEE_pop)
-        
-        if using_locus_tag:
-            KOed_genes = [x for x in KOed_genes_df[is_cur_pop].locus_tag]
-        else:
-            KOed_genes = [x for x in KOed_genes_df[is_cur_pop].blattner]
-            
-        genes_to_remove = [cur_KO_model.genes.get_by_id(x)
-                           for x in KOed_genes if x in model_genes]
-        if genes_to_remove:
-            cobra.manipulation.delete_model_genes(
-                cur_KO_model, genes_to_remove)
-        
-        LTEE_cobra_models[LTEE_pop] = cur_KO_model
-    return LTEE_cobra_models
-
-
-def play_jenga1(basic_model, cutoff = 0.01):
+def play_genome_jenga1(basic_model, cutoff = 0.01):
     """
 
     This version completely removes genes from the model.
@@ -94,7 +67,8 @@ def play_jenga1(basic_model, cutoff = 0.01):
     print("steps <= " + str(steps))
     return evolved_model
 
-def play_jenga2(basic_model, cutoff = 0.01):
+
+def play_genome_jenga2(basic_model, cutoff = 0.01):
     """
 
     This version inactivates genes in the model, but does not
@@ -156,6 +130,12 @@ def main():
     print(cobra_config)
     
     BiGG_model_dir = "../data/BiGG-models"
+
+    ## The simplest well-curated model: E. coli core metabolism.
+    core_model = cobra.io.load_json_model(path.join(
+        BiGG_model_dir, "e_coli_core.json"))
+    core_model.id = "Ecoli-core"
+    
     # the E. coli K-12 iJO1366 model: this is the best curated complete E. coli model.
     K12_model = cobra.io.load_json_model(path.join(
         BiGG_model_dir, "iJO1366.json"))
@@ -167,39 +147,9 @@ def main():
         BiGG_model_dir, "iECB_1328.json"))
     REL606_model.id = "REL606"
 
-    ## The simplest well-curated model: E. coli core metabolism.
-    core_model = cobra.io.load_json_model(path.join(
-        BiGG_model_dir, "e_coli_core.json"))
-    core_model.id = "Ecoli-core"
-
-    nonmutator_pops = ["Ara-5", "Ara-6", "Ara+1", "Ara+2", "Ara+4", "Ara+5"]
-    mutator_pops = ["Ara-1", "Ara-2", "Ara-3", "Ara-4", "Ara+3", "Ara+6"]
-    LTEE_pop_vec = nonmutator_pops + mutator_pops
-
-    all_KOed_genes_in_50K_A_clones = pd.read_csv(
-        "../results/metabolic-enzymes/KOed-genes-in-LTEE-50K-A-clones.csv")
-
-    ## Generate models from K-12.
-    iJO1366_LTEE_models = generate_LTEE_clone_cobra_models(
-        all_KOed_genes_in_50K_A_clones, K12_model)
-    ## Generate models from REL606.
-    iECB_1328_LTEE_models = generate_LTEE_clone_cobra_models(
-        all_KOed_genes_in_50K_A_clones, REL606_model, using_locus_tag=True)
-
-    ## play_jenga functions work fine with the core_model.
-    ##evolved_model = play_jenga1(core_model)
-    ##evolved_model = play_jenga2(core_model)
-
-
-    ## play_jenga1 and play_jenga2 both fail, on K12 and REL606 models, on both
-    ## my laptop and the DCC.
-    ## then rewrite my code to avoid whatever unknown block
-    ## that is failing.
-    evolved_model = play_jenga1(K12_model)
-
-    ## play_jenga1 function fails on REL606_model
-    ##evolved_model = play_jenga2(REL606_model)
+    evolved_model = play_jenga1(REL606_model)
     return
 
-## run the main program
+
+## play genome Jenga!
 main()
