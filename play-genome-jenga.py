@@ -30,7 +30,7 @@ def outf_path(outdir, outf_name, taskID):
     return outf_path
 
 
-def play_genome_jenga1(basic_model, cutoff = 0.0000002):
+def play_genome_jenga1(basic_model, cutoff = 0.00000003):
     """ This version completely removes genes from the model."""
     random.seed() ## seed the PRNG with the current system time.
     evolved_model = basic_model.copy()
@@ -58,7 +58,7 @@ def play_genome_jenga1(basic_model, cutoff = 0.0000002):
     return evolved_model
 
 
-def play_genome_jenga2(basic_model, cutoff = 0.0000002):
+def play_genome_jenga2(basic_model, cutoff = 0.00000003):
     """ This version inactivates genes in the model, but does not remove them."""
     random.seed() ## seed the PRNG with the current system time.
     evolved_model = basic_model.copy()
@@ -154,10 +154,9 @@ def main():
     REL606_medium['EX_thm_e'] = 1000.0
     REL606_model.medium = REL606_medium
     
-    ## effective population size (transfer bottleneck) of LTEE
-    Neff = 5000000.0
+    ## effective LTEE population size (see Wiser et al. 2013 Supplement)
+    Neff = 33000000.0
     neutral_cutoff = 1.0/Neff
-    assert neutral_cutoff == 0.0000002
     ## play Genome Jenga!
     evolved_model = play_genome_jenga1(REL606_model, neutral_cutoff)
     ## and write the results to file.
