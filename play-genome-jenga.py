@@ -52,6 +52,7 @@ def play_genome_jenga1(basic_model, cutoff = 0.00000003):
         if num_candidate_genes: ## there exist genes to delete
             idx_to_delete = random.sample(range(num_candidate_genes),1).pop()
             genes_to_delete = filtered_KO_results.ids.tolist()[idx_to_delete]
+            print("deleting: ", genes_to_delete)
             cobra.manipulation.remove_genes(evolved_model, genes_to_delete)
         else: ## no more genes to delete
             break ## leave the while loop.  
@@ -82,6 +83,7 @@ def play_genome_jenga2(basic_model, cutoff = 0.00000003):
         if num_candidate_genes: ## there exist genes to delete
             idx_to_delete = random.sample(range(num_candidate_genes),1).pop()
             genes_to_delete = list(filtered_KO_results.ids.tolist()[idx_to_delete])
+            print("deleting: ", genes_to_delete)
             cobra.manipulation.delete_model_genes(evolved_model, genes_to_delete)
         else: ## no more genes to delete
             break ## leave the while loop.  
@@ -121,8 +123,8 @@ def write_reactions(evolved_model, reaction_outf):
 
 
 def main():
-    
-    ## use Gurobi. It makes a big difference!
+
+    ## Use Gurobi 9.5.
     cobra_config = cobra.Configuration()
     cobra_config.solver = "gurobi"
     
@@ -167,9 +169,11 @@ def main():
     write_essential_genes(evolved_model, essential_outf)
     rxn_outf = outf_path(outdir, "minimal_reactions", TASK_ID)
     write_reactions(evolved_model, rxn_outf)
+    ## signal that the program completed successfully.
+    print("SUCCESS!")
     return
 
 
-## play Genome Jenga!
+## let's play Genome Jenga!
 if __name__ == "__main__":
     main()
