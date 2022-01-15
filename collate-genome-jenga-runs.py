@@ -25,7 +25,7 @@ def sort_the_paths(pathlist):
     return sorted_paths
 
 
-def collate_files(pathlist, outfilepath):
+def collate_files(pathlist, outfilepath, sep=","):
     sorted_pathlist = sort_the_paths(pathlist)
     header = None
     with open(outfilepath, "w") as out_fh:
@@ -34,10 +34,13 @@ def collate_files(pathlist, outfilepath):
             with open(path, "r") as in_fh:
                 for i, line in enumerate(in_fh):
                     if i == 0 and header is None:
-                        header = line.strip() + ",Replicate\n"
+                        header = line.strip() + sep + "Replicate\n"
                         out_fh.write(header)
                     else:
-                        outline = line.strip() + "," + cur_rep + "\n"
+                        if i == 0: continue ## skip the header.
+                        if "s0001" in line:
+                            continue ## skip the "gene" for spontaneous reactions.
+                        outline = line.strip() + sep + cur_rep + "\n"
                         out_fh.write(outline)
     return
                     
@@ -53,7 +56,7 @@ def main():
                              if "essential_genes" in x]
     minimal_reactions_files = [join(inputdir, x) for x in listdir(inputdir)
                                  if "minimal_reactions" in x]
-    collate_files(minimal_genome_files, join(rdir, "jenga_minimal_genome.csv"))
+    collate_files(minimal_genome_files, join(rdir, "jenga_minimal_genomes.csv"))
     collate_files(essential_genes_files, join(rdir, "jenga_essential_genes.csv"))
     collate_files(minimal_reactions_files, join(rdir, "jenga_minimal_reactions.csv"))
     return

@@ -88,6 +88,33 @@ Nam.df <- read.csv("../results/metabolic-enzymes/Nam2012_Database_S1.csv") %>%
 specialist.enzymes <- Nam.df %>% filter(Class=="Spec.")
 generalist.enzymes <- Nam.df %>% filter(Class=="Gen.")
 
+######################################################################
+## Figure 1: Make an UpSet plot to examine set overlap.
+
+## Cite: Jake R Conway, Alexander Lex, Nils Gehlenborg UpSetR:
+## An R Package for the Visualization of Intersecting Sets and their
+## Properties doi: https://doi.org/10.1093/bioinformatics/btx364
+
+## The as.numeric() calls turn TRUE/FALSE to 1/0.
+REL606.UpSet.data <- REL606.genes %>%
+    mutate(`BiGG Core` = Gene %in% BiGG.core$Gene) %>%
+    mutate(`BiGG Core` = as.numeric(`BiGG Core`)) %>%
+    mutate(Superessential = Gene %in% superessential.rxns.df$Gene) %>%
+    mutate(Superessential = as.numeric(Superessential)) %>%
+    mutate(Specialist = Gene %in% specialist.enzymes$Gene) %>%
+    mutate(Specialist = as.numeric(Specialist)) %>%
+    mutate(Generalist = Gene %in% generalist.enzymes$Gene) %>%
+    mutate(Generalist = as.numeric(Generalist))
+
+pdf("../results/metabolic-enzymes/Fig1.pdf",onefile=FALSE)
+upset(REL606.UpSet.data,
+      sets = c("BiGG Core", "Superessential",
+               "Specialist", "Generalist"),
+      mb.ratio = c(0.7, 0.3), order.by = "freq", text.scale=2)
+dev.off()
+
+write.csv(REL606.UpSet.data,file="../results/metabolic-enzymes/TableS1.csv")
+
 ########################################################
 ## KNOCKOUTS OF METABOLIC ENZYMES IN 50K LTEE GENOMES
 ########################################################
@@ -230,7 +257,7 @@ c.BiGG.core.hypermut <- calc.cumulative.muts(
     BiGG.core,
     manual.pop.levels.vec = hypermutator.pops)
 
-Fig1A <- plot.base.layer(
+Fig2A <- plot.base.layer(
     hypermutator.data,
     REL606.genes,
     subset.size = length(unique(BiGG.core$Gene)),
@@ -290,7 +317,7 @@ c.superessential.hypermut <- calc.cumulative.muts(
     superessential.rxns.df,
     manual.pop.levels.vec = hypermutator.pops)
 
-Fig1B <- plot.base.layer(
+Fig2B <- plot.base.layer(
     hypermutator.data,
     REL606.genes,
     subset.size = length(unique(superessential.rxns.df$Gene)),
@@ -299,8 +326,6 @@ Fig1B <- plot.base.layer(
     my.color = "pink") %>%
     add.cumulative.mut.layer(c.superessential.hypermut, my.color="red") +
     ggtitle("Superessential metabolic enzymes")
-
-ggsave("../results/metabolic-enzymes/Fig1B.pdf",Fig1B)
 
 ## plot just the nonmutator populations.
 superessential.nonmut.data <- nonmutator.data %>%
@@ -343,10 +368,10 @@ superessential.pvals <- calc.traj.pvals(gene.mutation.data, REL606.genes, unique
 ## 12 Ara+6       9902 0.990
 
 ################################################################
-## Figure 1 combines the BiGG core and superessential gene results
+## Figure 2 combines the BiGG core and superessential gene results
 ## for hypermutators.
-Fig1 <- plot_grid(Fig1A, Fig1B, labels=c('A','B'),nrow=2)
-save_plot("../results/metabolic-enzymes/Fig1.pdf",Fig1, base_height=7,base_asp=1)
+Fig2 <- plot_grid(Fig2A, Fig2B, labels=c('A','B'),nrow=2)
+save_plot("../results/metabolic-enzymes/Fig1.pdf",Fig2, base_height=7,base_asp=1)
 
 ## Supplementary Figure S1 combines the BiGG and superessential gene
 ## results for nonmutators.
@@ -374,7 +399,7 @@ c.generalists.hypermut <- calc.cumulative.muts(
     generalist.enzymes,
     manual.pop.levels.vec = hypermutator.pops)
 
-Fig2A <- plot.base.layer(
+Fig3A <- plot.base.layer(
     hypermutator.data,
     REL606.genes,
     subset.size=length(unique(specialist.enzymes$Gene)),
@@ -384,7 +409,7 @@ Fig2A <- plot.base.layer(
     add.cumulative.mut.layer(c.specialists.hypermut, my.color="darkorchid4") +
     ggtitle("Specialist enzymes")
 
-Fig2B <- plot.base.layer(
+Fig3B <- plot.base.layer(
     hypermutator.data,
     REL606.genes,
     subset.size=length(unique(generalist.enzymes$Gene)),
@@ -394,8 +419,8 @@ Fig2B <- plot.base.layer(
     add.cumulative.mut.layer(c.generalists.hypermut, my.color="springgreen4") +
     ggtitle("Generalist enzymes")
 
-Fig2 <- plot_grid(Fig2A, Fig2B, labels=c('A','B'),nrow=2)
-save_plot("../results/metabolic-enzymes/Fig2.pdf",Fig2, base_height=7,base_asp=1)
+Fig3 <- plot_grid(Fig3A, Fig3B, labels=c('A','B'),nrow=2)
+save_plot("../results/metabolic-enzymes/Fig3.pdf",Fig3, base_height=7,base_asp=1)
 
 ## plot just the nonmutator populations.
 specialist.nonmut.data <- nonmutator.data %>%
@@ -476,26 +501,304 @@ generalist.pvals <- calc.traj.pvals(gene.mutation.data, REL606.genes, unique(gen
 ## 11 Ara+3       7066 0.707 
 ## 12 Ara+6       8988 0.899 
 
-################
-## Make an UpSet plot to examine set overlap.
+###############################################################################
+## Figure 4. Genome Jenga analysis. Panels A and B are illustrations
+## of the Jenga Hypothesis and the Genome Jenga algorithm, respectively.
 
-## Cite: Jake R Conway, Alexander Lex, Nils Gehlenborg UpSetR:
-## An R Package for the Visualization of Intersecting Sets and their
-## Properties doi: https://doi.org/10.1093/bioinformatics/btx364
+minimal.genome.data <- read.csv(
+    "../results/metabolic-enzymes/jenga_minimal_genomes.csv")
+essential.genes.data <- read.csv(
+    "../results/metabolic-enzymes/jenga_essential_genes.csv")
+minimal.rxns.data <- read.csv(
+    "../results/metabolic-enzymes/jenga_minimal_reactions.csv")
 
-## The as.numeric() calls turn TRUE/FALSE to 1/0.
-REL606.UpSet.data <- REL606.genes %>%
-    mutate(`BiGG Core` = Gene %in% BiGG.core$Gene) %>%
-    mutate(`BiGG Core` = as.numeric(`BiGG Core`)) %>%
-    mutate(Superessential = Gene %in% superessential.rxns.df$Gene) %>%
-    mutate(Superessential = as.numeric(Superessential)) %>%
-    mutate(Specialist = Gene %in% specialist.enzymes$Gene) %>%
-    mutate(Specialist = as.numeric(Specialist)) %>%
-    mutate(Generalist = Gene %in% generalist.enzymes$Gene) %>%
-    mutate(Generalist = as.numeric(Generalist))
 
-pdf("../results/metabolic-enzymes/Fig3.pdf",onefile=FALSE)
-upset(REL606.UpSet.data, sets = c("BiGG Core", "Superessential", "Specialist", "Generalist"), mb.ratio = c(0.7, 0.3), order.by = "freq", text.scale=2)
-dev.off()
+##### Figure 4, panels C, D, E.
+minimal.genome.count.df <- minimal.genome.data %>%
+    group_by(locus_tag) %>%
+    summarize(Count = n()) %>%
+    arrange(desc(Count)) %>%
+    mutate(locus_tag = factor(locus_tag,levels=.$locus_tag)) %>%
+    mutate(rank = row_number(locus_tag))
 
-write.csv(REL606.UpSet.data,file="../results/metabolic-enzymes/TableS1.csv")
+essential.gene.count.df <- essential.genes.data %>%
+    group_by(locus_tag) %>%
+    summarize(Count = n()) %>%
+    arrange(desc(Count)) %>%
+    mutate(locus_tag = factor(locus_tag,levels=.$locus_tag)) %>%
+    mutate(rank = row_number(locus_tag))
+
+minimal.rxn.count.df <- minimal.rxns.data %>%
+    group_by(Reaction) %>%
+    summarize(Count = n()) %>%
+    arrange(desc(Count)) %>%
+    mutate(Reaction = factor(Reaction,levels=.$Reaction)) %>%
+    mutate(rank = row_number(Reaction))
+
+Fig4C <- minimal.genome.count.df %>%
+    ggplot(aes(x = rank, y = Count)) +
+    geom_point(size=0.5) +
+    xlab("Genes") +
+    ylab("Number of genomes") +
+    theme_classic()
+
+Fig4D <- essential.gene.count.df %>% 
+    ggplot(aes(x = rank, y = Count)) +
+    geom_point(size=0.5) +
+    geom_vline( xintercept = 202, color="red", linetype="dashed") +
+    xlim(0,405) +
+    xlab("Essential genes") +
+    ylab("Number of genomes") +
+    theme_classic()
+
+Fig4E <- minimal.rxn.count.df %>%
+    ggplot(aes(x = rank, y = Count)) +
+    geom_point(size=0.5) +
+    xlab("Metabolic reactions") +
+    ylab("Number of genomes") +
+    theme_classic()
+
+Fig4CDE <- plot_grid(Fig4C, Fig4D, Fig4E, labels=c('C','D','E'),nrow=1)
+
+##### Figure 4, panels F, G, H.
+
+minimal.genome.sizes.df <- minimal.genome.data %>%
+    group_by(Replicate) %>%
+    summarize(NumGenes = n()) %>%
+    arrange(desc(NumGenes))
+
+essentialome.sizes.df <- essential.genes.data %>%
+    group_by(Replicate) %>%
+    summarize(NumEssentialGenes = n()) %>%
+    arrange(desc(NumEssentialGenes))
+
+minimal.rxn.network.sizes.df <- minimal.rxns.data %>%
+    group_by(Replicate) %>%
+    summarize(NumRxns = n()) %>%
+    arrange(desc(NumRxns))
+
+## Fig 4F. Minimal genomes have variable numbers of genes.
+Fig4F <- minimal.genome.sizes.df %>%
+    ggplot(aes(x = NumGenes)) +
+    geom_histogram(binwidth=1) +
+    theme_classic() +
+    ylab("Count") +
+    xlab("Genes per genome")
+
+## Fig 4G. Evolved genomes are more fragile, and the number of essential
+## genes varies across the minimal genomes.
+## IMPORTANT RESULT! The predicted essentialomes are
+## MUCH larger than the essentialome of REL606: 202 genes.
+Fig4G <- essentialome.sizes.df %>%
+    ggplot(aes(x = NumEssentialGenes)) +
+    geom_histogram(binwidth=1) +
+    theme_classic() +
+    ylab("Count") +
+    xlab("Essential genes per genome") +
+    geom_vline( xintercept=202, color="red", linetype="dashed") +
+    geom_label(x = 242, y = 50, size = 3,
+               label="202 essential genes\nin the ancestral\nmetabolic network",
+               label.size = 0, color = "red")
+
+## Fig 4H. Idiosyncratic variation in reaction network size.
+## This distribution has multiple modes.
+Fig4H <- minimal.rxn.network.sizes.df %>%
+    ggplot(aes(x = NumRxns)) +
+    geom_histogram(binwidth=1) +
+    theme_classic() +
+    ylab("Count") +
+    xlab("Reactions per network")
+
+Fig4FGH <- plot_grid(Fig4F, Fig4G, Fig4H, labels=c('F','G','H'),nrow=1)
+
+Fig4CDEFGH <- plot_grid(Fig4CDE, Fig4FGH, nrow = 2)
+ggsave("../results/metabolic-enzymes/Fig4CDEFGH.pdf", height = 5, width = 7.5)
+###############################################################################
+## Make STIMS figures for core and essential genes in the 1000 minimal genomes.
+
+## core genome of the minimal genomes.
+minimal.core <- minimal.genome.count.df %>%
+    filter(Count == 1000) %>%
+    inner_join(REL606.genes)
+## Write the minimal genome core genes to file.
+jenga.genome.core.csv <- "../results/metabolic-enzymes/jenga-genome-core.csv"
+write.csv(minimal.core, file = jenga.genome.core.csv)
+
+## core essential genes.
+minimal.essential <- essential.gene.count.df %>%
+    filter(Count == 1000) %>%
+    inner_join(REL606.genes)
+## Write the essential core genes to file.
+jenga.essential.core.csv = "../results/metabolic-enzymes/jenga-essential-core.csv"
+write.csv(minimal.essential, file = jenga.essential.core.csv)
+
+
+## plot just the hypermutator populations.
+minimal.core.hypermut.data <- hypermutator.data %>%
+    filter(Gene %in% minimal.core$Gene)
+
+c.minimal.core.hypermut <- calc.cumulative.muts(
+    minimal.core.hypermut.data,
+    minimal.core,
+    manual.pop.levels.vec = hypermutator.pops)
+
+minimal.essential.hypermut.data <- hypermutator.data %>%
+    filter(Gene %in% minimal.essential$Gene)
+
+c.minimal.essential.hypermut <- calc.cumulative.muts(
+    minimal.essential.hypermut.data,
+    minimal.essential,
+    manual.pop.levels.vec = hypermutator.pops)
+
+Fig5A <- plot.base.layer(
+    hypermutator.data,
+    REL606.genes,
+    subset.size=length(unique(minimal.core$Gene)),
+    manual.pop.levels.vec = hypermutator.pops,
+    plot.rows = 2,
+    my.color = "plum1") %>%
+    add.cumulative.mut.layer(c.minimal.core.hypermut, my.color="darkorchid4") +
+    ggtitle("Core genes found in all 1000 minimal genomes")
+
+Fig5B <- plot.base.layer(
+    hypermutator.data,
+    REL606.genes,
+    subset.size=length(unique(minimal.essential$Gene)),
+    manual.pop.levels.vec = hypermutator.pops,
+    plot.rows = 2,
+    my.color = "darkolivegreen1") %>%
+    add.cumulative.mut.layer(c.minimal.essential.hypermut, my.color="springgreen4") +
+    ggtitle("Essential genes found in all 1000 minimal genomes")
+
+Fig5 <- plot_grid(Fig5A, Fig5B, labels=c('A','B'),nrow=2)
+save_plot("../results/metabolic-enzymes/Fig5.pdf",Fig5, base_height=7,base_asp=1)
+
+## plot just the nonmutator populations.
+minimal.core.nonmut.data <- nonmutator.data %>%
+    filter(Gene %in% minimal.core$Gene)
+
+c.minimal.core.nonmut <- calc.cumulative.muts(
+    minimal.core.nonmut.data,
+    minimal.core,
+    manual.pop.levels.vec = nonmutator.pops)
+
+minimal.essential.nonmut.data <- nonmutator.data %>%
+    filter(Gene %in% minimal.essential$Gene)
+
+c.minimal.essential.nonmut <- calc.cumulative.muts(
+    minimal.essential.nonmut.data,
+    minimal.essential,
+    manual.pop.levels.vec = nonmutator.pops)
+
+S4FigA <- plot.base.layer(
+    nonmutator.data,
+    REL606.genes,
+    subset.size=length(unique(minimal.core$Gene)),
+    manual.pop.levels.vec = nonmutator.pops,
+    plot.rows = 2,
+    my.color = "plum1") %>%
+    add.cumulative.mut.layer(c.minimal.core.nonmut, my.color="darkorchid4") +
+    ggtitle("Core genes found in all 1000 minimal genomes")
+
+S4FigB <- plot.base.layer(
+    nonmutator.data,
+    REL606.genes,
+    subset.size=length(unique(minimal.essential$Gene)),
+    manual.pop.levels.vec = nonmutator.pops,
+    plot.rows = 2,
+    my.color = "darkolivegreen1") %>%
+    add.cumulative.mut.layer(c.minimal.essential.nonmut, my.color="springgreen4") +
+    ggtitle("Essential genes found in all 1000 minimal genomes")
+
+S4Fig <- plot_grid(S4FigA, S4FigB, labels=c('A','B'),nrow=2)
+save_plot("../results/metabolic-enzymes/S4Fig.pdf",S4Fig, base_height=7,base_asp=1)
+
+
+## Make STIMS figures for essential genes for glucose and citrate growth
+## in the REL606 FBA metabolic model.
+
+FBA.glucose.essential <- read.csv(
+    "../results/metabolic-enzymes/glucose_FBA_essential.csv")
+
+FBA.citrate.essential <- read.csv(
+    "../results/metabolic-enzymes/citrate_FBA_essential.csv")
+
+## plot just the hypermutator populations.
+glucose.essential.hypermut.data <- hypermutator.data %>%
+    filter(Gene %in% FBA.glucose.essential$Gene)
+
+c.glucose.essential.hypermut <- calc.cumulative.muts(
+    glucose.essential.hypermut.data,
+    FBA.glucose.essential,
+    manual.pop.levels.vec = hypermutator.pops)
+
+citrate.essential.hypermut.data <- hypermutator.data %>%
+    filter(Gene %in% FBA.citrate.essential$Gene)
+
+c.citrate.essential.hypermut <- calc.cumulative.muts(
+    citrate.essential.hypermut.data,
+    FBA.citrate.essential,
+    manual.pop.levels.vec = hypermutator.pops)
+
+Fig6A <- plot.base.layer(
+    hypermutator.data,
+    REL606.genes,
+    subset.size=length(unique(FBA.glucose.essential$Gene)),
+    manual.pop.levels.vec = hypermutator.pops,
+    plot.rows = 2,
+    my.color = "plum1") %>%
+    add.cumulative.mut.layer(c.glucose.essential.hypermut, my.color="darkorchid4") +
+    ggtitle("Genes essential for growth on glucose in the REL606 metabolic model")
+
+Fig6B <- plot.base.layer(
+    hypermutator.data,
+    REL606.genes,
+    subset.size=length(unique(FBA.citrate.essential$Gene)),
+    manual.pop.levels.vec = hypermutator.pops,
+    plot.rows = 2,
+    my.color = "darkolivegreen1") %>%
+    add.cumulative.mut.layer(c.citrate.essential.hypermut, my.color="springgreen4") +
+    ggtitle("Genes essential for growth on citrate in the REL606 metabolic model")
+
+Fig6 <- plot_grid(Fig6A, Fig6B, labels=c('A','B'),nrow=2)
+save_plot("../results/metabolic-enzymes/Fig6.pdf",Fig6, base_height=7,base_asp=1)
+
+## plot just the nonmutator populations.
+glucose.essential.nonmut.data <- nonmutator.data %>%
+    filter(Gene %in% FBA.glucose.essential$Gene)
+
+c.glucose.essential.nonmut <- calc.cumulative.muts(
+    glucose.essential.nonmut.data,
+    FBA.glucose.essential,
+    manual.pop.levels.vec = nonmutator.pops)
+
+citrate.essential.nonmut.data <- nonmutator.data %>%
+    filter(Gene %in% FBA.citrate.essential$Gene)
+
+c.citrate.essential.nonmut <- calc.cumulative.muts(
+    citrate.essential.nonmut.data,
+    FBA.citrate.essential,
+    manual.pop.levels.vec = nonmutator.pops)
+
+S5FigA <- plot.base.layer(
+    nonmutator.data,
+    REL606.genes,
+    subset.size=length(unique(FBA.glucose.essential$Gene)),
+    manual.pop.levels.vec = nonmutator.pops,
+    plot.rows = 2,
+    my.color = "plum1") %>%
+    add.cumulative.mut.layer(c.glucose.essential.nonmut, my.color="darkorchid4") +
+    ggtitle("Genes essential for growth on glucose in the REL606 metabolic model")
+
+S5FigB <- plot.base.layer(
+    nonmutator.data,
+    REL606.genes,
+    subset.size=length(unique(FBA.citrate.essential$Gene)),
+    manual.pop.levels.vec = nonmutator.pops,
+    plot.rows = 2,
+    my.color = "darkolivegreen1") %>%
+    add.cumulative.mut.layer(c.citrate.essential.nonmut, my.color="springgreen4") +
+    ggtitle("Genes essential for growth on citrate in the REL606 metabolic model")
+
+S5Fig <- plot_grid(S5FigA, S5FigB, labels=c('A','B'),nrow=2)
+save_plot("../results/metabolic-enzymes/S5Fig.pdf",S5Fig, base_height=7,base_asp=1)

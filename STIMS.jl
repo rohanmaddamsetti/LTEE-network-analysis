@@ -17,7 +17,6 @@ ISSUES:
    Nkrumah proposed the following solution:
    When the data reaches a critical size, plot a random sample of the
    data to reduce it to some size.
-
 """
 
 module STIMS

@@ -116,8 +116,8 @@ def write_reactions(evolved_model, reaction_outf):
         print("Reaction", file=fh)
         for rxn in evolved_model.reactions:
             if rxn.functional:
-                ## important: print rxn.name, not rxn.
-                print(rxn.name, file=fh)
+                ## important: print rxn.id, not rxn.
+                print(rxn.id, file=fh)
     fh.close()
     return
 
