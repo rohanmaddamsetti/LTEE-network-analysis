@@ -72,21 +72,29 @@ nonmutator.data <- gene.mutation.data %>%
 ## BiGG Models E. coli core.
 BiGG.core <- read.csv("../results/metabolic-enzymes/BiGG-Model-Ecoli_core.csv") %>%
     mutate(blattner = BiGG.ID) %>%
-    left_join(REL606.genes)
+    inner_join(REL606.genes)
+## write out these genes for julia STIMS calculations.
+write.csv(BiGG.core, "../results/metabolic-enzymes/BiGG-core-genes.csv")
 
 ## superessential metabolic reactions reported by Barve and Wagner (2012).
 superessential.rxns.df <- read.csv("../results/metabolic-enzymes/Barve2012-S6-superessential.csv") %>%
     inner_join(REL606.genes)
+## write out these genes for julia STIMS calculations.
+write.csv(superessential.rxns.df, "../results/metabolic-enzymes/superessential-genes.csv")
+
 
 ## Look at specialist and generalist enzymes in Nam et al. (2012):
 ## Network context and selection in the evolution of enzyme specificity.
 
 ## 1157 genes.
 Nam.df <- read.csv("../results/metabolic-enzymes/Nam2012_Database_S1.csv") %>%
-    left_join(REL606.genes) %>% filter(!is.na(Gene))
+    inner_join(REL606.genes) %>% filter(!is.na(Gene))
 
 specialist.enzymes <- Nam.df %>% filter(Class=="Spec.")
 generalist.enzymes <- Nam.df %>% filter(Class=="Gen.")
+## write out these genes for julia STIMS calculations.
+write.csv(specialist.enzymes, "../results/metabolic-enzymes/specialist-enzymes.csv")
+write.csv(generalist.enzymes, "../results/metabolic-enzymes/generalist-enzymes.csv")
 
 ######################################################################
 ## Figure 1: Make an UpSet plot to examine set overlap.
@@ -239,14 +247,12 @@ expressed.putative.KOs <- anti_join(
 ########################################################
 ## METABOLIC ENZYME STIMS ANALYSIS.
 ########################################################
+## I calculate the STIMS p-values in my julia script for speed.
+calculate.STIMS.pvalues <- FALSE
 
 ## Run STIMS on BiGG Models E. coli core.
 ## Hypothesis: E. coli core metabolism
 ## is evolving under purifying selection in the LTEE.
-
-BiGG.core <- read.csv("../results/metabolic-enzymes/BiGG-Model-Ecoli_core.csv") %>%
-    mutate(blattner = BiGG.ID) %>%
-    left_join(REL606.genes)
 
 ## plot just the hypermutator populations.
 BiGG.core.hypermut.data <- hypermutator.data %>%
@@ -260,7 +266,7 @@ c.BiGG.core.hypermut <- calc.cumulative.muts(
 Fig2A <- plot.base.layer(
     hypermutator.data,
     REL606.genes,
-    subset.size = length(unique(BiGG.core$Gene)),
+    subset.size = length(BiGG.core$Gene),
     manual.pop.levels.vec = hypermutator.pops,
     plot.rows = 2) %>%
     add.cumulative.mut.layer(c.BiGG.core.hypermut, my.color="black") +
@@ -278,14 +284,15 @@ c.BiGG.core.nonmut <- calc.cumulative.muts(
 S1FigA <- plot.base.layer(
     nonmutator.data,
     REL606.genes,
-    subset.size = length(unique(BiGG.core$Gene)),
+    subset.size = length(BiGG.core$Gene),
     manual.pop.levels.vec = nonmutator.pops,
     plot.rows = 2) %>%
     add.cumulative.mut.layer(c.BiGG.core.nonmut, my.color="black") +
     ggtitle("BiGG core metabolic enzymes")
     
 ## calculate formal p-values.
-BiGG.core.pvals <- calc.traj.pvals(gene.mutation.data, REL606.genes, unique(BiGG.core$Gene))
+if (calculate.STIMS.pvalues)
+    BiGG.core.pvals <- calc.traj.pvals(gene.mutation.data, REL606.genes, BiGG.core$Gene)
 
 ## results:
 ##  > BiGG.core.pvals
@@ -347,7 +354,8 @@ S1FigB <- plot.base.layer(
     ggtitle("Superessential metabolic enzymes")
 
 ## calculate formal p-values.
-superessential.pvals <- calc.traj.pvals(gene.mutation.data, REL606.genes, unique(superessential.rxns.df$Gene))
+if (calculate.STIMS.pvalues)
+    superessential.pvals <- calc.traj.pvals(gene.mutation.data, REL606.genes, unique(superessential.rxns.df$Gene))
 
 ## results:
 ## > superessential.pvals
@@ -463,7 +471,8 @@ S2Fig <- plot_grid(S2FigA, S2FigB, labels=c('A','B'),nrow=2)
 save_plot("../results/metabolic-enzymes/S2Fig.pdf",S2Fig, base_height=7,base_asp=1)
 
 ## calculate formal p-values.
-specialist.pvals <- calc.traj.pvals(gene.mutation.data, REL606.genes, unique(specialist.enzymes$Gene))
+if (calculate.STIMS.pvalues)
+    specialist.pvals <- calc.traj.pvals(gene.mutation.data, REL606.genes, unique(specialist.enzymes$Gene))
 ## results:
 ## > specialist.pvals
 ## # A tibble: 12 x 3
@@ -482,7 +491,8 @@ specialist.pvals <- calc.traj.pvals(gene.mutation.data, REL606.genes, unique(spe
 ## 11 Ara+3       7796 0.780
 ## 12 Ara+6      10000 1    
 
-generalist.pvals <- calc.traj.pvals(gene.mutation.data, REL606.genes, unique(generalist.enzymes$Gene))
+if (calculate.STIMS.pvalues)
+    generalist.pvals <- calc.traj.pvals(gene.mutation.data, REL606.genes, unique(generalist.enzymes$Gene))
 ## results:
 ## > generalist.pvals
 ## # A tibble: 12 x 3
@@ -629,7 +639,7 @@ minimal.essential <- essential.gene.count.df %>%
     filter(Count == 1000) %>%
     inner_join(REL606.genes)
 ## Write the essential core genes to file.
-jenga.essential.core.csv = "../results/metabolic-enzymes/jenga-essential-core.csv"
+jenga.essential.core.csv <- "../results/metabolic-enzymes/jenga-essential-core.csv"
 write.csv(minimal.essential, file = jenga.essential.core.csv)
 
 
