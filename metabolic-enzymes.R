@@ -512,8 +512,8 @@ if (calculate.STIMS.pvalues)
 ## 12 Ara+6       8988 0.899 
 
 ###############################################################################
-## Figure 4. Genome Jenga analysis. Panels A and B are illustrations
-## of the Jenga Hypothesis and the Genome Jenga algorithm, respectively.
+## Figure 4. Genome Jenga analysis. Panel A is an illustration
+## of the Jenga Hypothesis. 
 
 minimal.genome.data <- read.csv(
     "../results/metabolic-enzymes/jenga_minimal_genomes.csv")
@@ -523,7 +523,7 @@ minimal.rxns.data <- read.csv(
     "../results/metabolic-enzymes/jenga_minimal_reactions.csv")
 
 
-##### Figure 4, panels C, D, E.
+##### Figure 4, panels B, C, D.
 minimal.genome.count.df <- minimal.genome.data %>%
     group_by(locus_tag) %>%
     summarize(Count = n()) %>%
@@ -545,33 +545,32 @@ minimal.rxn.count.df <- minimal.rxns.data %>%
     mutate(Reaction = factor(Reaction,levels=.$Reaction)) %>%
     mutate(rank = row_number(Reaction))
 
-Fig4C <- minimal.genome.count.df %>%
+Fig4B <- minimal.genome.count.df %>%
     ggplot(aes(x = rank, y = Count)) +
     geom_point(size=0.5) +
     xlab("Genes") +
-    ylab("Number of genomes") +
+    ylab("Frequency in genomes") +
     theme_classic()
 
-Fig4D <- essential.gene.count.df %>% 
+Fig4C <- essential.gene.count.df %>% 
     ggplot(aes(x = rank, y = Count)) +
     geom_point(size=0.5) +
     geom_vline( xintercept = 202, color="red", linetype="dashed") +
     xlim(0,405) +
     xlab("Essential genes") +
-    ylab("Number of genomes") +
+    ylab("Frequency in genomes") +
     theme_classic()
 
-Fig4E <- minimal.rxn.count.df %>%
+Fig4D <- minimal.rxn.count.df %>%
     ggplot(aes(x = rank, y = Count)) +
     geom_point(size=0.5) +
     xlab("Metabolic reactions") +
-    ylab("Number of genomes") +
+    ylab("Frequency in genomes") +
     theme_classic()
 
-Fig4CDE <- plot_grid(Fig4C, Fig4D, Fig4E, labels=c('C','D','E'),nrow=1)
+Fig4BCD <- plot_grid(Fig4B, Fig4C, Fig4D, labels=c('B','C','D'),nrow=1)
 
-##### Figure 4, panels F, G, H.
-
+##### Figure 4, panels E, F, G.
 minimal.genome.sizes.df <- minimal.genome.data %>%
     group_by(Replicate) %>%
     summarize(NumGenes = n()) %>%
@@ -587,19 +586,19 @@ minimal.rxn.network.sizes.df <- minimal.rxns.data %>%
     summarize(NumRxns = n()) %>%
     arrange(desc(NumRxns))
 
-## Fig 4F. Minimal genomes have variable numbers of genes.
-Fig4F <- minimal.genome.sizes.df %>%
+## Fig 4E. Minimal genomes have variable numbers of genes.
+Fig4E <- minimal.genome.sizes.df %>%
     ggplot(aes(x = NumGenes)) +
     geom_histogram(binwidth=1) +
     theme_classic() +
     ylab("Count") +
     xlab("Genes per genome")
 
-## Fig 4G. Evolved genomes are more fragile, and the number of essential
+## Fig 4F. Evolved genomes are more fragile, and the number of essential
 ## genes varies across the minimal genomes.
 ## IMPORTANT RESULT! The predicted essentialomes are
 ## MUCH larger than the essentialome of REL606: 202 genes.
-Fig4G <- essentialome.sizes.df %>%
+Fig4F <- essentialome.sizes.df %>%
     ggplot(aes(x = NumEssentialGenes)) +
     geom_histogram(binwidth=1) +
     theme_classic() +
@@ -610,19 +609,19 @@ Fig4G <- essentialome.sizes.df %>%
                label="202 essential genes\nin the ancestral\nmetabolic network",
                label.size = 0, color = "red")
 
-## Fig 4H. Idiosyncratic variation in reaction network size.
+## Fig 4G. Idiosyncratic variation in reaction network size.
 ## This distribution has multiple modes.
-Fig4H <- minimal.rxn.network.sizes.df %>%
+Fig4G <- minimal.rxn.network.sizes.df %>%
     ggplot(aes(x = NumRxns)) +
     geom_histogram(binwidth=1) +
     theme_classic() +
     ylab("Count") +
-    xlab("Reactions per network")
+    xlab("Reactions per genome")
 
-Fig4FGH <- plot_grid(Fig4F, Fig4G, Fig4H, labels=c('F','G','H'),nrow=1)
+Fig4EFG <- plot_grid(Fig4E, Fig4F, Fig4G, labels=c('E','F','G'),nrow=1)
 
-Fig4CDEFGH <- plot_grid(Fig4CDE, Fig4FGH, nrow = 2)
-ggsave("../results/metabolic-enzymes/Fig4CDEFGH.pdf", height = 5, width = 7.5)
+Fig4BCDEFG <- plot_grid(Fig4BCD, Fig4EFG, nrow = 2)
+ggsave("../results/metabolic-enzymes/Fig4BCDEFG.pdf", height = 5, width = 7.5)
 ###############################################################################
 ## Make STIMS figures for core and essential genes in the 1000 minimal genomes.
 
@@ -666,8 +665,8 @@ Fig5A <- plot.base.layer(
     subset.size=length(unique(minimal.core$Gene)),
     manual.pop.levels.vec = hypermutator.pops,
     plot.rows = 2,
-    my.color = "plum1") %>%
-    add.cumulative.mut.layer(c.minimal.core.hypermut, my.color="darkorchid4") +
+    my.color = "azure") %>%
+    add.cumulative.mut.layer(c.minimal.core.hypermut, my.color="deepskyblue") +
     ggtitle("Core genes found in all 1000 minimal genomes")
 
 Fig5B <- plot.base.layer(
@@ -676,8 +675,8 @@ Fig5B <- plot.base.layer(
     subset.size=length(unique(minimal.essential$Gene)),
     manual.pop.levels.vec = hypermutator.pops,
     plot.rows = 2,
-    my.color = "darkolivegreen1") %>%
-    add.cumulative.mut.layer(c.minimal.essential.hypermut, my.color="springgreen4") +
+    my.color = "bisque") %>%
+    add.cumulative.mut.layer(c.minimal.essential.hypermut, my.color="brown2") +
     ggtitle("Essential genes found in all 1000 minimal genomes")
 
 Fig5 <- plot_grid(Fig5A, Fig5B, labels=c('A','B'),nrow=2)
@@ -706,8 +705,8 @@ S4FigA <- plot.base.layer(
     subset.size=length(unique(minimal.core$Gene)),
     manual.pop.levels.vec = nonmutator.pops,
     plot.rows = 2,
-    my.color = "plum1") %>%
-    add.cumulative.mut.layer(c.minimal.core.nonmut, my.color="darkorchid4") +
+    my.color = "azure") %>%
+    add.cumulative.mut.layer(c.minimal.core.nonmut, my.color="deepskyblue") +
     ggtitle("Core genes found in all 1000 minimal genomes")
 
 S4FigB <- plot.base.layer(
@@ -716,8 +715,8 @@ S4FigB <- plot.base.layer(
     subset.size=length(unique(minimal.essential$Gene)),
     manual.pop.levels.vec = nonmutator.pops,
     plot.rows = 2,
-    my.color = "darkolivegreen1") %>%
-    add.cumulative.mut.layer(c.minimal.essential.nonmut, my.color="springgreen4") +
+    my.color = "bisque") %>%
+    add.cumulative.mut.layer(c.minimal.essential.nonmut, my.color="brown2") +
     ggtitle("Essential genes found in all 1000 minimal genomes")
 
 S4Fig <- plot_grid(S4FigA, S4FigB, labels=c('A','B'),nrow=2)
@@ -756,8 +755,8 @@ Fig6A <- plot.base.layer(
     subset.size=length(unique(FBA.glucose.essential$Gene)),
     manual.pop.levels.vec = hypermutator.pops,
     plot.rows = 2,
-    my.color = "plum1") %>%
-    add.cumulative.mut.layer(c.glucose.essential.hypermut, my.color="darkorchid4") +
+    my.color = "burlywood1") %>%
+    add.cumulative.mut.layer(c.glucose.essential.hypermut, my.color="chocolate4") +
     ggtitle("Genes essential for growth on glucose in the REL606 metabolic model")
 
 Fig6B <- plot.base.layer(
@@ -766,8 +765,8 @@ Fig6B <- plot.base.layer(
     subset.size=length(unique(FBA.citrate.essential$Gene)),
     manual.pop.levels.vec = hypermutator.pops,
     plot.rows = 2,
-    my.color = "darkolivegreen1") %>%
-    add.cumulative.mut.layer(c.citrate.essential.hypermut, my.color="springgreen4") +
+    my.color = "cornsilk1") %>%
+    add.cumulative.mut.layer(c.citrate.essential.hypermut, my.color="deeppink2") +
     ggtitle("Genes essential for growth on citrate in the REL606 metabolic model")
 
 Fig6 <- plot_grid(Fig6A, Fig6B, labels=c('A','B'),nrow=2)
@@ -796,8 +795,8 @@ S5FigA <- plot.base.layer(
     subset.size=length(unique(FBA.glucose.essential$Gene)),
     manual.pop.levels.vec = nonmutator.pops,
     plot.rows = 2,
-    my.color = "plum1") %>%
-    add.cumulative.mut.layer(c.glucose.essential.nonmut, my.color="darkorchid4") +
+    my.color = "burlywood1") %>%
+    add.cumulative.mut.layer(c.glucose.essential.nonmut, my.color="chocolate4") +
     ggtitle("Genes essential for growth on glucose in the REL606 metabolic model")
 
 S5FigB <- plot.base.layer(
@@ -806,8 +805,8 @@ S5FigB <- plot.base.layer(
     subset.size=length(unique(FBA.citrate.essential$Gene)),
     manual.pop.levels.vec = nonmutator.pops,
     plot.rows = 2,
-    my.color = "darkolivegreen1") %>%
-    add.cumulative.mut.layer(c.citrate.essential.nonmut, my.color="springgreen4") +
+    my.color = "cornsilk1") %>%
+    add.cumulative.mut.layer(c.citrate.essential.nonmut, my.color="deeppink2") +
     ggtitle("Genes essential for growth on citrate in the REL606 metabolic model")
 
 S5Fig <- plot_grid(S5FigA, S5FigB, labels=c('A','B'),nrow=2)
