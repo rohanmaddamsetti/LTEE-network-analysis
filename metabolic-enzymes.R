@@ -554,6 +554,9 @@ Fig4B <- minimal.genome.count.df %>%
 
 Fig4C <- essential.gene.count.df %>% 
     ggplot(aes(x = rank, y = Count)) +
+    geom_label(x = 95, y = 500, size = 2.75,
+               label="202 essential\ngenes for\nviability in\nminimal glucose\nmedia in the\nancestral\nmetabolic\nnetwork",
+               label.size = 0, color = "red") +
     geom_point(size=0.5) +
     geom_vline( xintercept = 202, color="red", linetype="dashed") +
     xlim(0,405) +
@@ -600,14 +603,14 @@ Fig4E <- minimal.genome.sizes.df %>%
 ## MUCH larger than the essentialome of REL606: 202 genes.
 Fig4F <- essentialome.sizes.df %>%
     ggplot(aes(x = NumEssentialGenes)) +
+    geom_label(x = 242, y = 100, size = 2.75,
+               label="202 essential genes\nfor viability in\nminimal glucose media\nin the ancestral\nmetabolic network",
+               label.size = 0, color = "red") +
     geom_histogram(binwidth=1) +
     theme_classic() +
     ylab("Count") +
     xlab("Essential genes per genome") +
-    geom_vline( xintercept=202, color="red", linetype="dashed") +
-    geom_label(x = 242, y = 100, size = 3,
-               label="202 essential genes\nfor viability\nin minimal glucose media\nin the ancestral\nmetabolic network",
-               label.size = 0, color = "red")
+    geom_vline( xintercept=202, color="red", linetype="dashed")
 
 ## Fig 4G. Idiosyncratic variation in reaction network size.
 ## This distribution has multiple modes.
