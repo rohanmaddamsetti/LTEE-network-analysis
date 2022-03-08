@@ -128,7 +128,7 @@ savefig(S3Fig, "../results/metabolic-enzymes/S3Fig.pdf")
 STIMS.RunSTIMS("../results/LTEE-metagenome-mutations.csv",
                "../results/REL606_IDs.csv",
                "../results/metabolic-enzymes/BiGG-core-genes.csv",
-               "../results/metabolic-enzymes")
+               "../results/metabolic-enzymes/BiGG-core-plot.pdf")
 ## results for BiGG core:
 ## Ara-5: 0.3154
 ## Ara-6: 0.2143
@@ -147,7 +147,7 @@ STIMS.RunSTIMS("../results/LTEE-metagenome-mutations.csv",
 STIMS.RunSTIMS("../results/LTEE-metagenome-mutations.csv",
                "../results/REL606_IDs.csv",
                "../results/metabolic-enzymes/superessential-genes.csv",
-               "../results/metabolic-enzymes")
+               "../results/metabolic-enzymes/superessential-plot.pdf")
 ## results for superessential genes:
 ## Ara-5: 0.6621
 ## Ara-6: 0.9039
@@ -166,7 +166,7 @@ STIMS.RunSTIMS("../results/LTEE-metagenome-mutations.csv",
 STIMS.RunSTIMS("../results/LTEE-metagenome-mutations.csv",
                "../results/REL606_IDs.csv",
                "../results/metabolic-enzymes/specialist-enzymes.csv",
-               "../results/metabolic-enzymes")
+               "../results/metabolic-enzymes/specialist-enzymes-plot.pdf")
 ## results for specialist enzymes:
 ## Ara-5: 0.241
 ## Ara-6: 0.8504
@@ -184,7 +184,7 @@ STIMS.RunSTIMS("../results/LTEE-metagenome-mutations.csv",
 STIMS.RunSTIMS("../results/LTEE-metagenome-mutations.csv",
                "../results/REL606_IDs.csv",
                "../results/metabolic-enzymes/generalist-enzymes.csv",
-               "../results/metabolic-enzymes")
+               "../results/metabolic-enzymes/generalist-enzymes-plot.pdf")
 ## results for generalist enzymes:
 ## Ara-5: 0.7716
 ## Ara-6: 0.4526
@@ -209,7 +209,7 @@ jenga_essential_core_csv = "../results/metabolic-enzymes/jenga-essential-core.cs
 STIMS.RunSTIMS("../results/LTEE-metagenome-mutations.csv",
                "../results/REL606_IDs.csv",
                jenga_genome_core_csv,
-               "../results/metabolic-enzymes")
+               "../results/metabolic-enzymes/jenga-core-genes.pdf")
 ## Results for core genome of the minimal genomes:
 ## Ara-5: 0.9293
 ## Ara-6: 0.91
@@ -228,7 +228,7 @@ STIMS.RunSTIMS("../results/LTEE-metagenome-mutations.csv",
 STIMS.RunSTIMS("../results/LTEE-metagenome-mutations.csv",
          "../results/REL606_IDs.csv",
          jenga_essential_core_csv,
-         "../results/metabolic-enzymes")
+         "../results/metabolic-enzymes/jenga-essential-core-genes.pdf")
 ## Results on core essential genes:
 ## Ara-5: 0.8985
 ## Ara-6: 0.8473
@@ -244,16 +244,16 @@ STIMS.RunSTIMS("../results/LTEE-metagenome-mutations.csv",
 ## Ara+6: 1.0
 
 ## statistics for Figure 6, and Supplementary Figure 5.
-## run STIMS on essential genes for growth on glucose and citrate in the
-## ancestral REL606 FBA model.
+## run STIMS on essential genes for growth on
+## glucose and citrate in the ancestral REL606 FBA model.
 
-REL606_essential_csv = "../results/metabolic-enzymes/REL606_FBA_essential.csv"
+glucose_essential_csv = "../results/metabolic-enzymes/glucose_FBA_essential.csv"
 ## Run STIMS on essential genes in the REL606 genome FBA model.
 STIMS.RunSTIMS("../results/LTEE-metagenome-mutations.csv",
                "../results/REL606_IDs.csv",
-               REL606_essential_csv,
-               "../results/metabolic-enzymes")
-## Results for essential genes in the REL606 genome FBA model:
+               glucose_essential_csv,
+               "../results/metabolic-enzymes/glucose-essential-genes.pdf")
+## Results for glucose essential genes in the REL606 FBA model:
 ## Ara-5: 0.9376
 ## Ara-6: 0.6595
 ## Ara+1: 0.9533
@@ -272,8 +272,8 @@ citrate_essential_csv = "../results/metabolic-enzymes/citrate_FBA_essential.csv"
 STIMS.RunSTIMS("../results/LTEE-metagenome-mutations.csv",
                "../results/REL606_IDs.csv",
                citrate_essential_csv,
-               "../results/metabolic-enzymes")
-## Results for essential genes in the Citrate REL606 genome FBA model:
+               "../results/metabolic-enzymes/citrate-essential-genes.pdf")
+## Results for citrate essential genes in the REL606 FBA model:
 ## Ara-5: 0.9058
 ## Ara-6: 0.787
 ## Ara+1: 0.9598

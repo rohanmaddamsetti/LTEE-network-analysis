@@ -96,7 +96,7 @@ generalist.enzymes <- Nam.df %>% filter(Class=="Gen.")
 write.csv(specialist.enzymes, "../results/metabolic-enzymes/specialist-enzymes.csv")
 write.csv(generalist.enzymes, "../results/metabolic-enzymes/generalist-enzymes.csv")
 
-######################################################################
+####################################################################
 ## Figure 1: Make an UpSet plot to examine set overlap.
 
 ## Cite: Jake R Conway, Alexander Lex, Nils Gehlenborg UpSetR:
@@ -605,8 +605,8 @@ Fig4F <- essentialome.sizes.df %>%
     ylab("Count") +
     xlab("Essential genes per genome") +
     geom_vline( xintercept=202, color="red", linetype="dashed") +
-    geom_label(x = 242, y = 50, size = 3,
-               label="202 essential genes\nin the ancestral\nmetabolic network",
+    geom_label(x = 242, y = 100, size = 3,
+               label="202 essential genes\nfor viability\nin minimal glucose media\nin the ancestral\nmetabolic network",
                label.size = 0, color = "red")
 
 ## Fig 4G. Idiosyncratic variation in reaction network size.
@@ -811,3 +811,29 @@ S5FigB <- plot.base.layer(
 
 S5Fig <- plot_grid(S5FigA, S5FigB, labels=c('A','B'),nrow=2)
 save_plot("../results/metabolic-enzymes/S5Fig.pdf",S5Fig, base_height=7,base_asp=1)
+
+################################################################
+## Figure 7: Make an UpSet plot to examine set overlap in the
+## gene sets derived after playing Genome Jenga.
+
+## The as.numeric() calls turn TRUE/FALSE to 1/0.
+Fig7.UpSet.data <- REL606.genes %>%
+    mutate(`Core of minimal genomes` = Gene %in% minimal.core$Gene) %>%
+    mutate(`Core of minimal genomes` = as.numeric(`Core of minimal genomes`)) %>%
+    mutate(`Essential in minimal genomes` = Gene %in% minimal.essential$Gene) %>%
+    mutate(`Essential in minimal genomes` = as.numeric(`Essential in minimal genomes`)) %>%
+    mutate(`Essential for glucose in ancestral model` = Gene %in% FBA.glucose.essential$Gene) %>%
+    mutate(`Essential for glucose in ancestral model` = as.numeric(`Essential for glucose in ancestral model`)) %>%
+    mutate(`Essential for citrate in ancestral model` = Gene %in% FBA.citrate.essential$Gene) %>%
+    mutate(`Essential for citrate in ancestral model` = as.numeric(`Essential for citrate in ancestral model`))
+
+pdf("../results/metabolic-enzymes/Fig7.pdf",onefile=FALSE)
+upset(Fig7.UpSet.data,
+      sets = c("Core of minimal genomes",
+               "Essential in minimal genomes",
+               "Essential for glucose in ancestral model",
+               "Essential for citrate in ancestral model"),
+      mb.ratio = c(0.7, 0.3), order.by = "freq", text.scale=1.3)
+dev.off()
+
+write.csv(Fig7.UpSet.data,file="../results/metabolic-enzymes/TableS2.csv")

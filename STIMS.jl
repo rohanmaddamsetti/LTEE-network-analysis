@@ -7,9 +7,9 @@ For examples for how to run from the Julia REPL, see the function run_examples()
 
 Examples for how to run from the command-line:
 
-julia STIMS.jl ../results/LTEE-metagenome-mutations.csv ../results/REL606_IDs.csv ../data/neutral_compilation.csv -o ../results/gene-modules/STIMS-jl-test-figures
+julia STIMS.jl ../results/LTEE-metagenome-mutations.csv ../results/REL606_IDs.csv ../data/neutral_compilation.csv -o ../results/gene-modules/STIMS-jl-test-figures/STIMS-plot.pdf
 
-julia STIMS.jl ../results/SLiM-5000gen-v03.csv ../results/SLiM_geneIDs.csv ../results/SLiM_test_gene_module.csv -o ../results/gene-modules/STIMS-jl-test-figures
+julia STIMS.jl ../results/SLiM-5000gen-v03.csv ../results/SLiM_geneIDs.csv ../results/SLiM_test_gene_module.csv -o ../results/gene-modules/STIMS-jl-test-figures/STIMS-plot.pdf
 
 ISSUES:
 
@@ -17,18 +17,20 @@ ISSUES:
    Nkrumah proposed the following solution:
    When the data reaches a critical size, plot a random sample of the
    data to reduce it to some size.
+
 """
 
 module STIMS
 
-## exported interface-- the only function that users should use.
-export RunSTIMS
+## exported interface-- the only functions that users should use.
+export RunSTIMS, RunSTIMS_on_data
 
 using DataFrames, DataFramesMeta, CSV, StatsBase, FLoops, RCall, ArgParse
 
 ## See this blog post about using ggplot within Julia:
 ## https://avt.im/blog/2018/03/23/R-packages-ggplot-in-julia
 @rlibrary ggplot2
+@rlibrary scales
 
 
 function make_cumulative_muts_pop_df(gene_module_mutations_df, pop, final_time)
@@ -121,7 +123,7 @@ end
 
 function calc_traj_pvals(gene_module_df,
                          gene_mutation_data, genome_metadata,
-                         pop_level_vec; N = 10000, ncores = 4)    
+                         pop_level_vec; N = 10000)    
     #= calculate the tail probabilities of the true cumulative mutation trajectory
     of a given vector of genes (a 'module'), based on resampling
     random sets of genes. Returns the upper tail of null distribution,
@@ -129,6 +131,8 @@ function calc_traj_pvals(gene_module_df,
     Output: a dataframe with three columns: Population, count, p.val.
     =#
 
+    nthreads = Threads.nthreads() ## get the number of threads available to Julia.
+    
     ## each sample has the same cardinality as gene_module_df.Gene.
     subset_size = length(gene_module_df.Gene)
 
@@ -142,7 +146,7 @@ function calc_traj_pvals(gene_module_df,
         combine(:normalized_cs => maximum => :data_final_normalized_cs)
     end
 
-    @floop ThreadedEx(basesize = N ÷ ncores) for _ in 1:N 
+    @floop ThreadedEx(basesize = N ÷ nthreads) for _ in 1:N 
         randomized_trajectory = generate_cumulative_mut_subset(gene_mutation_data,
                                                                genome_metadata,
                                                                pop_level_vec,
@@ -231,7 +235,7 @@ function plot_base_layer(gene_mutation_data, genome_metadata, pop_level_vec;
                                                          pop_level_vec,
                                                          subset_size)
         ## add a column for bootstrap replicate
-        @transform!(randomized_traj, bootstrap_replicate = bootstrap_rep)        
+        @transform!(randomized_traj, :bootstrap_replicate = bootstrap_rep)
         bootstrapped_trajectories = vcat(bootstrapped_trajectories, randomized_traj)
     end
 
@@ -239,20 +243,28 @@ function plot_base_layer(gene_mutation_data, genome_metadata, pop_level_vec;
     ## from each population, for a two-sided test.
     ## default is alphaval == 0.05.
     middle_trajs = get_middle_trajectories(bootstrapped_trajectories, alphaval, N)
+    ## for better plotting, divide x-axis labels by 1000.
+    transform!(middle_trajs, :t0 => ByRow(t -> t/1000) => :Time)
 
-    p = ggplot(middle_trajs, aes(x=:t0, y=:normalized_cs)) +
-        ylab("Cumulative number of mutations (normalized)") +
+    ## R function for plotting better y-axis labels.
+    ## see solution here for nice scientific notation on axes.
+    ## https://stackoverflow.com/questions/10762287/how-can-i-format-axis-labels-with-exponents-with-ggplot2-and-scales
+
+    fancy_scientific = R"""function(x) {ifelse(x==0, "0", parse(text=gsub("[+]", "", gsub("e", " %*% 10^", scales::scientific_format()(x)))))}"""
+
+    p = ggplot(middle_trajs, aes(x=:Time, y=:normalized_cs)) +
+        ylab("Cumulative mutations (normalized)") +
         theme_classic() +
         geom_point(size=0.2, color=my_color) +
-        theme(var"axis.title.x" = element_text(size=14),
-              var"axis.title.y" = element_text(size=14),
-              var"axis.text.x"  = element_text(size=14),
-              var"axis.text.y"  = element_text(size=14)) +
-                  ##scale_y_continuous(labels=fancy_scientific,
-                  ##breaks = scales::extended_breaks(n = 6),
-                  ##limits = c(0, NA)) +
+        theme(var"axis.title.x" = element_text(size=13),
+              var"axis.title.y" = element_text(size=13),
+              var"axis.text.x"  = element_text(size=13),
+              var"axis.text.y"  = element_text(size=13)) +
+                  scale_y_continuous(labels=fancy_scientific,
+                                     breaks = R"scales::extended_breaks(n = 6)",
+                                     limits = R"c(0, NA)") +
                   facet_wrap(R".~Population", scales="free", nrow=4) +
-                  xlab("Time")
+                  xlab("Generations (x 1,000)")
     return p
 end
 
@@ -261,9 +273,9 @@ function add_cumulative_mut_layer(p, layer_df; my_color="black")
     ## take a ggplot object output by plot_cumulative_muts, and add an extra layer.
     p = p +
         geom_point(data = layer_df,
-                   aes(x = :t0, y = :normalized_cs),
+                   aes(x = :Time, y = :normalized_cs),
                    color = my_color, size = 0.2) +
-                       geom_step(data = layer_df, aes(x = :t0, y = :normalized_cs),
+                       geom_step(data = layer_df, aes(x = :Time, y = :normalized_cs),
                                  size = 0.2, color = my_color)
     return p
 end
@@ -292,7 +304,7 @@ function run_LTEE_analyses()
         ## filters. In particular, genes that overlap with masked regions are
         ## excluded, even if the metagenomic data included mutations that
         ## are called in non-repetitive regions of those genes.
-        transform(:t0 => ByRow(t -> t/10000) => :Time)
+        transform(:t0 => ByRow(t -> t/1000) => :Time)
         innerjoin(REL606_genes, on = :Gene)
         @rsubset(:Gene != "intergenic")
     end
@@ -337,10 +349,16 @@ function run_LTEE_analyses()
                                            gene_mutation_data,
                                            REL606_genes,
                                            LTEE_pop_level_vec)
+    ## for better plotting, divide x-axis labels by 1000.
+    transform!(c_neutral_genes, :t0 => ByRow(t -> t/1000) => :Time)
+
 
     neutral_pvals = calc_traj_pvals(neutral_genes,
                                     gene_mutation_data, REL606_genes,
                                     LTEE_pop_level_vec)
+    println("gold standard relaxed selection results:")
+    println(neutral_pvals) ## print the results
+
     
     neutral_base_layer = plot_base_layer(
         gene_mutation_data, REL606_genes, LTEE_pop_level_vec,
@@ -376,6 +394,8 @@ function run_LTEE_analyses()
 c_purifying_genes = calc_cumulative_muts(purifying_genes,
                                          gene_mutation_data,
                                          REL606_genes, LTEE_pop_level_vec)
+## for better plotting, divide x-axis labels by 1000.
+transform!(c_purifying_genes, :t0 => ByRow(t -> t/1000) => :Time)
 
 purifying_base_layer = plot_base_layer(
     gene_mutation_data, REL606_genes, LTEE_pop_level_vec,
@@ -391,6 +411,9 @@ ggsave("../results/gene-modules/STIMS-jl-test-figures/Fig5.pdf", Fig5)
 purifying_pvals = calc_traj_pvals(purifying_genes,
                                   gene_mutation_data, REL606_genes,
                                   LTEE_pop_level_vec)
+println("gold standard purifying selection results:")
+println(purifying_pvals) ## print the results
+
 
 ## now look at positive selection genes.
 rando_plot = plot_base_layer(gene_mutation_data, REL606_genes,
@@ -400,6 +423,9 @@ rando_plot = plot_base_layer(gene_mutation_data, REL606_genes,
 c_top_nonmuts =  calc_cumulative_muts(top_nonmut_genomics,
                                       gene_mutation_data,
                                       REL606_genes, LTEE_pop_level_vec)
+## for better plotting, divide x-axis labels by 1000.
+transform!(c_top_nonmuts, :t0 => ByRow(t -> t/1000) => :Time)
+
 
 Fig6 = add_cumulative_mut_layer(rando_plot, c_top_nonmuts)
 ggsave("../results/gene-modules/STIMS-jl-test-figures/Fig6.pdf",Fig6)
@@ -409,12 +435,13 @@ top_nonmut_pvals = calc_traj_pvals(top_nonmut_genomics,
                                    gene_mutation_data,
                                    REL606_genes,
                                    LTEE_pop_level_vec)
-return 0
+println("gold standard positive selection results:")
+println(top_nonmut_pvals) ## print the results
 end
 
 
 function RunSTIMS(mutation_csv_path, genome_metadata_csv_path,
-                  genelist_csv_path, outputdir, outfile = "STIMS-plot.pdf")
+                  genelist_csv_path, outfile = "STIMS-plot.pdf")
 
     mutation_data = CSV.read(mutation_csv_path, DataFrame)
     genome_metadata = CSV.read(genome_metadata_csv_path, DataFrame) 
@@ -423,7 +450,7 @@ function RunSTIMS(mutation_csv_path, genome_metadata_csv_path,
     ## https://juliadata.github.io/DataFramesMeta.jl/stable/#Comparison-with-dplyr-and-LINQ
     
     gene_mutation_data = @chain mutation_data begin
-        transform(:t0 => ByRow(t -> t/10000) => :Time)
+        transform(:t0 => ByRow(t -> t/1000) => :Time)
         innerjoin(genome_metadata, on = :Gene)
         @rsubset(:Gene != "intergenic")
     end
@@ -438,7 +465,9 @@ function RunSTIMS(mutation_csv_path, genome_metadata_csv_path,
                                          gene_mutation_data,
                                          genome_metadata,
                                          pop_level_vec)
-
+    ## for better plotting, divide x-axis labels by 1000.
+    transform!(c_gene_module, :t0 => ByRow(t -> t/1000) => :Time)
+    
     pvals = calc_traj_pvals(gene_module_df,
                             gene_mutation_data,
                             genome_metadata,
@@ -453,46 +482,82 @@ function RunSTIMS(mutation_csv_path, genome_metadata_csv_path,
     Fig = add_cumulative_mut_layer(
         base_layer,
         c_gene_module)
-    ggsave(joinpath(outputdir, outfile), Fig)
+    ## default figure dimensions.
+    fig_height = 7
+    fig_width = 7
+    ## if plotting a single population, then plot a smaller figure.
+    if (length(pop_level_vec) == 1)
+        fig_height = 3
+        fig_width = 3
+    end
+    ggsave(outfile, Fig, height = fig_height, width = fig_width)
+end
+
+
+## take dataframes directly as input, and don't make the plot.
+function RunSTIMS_on_data(mutation_data, genome_metadata, gene_module_df)
+   
+    gene_mutation_data = @chain mutation_data begin
+        transform(:t0 => ByRow(t -> t/1000) => :Time)
+        innerjoin(genome_metadata, on = :Gene)
+        @rsubset(:Gene != "intergenic")
+    end
     
+    pop_level_vec = unique(gene_mutation_data.Population)
+    
+    ## make sure that only loci in genome_metadata are analyzed.
+    @rsubset!(gene_module_df, :Gene in genome_metadata.Gene)
+
+    c_gene_module = calc_cumulative_muts(gene_module_df,
+                                         gene_mutation_data,
+                                         genome_metadata,
+                                         pop_level_vec)
+
+    pvals = calc_traj_pvals(gene_module_df,
+                            gene_mutation_data,
+                            genome_metadata,
+                            pop_level_vec)
+    return(pvals)
 end
 
 
 function run_examples()
-
-    RunSTIMS("../results/LTEE-metagenome-mutations.csv", "../results/REL606_IDs.csv", "../data/neutral_compilation.csv", "../results/gene-modules/STIMS-jl-test-figures")
-
-    RunSTIMS("../results/SLiM-results/SLiM-5000gen-v03.csv", "../results/SLiM-results/SLiM_geneIDs.csv", "../results/SLiM-results/SLiM_test_gene_module.csv", "../results/SLiM-results")
-    
+    RunSTIMS("../results/LTEE-metagenome-mutations.csv", "../results/REL606_IDs.csv", "../data/neutral_compilation.csv", "../results/gene-modules/STIMS-jl-test-figures/neutral.pdf")
 end
+
 
 function run_SLiM_tests()
-
-    RunSTIMS("../results/SLiM-results/SLiM-10000gen-FivePercent.csv",
+    RunSTIMS("../results/SLiM-results/SLiM-5000gen-OnePercent-Hypermutator.csv",
              "../results/SLiM-results/SLiM_geneIDs.csv",
              "../results/SLiM-results/SLiM_neutral_module.csv",
-             "../results/SLiM-results",
-             "SLiM-10000gen-FivePercent-neutral.pdf")
+             "../results/SLiM-results/SLiM-5000gen-OnePercent-Hypermutator-neutral.pdf")
 
-    RunSTIMS("../results/SLiM-results/SLiM-10000gen-FivePercent.csv",
-             "../results/SLiM-results/SLiM_geneIDs.csv",
-             "../results/SLiM-results/SLiM_weak_positive_module.csv",
-             "../results/SLiM-results",
-             "SLiM-10000gen-FivePercent-weak-positive.pdf")
-
-    RunSTIMS("../results/SLiM-results/SLiM-10000gen-FivePercent.csv",
+    RunSTIMS("../results/SLiM-results/SLiM-5000gen-OnePercent-Hypermutator.csv",
              "../results/SLiM-results/SLiM_geneIDs.csv",
              "../results/SLiM-results/SLiM_positive_module.csv",
-             "../results/SLiM-results",
-             "SLiM-10000gen-FivePercent-positive.pdf")
+             "../results/SLiM-results/SLiM-5000gen-OnePercent-Hypermutator-positive.pdf")
 
-    RunSTIMS("../results/SLiM-results/SLiM-10000gen-FivePercent.csv",
+    RunSTIMS("../results/SLiM-results/SLiM-5000gen-OnePercent-Hypermutator.csv",
              "../results/SLiM-results/SLiM_geneIDs.csv",
              "../results/SLiM-results/SLiM_purifying_module.csv",
-             "../results/SLiM-results",
-             "SLiM-10000gen-FivePercent-purifying.pdf")
-    return 0
+             "../results/SLiM-results/SLiM-5000gen-OnePercent-Hypermutator-purifying.pdf")
+
+    RunSTIMS("../results/SLiM-results/SLiM-5000gen-OnePercent-Nonmutator.csv",
+             "../results/SLiM-results/SLiM_geneIDs.csv",
+             "../results/SLiM-results/SLiM_neutral_module.csv",
+             "../results/SLiM-results/SLiM-5000gen-OnePercent-Nonmutator-neutral.pdf")
+
+    RunSTIMS("../results/SLiM-results/SLiM-5000gen-OnePercent-Nonmutator.csv",
+             "../results/SLiM-results/SLiM_geneIDs.csv",
+             "../results/SLiM-results/SLiM_positive_module.csv",
+             "../results/SLiM-results/SLiM-5000gen-OnePercent-Nonmutator-positive.pdf")
+
+    RunSTIMS("../results/SLiM-results/SLiM-5000gen-OnePercent-Nonmutator.csv",
+             "../results/SLiM-results/SLiM_geneIDs.csv",
+             "../results/SLiM-results/SLiM_purifying_module.csv",
+             "../results/SLiM-results/SLiM-5000gen-OnePercent-Nonmutator-purifying.pdf")
 end
+
 
 function parse_commandline()
     s = ArgParseSettings()
@@ -510,10 +575,10 @@ function parse_commandline()
         help = "a text file starting with the column name 'Gene', with one gene per line. This contains the set of genes that will be analyzed by STIMS."
         arg_type = String
         required = true
-        "--outputdir", "-o"
-        help = "output directory for figures. default is the current directory."
+        "--outfile", "-o"
+        help = "path for the figure. default is STIMS-plot.pdf."
         arg_type = String
-        default = "."
+        default = "STIMS-plot.pdf"
     end
 
     return parse_args(s)
@@ -528,17 +593,19 @@ function main()
     end
 
     mutation_csv_path = parsed_args["mutation_csv_path"]
-        genome_metadata_csv_path = parsed_args["genome_metadata_csv_path"]
-        gene_set_csv_path = parsed_args["gene_set_path"]
-        outputdir = parsed_args["outputdir"]
+    genome_metadata_csv_path = parsed_args["genome_metadata_csv_path"]
+    gene_set_csv_path = parsed_args["gene_set_path"]
+    outfile = parsed_args["outfile"]
     
     RunSTIMS(mutation_csv_path, genome_metadata_csv_path,
-             gene_set_csv_path, outputdir)
+             gene_set_csv_path, outfile)
 end
+
 
 ## only run main() when STIMS.jl is invoked from the command-line.
 if length(ARGS) > 0
     main()
 end
+
 
 end ## end of module STIMS.
