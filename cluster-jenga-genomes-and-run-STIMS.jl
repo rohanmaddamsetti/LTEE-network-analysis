@@ -3,7 +3,7 @@ cluster-jenga-genomes-and-run-STIMS.jl by Rohan Maddamsetti.
 Make Supplementary Figure S3 and run STIMS to get statistics quickly.
 """
 
-using DataFrames, DataFramesMeta, CSV, Distances, Clustering, Plots
+using DataFrames, DataFramesMeta, CSV, Distances, Clustering, Plots, Plots.PlotMeasures
 include("STIMS.jl")
 
 ################################################################################
@@ -101,24 +101,27 @@ sorted_minimal_rxns_matrix = minimal_rxns_data |>
 
 ## Supplementary Figure 3A.
 S3FigA = heatmap(sorted_minimal_genome_matrix,
-              c = cgrad(:blues, 2, categorical = true),
-              colorbar = false,
-              xlabel = "Genomes", ylabel = "Genes",
-              fontfamily = "Helvetica")
+                 c = cgrad(:blues, 2, categorical = true),
+                 colorbar = false,
+                 xlabel = "Genomes", ylabel = "Genes",
+                 fontfamily = "Helvetica",
+                 xrotation = 45)
 ## Supplementary Figure 3B.
 S3FigB = heatmap(sorted_essential_gene_matrix,
-              c = cgrad(:blues, 2, categorical = true),
-              colorbar = false,
-              xlabel = "Genomes", ylabel = "Essential genes",
-              fontfamily = "Helvetica")
+                 c = cgrad(:blues, 2, categorical = true),
+                 colorbar = false,
+                 xlabel = "Genomes", ylabel = "Essential genes",
+                 fontfamily = "Helvetica",
+                 xrotation = 45)
 ## Supplementary Figure 3C.
 S3FigC = heatmap(sorted_minimal_rxns_matrix,
-              c = cgrad(:blues, 2, categorical = true),
-              colorbar = false,
-              xlabel = "Genomes", ylabel = "Reactions",
-              fontfamily = "Helvetica")
+                 c = cgrad(:blues, 2, categorical = true),
+                 colorbar = false,
+                 xlabel = "Genomes", ylabel = "Reactions",
+                 fontfamily = "Helvetica",
+                 xrotation = 45)
 
-S3Fig = plot(S3FigA,S3FigB,S3FigC,layout=(1,3), legend=false)
+S3Fig = plot(S3FigA, S3FigB, S3FigC, layout=(1,3), legend=false)
 savefig(S3Fig, "../results/metabolic-enzymes/S3Fig.pdf")
 
 ################################################################################
