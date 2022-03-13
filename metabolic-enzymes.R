@@ -121,7 +121,7 @@ upset(REL606.UpSet.data,
       mb.ratio = c(0.7, 0.3), order.by = "freq", text.scale=2)
 dev.off()
 
-write.csv(REL606.UpSet.data,file="../results/metabolic-enzymes/TableS1.csv")
+write.csv(REL606.UpSet.data,file="../results/metabolic-enzymes/S1File.csv")
 
 ########################################################
 ## KNOCKOUTS OF METABOLIC ENZYMES IN 50K LTEE GENOMES
@@ -839,4 +839,4 @@ upset(Fig7.UpSet.data,
       mb.ratio = c(0.7, 0.3), order.by = "freq", text.scale=1.3)
 dev.off()
 
-write.csv(Fig7.UpSet.data,file="../results/metabolic-enzymes/TableS2.csv")
+write.csv(Fig7.UpSet.data,file="../results/metabolic-enzymes/S2File.csv")
