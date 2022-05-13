@@ -289,3 +289,45 @@ STIMS.RunSTIMS("../results/LTEE-metagenome-mutations.csv",
 ## Ara-4: 0.9498
 ## Ara+3: 0.9435
 ## Ara+6: 1.0
+
+acetate_essential_csv = "../results/metabolic-enzymes/acetate_FBA_essential.csv"
+## Run STIMS on essential genes in the Acetate REL606 genome FBA model.
+STIMS.RunSTIMS("../results/LTEE-metagenome-mutations.csv",
+               "../results/REL606_IDs.csv",
+               acetate_essential_csv,
+               "../results/metabolic-enzymes/acetate-essential-genes.pdf")
+## Results for acetate essential genes in the REL606 FBA model:
+## Ara-5: 0.9227
+## Ara-6: 0.7025
+## Ara+1: 0.9513
+## Ara+2: 0.8597
+## Ara+4: 0.9989
+## Ara+5: 0.7645
+## Ara-1: 1.0
+## Ara-2: 0.9835
+## Ara-3: 0.9566
+## Ara-4: 0.9636
+## Ara+3: 0.9771
+## Ara+6: 1.0
+
+## This test is redundant-- citrate essential genes == glucose+acetate essential genes,
+## in the FBA analysis!
+glucose_acetate_essential_csv = "../results/metabolic-enzymes/glucose_acetate_FBA_essential.csv"
+## Run STIMS on essential genes in the Glucose + Acetate REL606 genome FBA model.
+STIMS.RunSTIMS("../results/LTEE-metagenome-mutations.csv",
+               "../results/REL606_IDs.csv",
+               glucose_acetate_essential_csv,
+               "../results/metabolic-enzymes/glucose-acetate-essential-genes.pdf")
+## Results for glucose + acetate essential genes in the REL606 FBA model:
+## Ara-5: 0.9158
+## Ara-6: 0.7864
+## Ara+1: 0.9635
+## Ara+2: 0.8465
+## Ara+4: 0.9996
+## Ara+5: 0.736
+## Ara-1: 1.0
+## Ara-2: 0.9708
+## Ara-3: 0.9864
+## Ara-4: 0.9531
+## Ara+3: 0.9435
+## Ara+6: 1.0
