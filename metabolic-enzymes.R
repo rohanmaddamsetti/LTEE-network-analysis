@@ -65,6 +65,53 @@ nonmutator.data <- gene.mutation.data %>%
     mutate(Population=factor(Population,
                              levels = nonmutator.pops))
 
+
+## I made the following csv file by hand, based on the mutator allele
+## table in the Maddamsetti and Grant mutation rate and biases paper.
+hypermutator.epochs.df <- read.csv("../data/LTEE_hypermutator_epochs.csv")
+
+.filter.hypermutators.by.epoch <- function(hypermutator.epochs, pop.df) {
+    ## pop.df is the hypermutator.data for a single population (e.g. Ara-1).
+    my.pop <- unique(pop.df$Population)
+    stopifnot(length(my.pop) == 1)
+    
+    my.epoch <- filter(hypermutator.epochs, Population == my.pop)
+    my.epoch.start <- my.epoch$hypermutator_start
+    my.epoch.end <- my.epoch$hypermutator_end
+
+    if (is.na(my.epoch.start))
+        my.epoch.start <- 0
+    
+    if (is.na(my.epoch.end))
+        my.epoch.end <- max(pop.df$tf)
+
+    epoch.pop.df <- pop.df %>%
+        filter(t0 >= my.epoch.start) %>%
+        filter(t0 <= my.epoch.end)
+    
+    return(epoch.pop.df)
+}
+## This is the single variable function that is actually being called.
+filter.hypermutators.by.epoch <- partial(.f=.filter.hypermutators.by.epoch,
+                                         hypermutator.epochs.df)
+
+## Both reviewers at GBE suggested subsetting the analysis on just
+## the epochs in which the hypermutators experienced a hypermutator
+## phenotype. But it turns out that this basically makes no difference,
+## compared to the results already reported in the manuscript.
+## For cluster-jenga-genomes-and-run-STIMS.jl,
+## we just need to subset the data-- we all the other processing
+## is done within STIMS.jl.
+epoch.hypermutator.data.for.STIMS.jl <- read.csv(
+    '../results/LTEE-metagenome-mutations.csv',
+    header=TRUE,as.is=TRUE) %>%
+    filter(Population %in% hypermutator.pops) %>%
+    split(.$Population) %>%
+    map_dfr(.f = filter.hypermutators.by.epoch)
+
+write.csv(x=epoch.hypermutator.data.for.STIMS.jl,
+          file="../results/hypermutator-epoch-LTEE-metagenome-mutations.csv",
+          quote = FALSE, row.names = FALSE)
 ########################################################
 ## METABOLIC ENZYME DATASETS
 ########################################################

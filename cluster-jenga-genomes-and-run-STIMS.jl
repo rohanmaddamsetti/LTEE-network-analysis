@@ -127,6 +127,7 @@ savefig(S3Fig, "../results/metabolic-enzymes/S3Fig.pdf")
 ################################################################################
 ## Run STIMS statistics, quickly.
 
+
 ## statistics for BiGG core.
 STIMS.RunSTIMS("../results/LTEE-metagenome-mutations.csv",
                "../results/REL606_IDs.csv",
@@ -145,6 +146,20 @@ STIMS.RunSTIMS("../results/LTEE-metagenome-mutations.csv",
 ## Ara-4: 0.9339
 ## Ara+3: 0.9628
 ## Ara+6: 0.99774
+
+## now repeat, just on hypermutator epochs.
+STIMS.RunSTIMS("../results/hypermutator-epoch-LTEE-metagenome-mutations.csv",
+               "../results/REL606_IDs.csv",
+               "../results/metabolic-enzymes/BiGG-core-genes.csv",
+               "../results/metabolic-enzymes/hypermutator-epoch-BiGG-core-plot.pdf")
+## results for BiGG core, just hypermutator epochs:
+## Ara-1: 0.9841
+## Ara-2: 0.7578
+## Ara-3: 0.1061
+## Ara-4: 0.9404
+## Ara+3: 0.9682
+## Ara+6: 0.996
+
 
 ## statistics for superessential metabolic reactions
 STIMS.RunSTIMS("../results/LTEE-metagenome-mutations.csv",
@@ -165,6 +180,19 @@ STIMS.RunSTIMS("../results/LTEE-metagenome-mutations.csv",
 ## Ara+3: 0.5625
 ## Ara+6: 0.9963
 
+## now repeat, just on hypermutator epochs.
+STIMS.RunSTIMS("../results/hypermutator-epoch-LTEE-metagenome-mutations.csv",
+               "../results/REL606_IDs.csv",
+               "../results/metabolic-enzymes/superessential-genes.csv",
+               "../results/metabolic-enzymes/hypermutator-epoch-superessential-plot.pdf")
+## results for superessential genes, just hypermutator epochs:
+## Ara-1: 1.0
+## Ara-2: 0.6625
+## Ara-3: 0.5396
+## Ara-4: 0.9146
+## Ara+3: 0.5475
+## Ara+6: 0.9975
+
 
 STIMS.RunSTIMS("../results/LTEE-metagenome-mutations.csv",
                "../results/REL606_IDs.csv",
@@ -184,6 +212,20 @@ STIMS.RunSTIMS("../results/LTEE-metagenome-mutations.csv",
 ## Ara+3: 0.7823
 ## Ara+6: 0.9998
 
+## now repeat, just on hypermutator epochs.
+STIMS.RunSTIMS("../results/hypermutator-epoch-LTEE-metagenome-mutations.csv",
+               "../results/REL606_IDs.csv",
+               "../results/metabolic-enzymes/specialist-enzymes.csv",
+               "../results/metabolic-enzymes/hypermutator-epoch-specialist-enzymes.pdf")
+## results for specialist enzymes, just hypermutator epochs:
+## Ara-1: 0.5611
+## Ara-2: 0.3723
+## Ara-3: 0.8475
+## Ara-4: 0.9359
+## Ara+3: 0.7829
+## Ara+6: 0.9996
+
+
 STIMS.RunSTIMS("../results/LTEE-metagenome-mutations.csv",
                "../results/REL606_IDs.csv",
                "../results/metabolic-enzymes/generalist-enzymes.csv",
@@ -201,6 +243,20 @@ STIMS.RunSTIMS("../results/LTEE-metagenome-mutations.csv",
 ## Ara-4: 0.6898
 ## Ara+3: 0.7102
 ## Ara+6: 0.8969
+
+## now repeat, just on hypermutator epochs.
+STIMS.RunSTIMS("../results/hypermutator-epoch-LTEE-metagenome-mutations.csv",
+               "../results/REL606_IDs.csv",
+               "../results/metabolic-enzymes/generalist-enzymes.csv",
+               "../results/metabolic-enzymes/hypermutator-epoch-generalist-enzymes.pdf")
+## results for generalist enzymes, just hypermutator epochs:
+## Ara-1: 0.9981
+## Ara-2: 0.6889
+## Ara-3: 0.2283
+## Ara-4: 0.657
+## Ara+3: 0.6983
+## Ara+6: 0.897
+
 
 ## statistics for Figure 5, and Supplementary Figure 4.
 ## run STIMS on core and essential genes in the minimal genomes.
@@ -227,6 +283,20 @@ STIMS.RunSTIMS("../results/LTEE-metagenome-mutations.csv",
 ## Ara+3: 0.992
 ## Ara+6: 1.0
 
+## now repeat on the core genome of the minimal genomes, just on hypermutator epochs.
+STIMS.RunSTIMS("../results/hypermutator-epoch-LTEE-metagenome-mutations.csv",
+               "../results/REL606_IDs.csv",
+               jenga_genome_core_csv,
+               "../results/metabolic-enzymes/hypermutator-epoch-jenga-core-genes.pdf")
+## results for jenga core, just hypermutator epochs:
+## Ara-1: 1.0
+## Ara-2: 0.9647
+## Ara-3: 0.7241
+## Ara-4: 0.979
+## Ara+3: 0.9946
+## Ara+6: 1.0
+
+
 ## Run STIMS on the core essential genes.
 STIMS.RunSTIMS("../results/LTEE-metagenome-mutations.csv",
          "../results/REL606_IDs.csv",
@@ -245,6 +315,20 @@ STIMS.RunSTIMS("../results/LTEE-metagenome-mutations.csv",
 ## Ara-4: 0.9471
 ## Ara+3: 0.9969
 ## Ara+6: 1.0
+
+## now repeat on the core essential genes, just on hypermutator epochs.
+STIMS.RunSTIMS("../results/hypermutator-epoch-LTEE-metagenome-mutations.csv",
+               "../results/REL606_IDs.csv",
+               jenga_essential_core_csv,
+               "../results/metabolic-enzymes/hypermutator-epoch-jenga-essential-core-genes.pdf")
+## results for jenga essential core, just hypermutator epochs:
+## Ara-1: 1.0
+## Ara-2: 0.9745
+## Ara-3: 0.8236
+## Ara-4: 0.9532
+## Ara+3: 0.9981
+## Ara+6: 1.0
+
 
 ## statistics for Figure 6, and Supplementary Figure 5.
 ## run STIMS on essential genes for growth on
@@ -270,6 +354,20 @@ STIMS.RunSTIMS("../results/LTEE-metagenome-mutations.csv",
 ## Ara+3: 0.9486
 ## Ara+6: 1.0
 
+## now repeat on glucose essential genes, just on hypermutator epochs.
+STIMS.RunSTIMS("../results/hypermutator-epoch-LTEE-metagenome-mutations.csv",
+               "../results/REL606_IDs.csv",
+               glucose_essential_csv,
+               "../results/metabolic-enzymes/hypermutator-epoch-glucose-essential-genes.pdf")
+## results for glucose essential genes, just hypermutator epochs:
+## Ara-1: 1.0
+## Ara-2: 0.9776
+## Ara-3: 0.9218
+## Ara-4: 0.9331
+## Ara+3: 0.9445
+## Ara+6: 1.0
+
+
 citrate_essential_csv = "../results/metabolic-enzymes/citrate_FBA_essential.csv"
 ## Run STIMS on essential genes in the Citrate REL606 genome FBA model.
 STIMS.RunSTIMS("../results/LTEE-metagenome-mutations.csv",
@@ -290,6 +388,20 @@ STIMS.RunSTIMS("../results/LTEE-metagenome-mutations.csv",
 ## Ara+3: 0.9435
 ## Ara+6: 1.0
 
+## now repeat on citrate essential genes, just on hypermutator epochs.
+STIMS.RunSTIMS("../results/hypermutator-epoch-LTEE-metagenome-mutations.csv",
+               "../results/REL606_IDs.csv",
+               citrate_essential_csv,
+               "../results/metabolic-enzymes/hypermutator-epoch-citrate-essential-genes.pdf")
+## results for citrate essential genes, just hypermutator epochs:
+## Ara-1: 1.0
+## Ara-2: 0.9838
+## Ara-3: 0.9693
+## Ara-4: 0.9418
+## Ara+3: 0.9396
+## Ara+6: 1.0
+
+
 acetate_essential_csv = "../results/metabolic-enzymes/acetate_FBA_essential.csv"
 ## Run STIMS on essential genes in the Acetate REL606 genome FBA model.
 STIMS.RunSTIMS("../results/LTEE-metagenome-mutations.csv",
@@ -309,6 +421,20 @@ STIMS.RunSTIMS("../results/LTEE-metagenome-mutations.csv",
 ## Ara-4: 0.9636
 ## Ara+3: 0.9771
 ## Ara+6: 1.0
+
+## now repeat on acetate essential genes, just on hypermutator epochs.
+STIMS.RunSTIMS("../results/hypermutator-epoch-LTEE-metagenome-mutations.csv",
+               "../results/REL606_IDs.csv",
+               acetate_essential_csv,
+               "../results/metabolic-enzymes/hypermutator-epoch-acetate-essential-genes.pdf")
+## results for acetate essential genes, just hypermutator epochs:
+## Ara-1: 1.0
+## Ara-2: 0.9884
+## Ara-3: 0.937
+## Ara-4: 0.9534
+## Ara+3: 0.9742
+## Ara+6: 1.0
+
 
 ## This test is redundant-- citrate essential genes == glucose+acetate essential genes,
 ## in the FBA analysis!
