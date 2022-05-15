@@ -4,6 +4,8 @@ Make Supplementary Figure S3 and run STIMS to get statistics quickly.
 """
 
 using DataFrames, DataFramesMeta, CSV, Distances, Clustering, Plots, Plots.PlotMeasures
+## NOTA BENE: for this project, I added some code to STIMS.jl that at
+## present are NOT in the main branch of STIMS development.
 include("STIMS.jl")
 
 ################################################################################
@@ -457,3 +459,44 @@ STIMS.RunSTIMS("../results/LTEE-metagenome-mutations.csv",
 ## Ara-4: 0.9531
 ## Ara+3: 0.9435
 ## Ara+6: 1.0
+
+
+## let's run STIMS on the genes that are essential for citrate (glucose+acetate),
+## but not glucose alone.
+glucose_essential_df = CSV.read(glucose_essential_csv, DataFrame)
+citrate_essential_df = CSV.read(citrate_essential_csv, DataFrame)
+acetate_essential_df = CSV.read(acetate_essential_csv, DataFrame)
+
+## This is only citT!
+citrate_not_acetate_essential_genes = setdiff(Set(citrate_essential_df.Gene),
+                                              Set(acetate_essential_df.Gene))
+## This is gapA, citT, pgk, tpiA.
+citrate_not_glucose_essential_genes = setdiff(Set(citrate_essential_df.Gene),
+                                              Set(glucose_essential_df.Gene))
+
+citrate_not_glucose_essential_df = @rsubset(
+    citrate_essential_df,
+    :Gene in citrate_not_glucose_essential_genes)
+
+citrate_not_glucose_essential_csv = "../results/metabolic-enzymes/citrate_not_glucose_FBA_essential.csv"
+CSV.write(citrate_not_glucose_essential_csv, citrate_not_glucose_essential_df)
+
+STIMS.RunSTIMS("../results/LTEE-metagenome-mutations.csv",
+               "../results/REL606_IDs.csv",
+               citrate_not_glucose_essential_csv,
+               "../results/metabolic-enzymes/citrate-not-glucose-essential-genes.pdf")
+## STIMS results for gapA, citT, pgk, tpiA.
+## basically, not enough power, but the signal is promising,
+## check out Ara-2 and Ara-3.
+## Ara-5: 0.1885
+## Ara-6: 0.145
+## Ara+1: 0.2781
+## Ara+2: 0.1245
+## Ara+4: 0.144
+## Ara+5: 0.1402
+## Ara-1: 0.8635
+## Ara-2: 0.9023
+## Ara-3: 0.9088
+## Ara-4: 0.7547
+## Ara+3: 0.5001
+## Ara+6: 0.2379

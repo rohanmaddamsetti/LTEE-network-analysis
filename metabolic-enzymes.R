@@ -39,14 +39,22 @@ LTEE.pop.vec <- c(nonmutator.pops, hypermutator.pops)
 ## conda activate ltee-metagenomix
 ## cd LTEE-metagenomic-repo
 ## python rohan-write-csv.py > ../results/LTEE-metagenome-mutations.csv
-gene.mutation.data <- read.csv(
+all.mutation.data <- read.csv(
     '../results/LTEE-metagenome-mutations.csv',
     header=TRUE,as.is=TRUE) %>%
     mutate(Generation=t0/10000) %>%
     ## This for changing the ordering of populations in plots.
     mutate(Population = factor(
                Population,
-               levels = LTEE.pop.vec)) %>%
+               levels = LTEE.pop.vec))
+## I split this process into 2 steps, because in the Poisson test for
+## purifying selection on citT, gapA, tpiA, pgk in Ara-3,
+## I also want to consider intergenic mutations, so I need to use
+## all.mutation.data and not gene.mutation.data.
+## In the rest of the analysis, we want to focus on mutations associated
+## with genes (including promoter regions), so those analyses use
+## gene.mutation.data.
+gene.mutation.data <- all.mutation.data %>%
     inner_join(REL606.genes) %>%
     filter(Gene!='intergenic')
 
@@ -112,6 +120,7 @@ epoch.hypermutator.data.for.STIMS.jl <- read.csv(
 write.csv(x=epoch.hypermutator.data.for.STIMS.jl,
           file="../results/hypermutator-epoch-LTEE-metagenome-mutations.csv",
           quote = FALSE, row.names = FALSE)
+
 ########################################################
 ## METABOLIC ENZYME DATASETS
 ########################################################
@@ -150,6 +159,15 @@ write.csv(generalist.enzymes, "../results/metabolic-enzymes/generalist-enzymes.c
 ## An R Package for the Visualization of Intersecting Sets and their
 ## Properties doi: https://doi.org/10.1093/bioinformatics/btx364
 
+## Let's also examine overlap with the aerobic-specific genes and
+## anaerobic-specific genes studied in Nkrumah's Am Nat paper.
+aerobic.specific.genes <- read.csv("../data/aerobic-specific-genes.csv") %>%
+    inner_join(REL606.genes) %>% filter(!is.na(Gene))
+
+anaerobic.specific.genes <- read.csv("../data/anaerobic-specific-genes.csv") %>%
+    inner_join(REL606.genes) %>% filter(!is.na(Gene))
+
+
 ## The as.numeric() calls turn TRUE/FALSE to 1/0.
 REL606.UpSet.data <- REL606.genes %>%
     mutate(`BiGG Core` = Gene %in% BiGG.core$Gene) %>%
@@ -160,6 +178,10 @@ REL606.UpSet.data <- REL606.genes %>%
     mutate(Specialist = as.numeric(Specialist)) %>%
     mutate(Generalist = Gene %in% generalist.enzymes$Gene) %>%
     mutate(Generalist = as.numeric(Generalist))
+    mutate(Aerobic = Gene %in% aerobic.specific.genes$Gene) %>%
+    mutate(Aerobic = as.numeric(Aerobic)) %>%
+    mutate(Anaerobic = Gene %in% anaerobic.specific.genes$Gene) %>%
+    mutate(Anaerobic = as.numeric(Anaerobic))
 
 pdf("../results/metabolic-enzymes/Fig1.pdf",onefile=FALSE)
 upset(REL606.UpSet.data,
@@ -169,6 +191,17 @@ upset(REL606.UpSet.data,
 dev.off()
 
 write.csv(REL606.UpSet.data,file="../results/metabolic-enzymes/S1File.csv")
+
+
+## Show aerobic-specific and anaerobic-specific genes in Supplementary Figure S6.
+pdf("../results/metabolic-enzymes/S6Fig.pdf",onefile=FALSE)
+upset(REL606.UpSet.data,
+      sets = c("BiGG Core", "Superessential",
+               "Specialist", "Generalist",
+               "Aerobic", "Anaerobic"),
+      mb.ratio = c(0.7, 0.3), order.by = "freq", text.scale=1.5)
+dev.off()
+
 
 ########################################################
 ## KNOCKOUTS OF METABOLIC ENZYMES IN 50K LTEE GENOMES
@@ -862,9 +895,57 @@ S5FigB <- plot.base.layer(
 S5Fig <- plot_grid(S5FigA, S5FigB, labels=c('A','B'),nrow=2)
 save_plot("../results/metabolic-enzymes/S5Fig.pdf",S5Fig, base_height=7,base_asp=1)
 
-################################################################
+################################################################################
+## let's do a Poisson test for purifying selection on the 4 genes that are
+## essential on citrate (or glucose+acetate) but not on glucose only, based
+## on the FBA analysis. These genes are: gapA, citT, pgk, tpiA.
+## All except citT are essential in acetate-only media in the FBA analysis.
+
+citrate.but.not.glucose.FBA.essential.genes <- c("gapA", "citT", "pgk", "tpiA")
+
+## let's take a look at mutations in these genes.
+## by eye, it seems pretty clear that there is purifying selection on these genes
+## in Ara-3.
+citrate.but.not.glucose.FBA.essential.muts <- gene.mutation.data %>%
+    filter(Gene %in% citrate.but.not.glucose.FBA.essential.genes)
+
+## let's calculate the probability of no mutations in Ara-3 in these
+## genes, analytically.
+
+calculate.Poisson.probability.of.no.hits <- function(t,n) {
+    GENOME.LENGTH <- 4629812
+    poisson.prob.of.no.hits <- (1 - (t/GENOME.LENGTH))^n
+    return(poisson.prob.of.no.hits)
+}
+
+Ara.minus.3.muts <- all.mutation.data %>%
+    filter(Population == "Ara-3")
+
+num.Ara.minus.3.muts <- nrow(Ara.minus.3.muts)
+
+citrate.but.not.glucose.FBA.essential.gene.annotation <- REL606.genes %>%
+    filter(Gene %in% citrate.but.not.glucose.FBA.essential.genes)
+
+citrate.but.not.glucose.FBA.essential.gene.target.size <- sum(
+    citrate.but.not.glucose.FBA.essential.gene.annotation$gene_length)
+
+## The probability of this event is p = (1 − (t / g))^n ,
+## where t is the mutational target size (t = 4392)
+## g is the length of the chromosome (g = 4,629,812), and
+## n is the number of observed mutations in Ara-3 (n = 3,255)
+
+Ara.minus.3.poisson.result <- calculate.Poisson.probability.of.no.hits(
+    citrate.but.not.glucose.FBA.essential.gene.target.size,
+    num.Ara.minus.3.muts)
+## p = 0.0455. So significant, but not super impressive.
+
+################################################################################
 ## Figure 7: Make an UpSet plot to examine set overlap in the
 ## gene sets derived after playing Genome Jenga.
+
+## let's include experimental essential data for REL606, from Couce et al. (2017).
+REL606.essential.genes <- read.csv("../data/Couce2017-LTEE-essential.csv") %>%
+    inner_join(REL606.genes) %>% filter(!is.na(Gene))
 
 ## The as.numeric() calls turn TRUE/FALSE to 1/0.
 Fig7.UpSet.data <- REL606.genes %>%
@@ -875,7 +956,10 @@ Fig7.UpSet.data <- REL606.genes %>%
     mutate(`Essential for glucose in ancestral model` = Gene %in% FBA.glucose.essential$Gene) %>%
     mutate(`Essential for glucose in ancestral model` = as.numeric(`Essential for glucose in ancestral model`)) %>%
     mutate(`Essential for citrate in ancestral model` = Gene %in% FBA.citrate.essential$Gene) %>%
-    mutate(`Essential for citrate in ancestral model` = as.numeric(`Essential for citrate in ancestral model`))
+    mutate(`Essential for citrate in ancestral model` = as.numeric(`Essential for citrate in ancestral model`)) %>%
+    mutate(`Essential in REL606` = Gene %in% REL606.essential.genes$Gene) %>%
+    mutate(`Essential in REL606` = as.numeric(`Essential in REL606`))
+write.csv(Fig7.UpSet.data,file="../results/metabolic-enzymes/S2File.csv")
 
 pdf("../results/metabolic-enzymes/Fig7.pdf",onefile=FALSE)
 upset(Fig7.UpSet.data,
@@ -886,4 +970,89 @@ upset(Fig7.UpSet.data,
       mb.ratio = c(0.7, 0.3), order.by = "freq", text.scale=1.3)
 dev.off()
 
-write.csv(Fig7.UpSet.data,file="../results/metabolic-enzymes/S2File.csv")
+## include genes that have been experimental shown to be essential in REL606
+## in S7 Figure.
+pdf("../results/metabolic-enzymes/S7Fig.pdf",onefile=FALSE)
+upset(Fig7.UpSet.data,
+      sets = c("Core of minimal genomes",
+               "Essential in minimal genomes",
+               "Essential for glucose in ancestral model",
+               "Essential for citrate in ancestral model",
+               "Essential in REL606"),
+      mb.ratio = c(0.7, 0.3), order.by = "freq", text.scale=1.3)
+dev.off()
+
+################################################################################
+## Let's plot how the difference between the normalized cumulative number of
+## mutations in a gene set of interest changes, relative to the
+## normalized cumulative number of mutations across the genome.
+
+## rather than bootstrapping a mean, its much simpler to calculate
+## the normalized cumulative number of mutations over the entire genome
+## (in this case, the set of all genes in the genome included in the analysis).
+
+plot.trajectory.differences <- function(cmut.diff.df) {
+    ## plot the difference between the genomic average trajectory,
+    ## and the trajectory for the given gene set of interest.
+    p <- ggplot(cmut.diff.df, aes(x = Generation, y = normalized.cs)) +
+        ylab("Cumulative mutations (normalized)\nDeviation from genomic average") +
+        theme_classic() +
+        geom_step(size=0.2, color="black") +
+        theme(axis.title.x = element_text(size=13),
+              axis.title.y = element_text(size=13),
+              axis.text.x = element_text(size=13),
+              axis.text.y = element_text(size=13)) +
+        scale_y_continuous(labels=fancy_scientific,
+                           breaks = scales::extended_breaks(n = 6)) +
+        facet_wrap(.~Population, scales="free", nrow=4) +
+        xlab("Generations (x 1,000)")
+    return(p)
+}
+
+
+.calc.cumulative.difference.from.genome <- function(genomic.trajectories, c.muts) {
+    c.mut.timepoints <- c.muts %>% select(Population, Generation)
+    
+    matched.genomic.trajectories <- inner_join(genomic.trajectories,
+                                               c.mut.timepoints) %>%
+        rename(normalized.cs.for.genome = normalized.cs) %>%
+        select(Population, Generation, normalized.cs.for.genome)
+    
+    c.muts.difference.from.genome.df <- full_join(c.muts, matched.genomic.trajectories) %>%
+        mutate(normalized.cs.diff.from.genome = normalized.cs - normalized.cs.for.genome) %>%
+        select(Population, Generation, normalized.cs.diff.from.genome) %>%
+        rename(normalized.cs = normalized.cs.diff.from.genome) ## for plotting compatibility
+    return(c.muts.difference.from.genome.df)
+}
+
+
+genomic.trajectories <- calc.cumulative.muts(gene.mutation.data, REL606.genes)
+## single-argument function to actually use.
+calc.cumulative.difference.from.genome <- partial(
+    .f = .calc.cumulative.difference.from.genome,
+    genomic.trajectories)
+
+
+############################################
+## let's actually look at these plots now.
+
+c.BiGG.core.hypermut.difference.from.genome <- calc.cumulative.difference.from.genome(
+    c.BiGG.core.hypermut)
+
+c.superessential.hypermut.difference.from.genome <- calc.cumulative.difference.from.genome(
+    c.superessential.hypermut)
+
+c.specialist.hypermut.difference.from.genome <- calc.cumulative.difference.from.genome(
+    c.specialists.hypermut)
+
+c.generalist.hypermut.difference.from.genome <- calc.cumulative.difference.from.genome(
+    c.generalists.hypermut)
+
+plot.trajectory.differences(c.BiGG.core.hypermut.difference.from.genome)
+
+plot.trajectory.differences(c.superessential.hypermut.difference.from.genome)
+
+plot.trajectory.differences(c.specialist.hypermut.difference.from.genome)
+
+plot.trajectory.differences(c.generalist.hypermut.difference.from.genome)
+    

@@ -226,6 +226,7 @@ plot.base.layer <- function(data, REL606.genes, subset.size=50, N=1000, alphaval
     return(p)
 }
 
+
 ## take a ggplot object output by plot.cumulative.muts, and add an extra layer.
 add.cumulative.mut.layer <- function(p, layer.df, my.color) {
     p <- p +
@@ -236,6 +237,26 @@ add.cumulative.mut.layer <- function(p, layer.df, my.color) {
                   size=0.2, color=my.color)
     return(p)
 }
+
+
+## plot the trajectory of cumulative mutations in a gene set of interest.
+plot.trajectories <- function(cmut.df) {
+    p <- ggplot(cmut.df, aes(x=Generation, y=normalized.cs)) +
+        ylab("Cumulative mutations (normalized)") +
+        theme_classic() +
+        geom_step(size=0.2, color="black") +
+        theme(axis.title.x = element_text(size=13),
+              axis.title.y = element_text(size=13),
+              axis.text.x  = element_text(size=13),
+              axis.text.y  = element_text(size=13)) +
+                  scale_y_continuous(labels=fancy_scientific,
+                                     breaks = scales::extended_breaks(n = 6),
+                                     limits = c(0, NA)) +
+        facet_wrap(.~Population, scales="free", nrow=4) +
+        xlab("Generations (x 1,000)")
+    return(p)
+}
+
 
 ################################################################################
 ## These functions are used in my LTEE thermostability analysis.
