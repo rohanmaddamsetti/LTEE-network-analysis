@@ -99,6 +99,8 @@ hypermutator.epochs.df <- read.csv("../data/LTEE_hypermutator_epochs.csv")
     
     return(epoch.pop.df)
 }
+
+
 ## This is the single variable function that is actually being called.
 filter.hypermutators.by.epoch <- partial(.f=.filter.hypermutators.by.epoch,
                                          hypermutator.epochs.df)
@@ -177,7 +179,7 @@ REL606.UpSet.data <- REL606.genes %>%
     mutate(Specialist = Gene %in% specialist.enzymes$Gene) %>%
     mutate(Specialist = as.numeric(Specialist)) %>%
     mutate(Generalist = Gene %in% generalist.enzymes$Gene) %>%
-    mutate(Generalist = as.numeric(Generalist))
+    mutate(Generalist = as.numeric(Generalist)) %>%
     mutate(Aerobic = Gene %in% aerobic.specific.genes$Gene) %>%
     mutate(Aerobic = as.numeric(Aerobic)) %>%
     mutate(Anaerobic = Gene %in% anaerobic.specific.genes$Gene) %>%
@@ -991,21 +993,31 @@ dev.off()
 ## the normalized cumulative number of mutations over the entire genome
 ## (in this case, the set of all genes in the genome included in the analysis).
 
-plot.trajectory.differences <- function(cmut.diff.df) {
+plot.trajectory.differences <- function(cmut.diff.df, hypermutator.epochs.df) {
     ## plot the difference between the genomic average trajectory,
     ## and the trajectory for the given gene set of interest.
+
+    ## divide generations by 10000 in hypermutator.epochs.df for plotting.
+    hypermutator.epochs.df <- hypermutator.epochs.df %>%
+        mutate(hypermutator_start_gen = hypermutator_start/10000) %>%
+        mutate(hypermutator_end_gen = hypermutator_end/10000)
+ 
     p <- ggplot(cmut.diff.df, aes(x = Generation, y = normalized.cs)) +
-        ylab("Cumulative mutations (normalized)\nDeviation from genomic average") +
-        theme_classic() +
-        geom_step(size=0.2, color="black") +
-        theme(axis.title.x = element_text(size=13),
-              axis.title.y = element_text(size=13),
-              axis.text.x = element_text(size=13),
-              axis.text.y = element_text(size=13)) +
+    ylab("Cumulative mutations (normalized)\nDeviation from genomic average") +
+    theme_classic() +
+    geom_step(size=0.2, color="black") +
+    theme(axis.title.x = element_text(size=13),
+          axis.title.y = element_text(size=13),
+          axis.text.x = element_text(size=13),
+          axis.text.y = element_text(size=13)) +
         scale_y_continuous(labels=fancy_scientific,
                            breaks = scales::extended_breaks(n = 6)) +
         facet_wrap(.~Population, scales="free", nrow=4) +
-        xlab("Generations (x 1,000)")
+        xlab("Generations (x 10,000)") + 
+        geom_vline(data=hypermutator.epochs.df,
+                   aes(xintercept=hypermutator_start_gen), color="gray", linetype="dashed") +
+        geom_vline(data=hypermutator.epochs.df,
+                   aes(xintercept=hypermutator_end_gen), color="gray", linetype="dashed")
     return(p)
 }
 
@@ -1048,11 +1060,15 @@ c.specialist.hypermut.difference.from.genome <- calc.cumulative.difference.from.
 c.generalist.hypermut.difference.from.genome <- calc.cumulative.difference.from.genome(
     c.generalists.hypermut)
 
-plot.trajectory.differences(c.BiGG.core.hypermut.difference.from.genome)
+plot.trajectory.differences(c.BiGG.core.hypermut.difference.from.genome,
+                            hypermutator.epochs.df)
 
-plot.trajectory.differences(c.superessential.hypermut.difference.from.genome)
+plot.trajectory.differences(c.superessential.hypermut.difference.from.genome,
+                            hypermutator.epochs.df)
 
-plot.trajectory.differences(c.specialist.hypermut.difference.from.genome)
+plot.trajectory.differences(c.specialist.hypermut.difference.from.genome,
+                            hypermutator.epochs.df)
 
-plot.trajectory.differences(c.generalist.hypermut.difference.from.genome)
+plot.trajectory.differences(c.generalist.hypermut.difference.from.genome,
+                            hypermutator.epochs.df)
     
