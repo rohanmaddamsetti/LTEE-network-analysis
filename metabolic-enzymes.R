@@ -750,8 +750,8 @@ Fig5A <- plot.base.layer(
     subset.size=length(unique(minimal.core$Gene)),
     manual.pop.levels.vec = hypermutator.pops,
     plot.rows = 2,
-    my.color = "azure") %>%
-    add.cumulative.mut.layer(c.minimal.core.hypermut, my.color="deepskyblue") +
+    my.color = "skyblue") %>%
+    add.cumulative.mut.layer(c.minimal.core.hypermut, my.color="blue") +
     ggtitle("Core genes found in all 1000 minimal genomes")
 
 Fig5B <- plot.base.layer(
@@ -790,8 +790,8 @@ S4FigA <- plot.base.layer(
     subset.size=length(unique(minimal.core$Gene)),
     manual.pop.levels.vec = nonmutator.pops,
     plot.rows = 2,
-    my.color = "azure") %>%
-    add.cumulative.mut.layer(c.minimal.core.nonmut, my.color="deepskyblue") +
+    my.color = "skyblue") %>%
+    add.cumulative.mut.layer(c.minimal.core.nonmut, my.color="blue") +
     ggtitle("Core genes found in all 1000 minimal genomes")
 
 S4FigB <- plot.base.layer(
@@ -817,6 +817,9 @@ FBA.glucose.essential <- read.csv(
 FBA.citrate.essential <- read.csv(
     "../results/metabolic-enzymes/citrate_FBA_essential.csv")
 
+FBA.acetate.essential <- read.csv(
+    "../results/metabolic-enzymes/acetate_FBA_essential.csv")
+
 ## plot just the hypermutator populations.
 glucose.essential.hypermut.data <- hypermutator.data %>%
     filter(Gene %in% FBA.glucose.essential$Gene)
@@ -834,6 +837,15 @@ c.citrate.essential.hypermut <- calc.cumulative.muts(
     FBA.citrate.essential,
     manual.pop.levels.vec = hypermutator.pops)
 
+acetate.essential.hypermut.data <- hypermutator.data %>%
+    filter(Gene %in% FBA.acetate.essential$Gene)
+
+c.acetate.essential.hypermut <- calc.cumulative.muts(
+    acetate.essential.hypermut.data,
+    FBA.acetate.essential,
+    manual.pop.levels.vec = hypermutator.pops)
+
+
 Fig6A <- plot.base.layer(
     hypermutator.data,
     REL606.genes,
@@ -847,12 +859,12 @@ Fig6A <- plot.base.layer(
 Fig6B <- plot.base.layer(
     hypermutator.data,
     REL606.genes,
-    subset.size=length(unique(FBA.citrate.essential$Gene)),
+    subset.size=length(unique(FBA.acetate.essential$Gene)),
     manual.pop.levels.vec = hypermutator.pops,
     plot.rows = 2,
     my.color = "cornsilk1") %>%
     add.cumulative.mut.layer(c.citrate.essential.hypermut, my.color="deeppink2") +
-    ggtitle("Genes essential for growth on citrate in the REL606 metabolic model")
+    ggtitle("Genes essential for growth on acetate in the REL606 metabolic model")
 
 Fig6 <- plot_grid(Fig6A, Fig6B, labels=c('A','B'),nrow=2)
 save_plot("../results/metabolic-enzymes/Fig6.pdf",Fig6, base_height=7,base_asp=1)
@@ -993,7 +1005,7 @@ dev.off()
 ## the normalized cumulative number of mutations over the entire genome
 ## (in this case, the set of all genes in the genome included in the analysis).
 
-plot.trajectory.differences <- function(cmut.diff.df, hypermutator.epochs.df) {
+plot.trajectory.differences <- function(cmut.diff.df, hypermutator.epochs.df, my.color="black") {
     ## plot the difference between the genomic average trajectory,
     ## and the trajectory for the given gene set of interest.
 
@@ -1005,14 +1017,14 @@ plot.trajectory.differences <- function(cmut.diff.df, hypermutator.epochs.df) {
     p <- ggplot(cmut.diff.df, aes(x = Generation, y = normalized.cs)) +
     ylab("Cumulative mutations (normalized)\nDeviation from genomic average") +
     theme_classic() +
-    geom_step(size=0.2, color="black") +
+    geom_step(size=0.2, color=my.color) +
     theme(axis.title.x = element_text(size=13),
           axis.title.y = element_text(size=13),
           axis.text.x = element_text(size=13),
           axis.text.y = element_text(size=13)) +
         scale_y_continuous(labels=fancy_scientific,
                            breaks = scales::extended_breaks(n = 6)) +
-        facet_wrap(.~Population, scales="free", nrow=4) +
+        facet_wrap(.~Population, scales="free", nrow=2) +
         xlab("Generations (x 10,000)") + 
         geom_vline(data=hypermutator.epochs.df,
                    aes(xintercept=hypermutator_start_gen), color="gray", linetype="dashed") +
@@ -1046,7 +1058,8 @@ calc.cumulative.difference.from.genome <- partial(
 
 
 ############################################
-## let's actually look at these plots now.
+## new Figure X1 combines the BiGG core and superessential gene results
+## for hypermutators.
 
 c.BiGG.core.hypermut.difference.from.genome <- calc.cumulative.difference.from.genome(
     c.BiGG.core.hypermut)
@@ -1054,21 +1067,74 @@ c.BiGG.core.hypermut.difference.from.genome <- calc.cumulative.difference.from.g
 c.superessential.hypermut.difference.from.genome <- calc.cumulative.difference.from.genome(
     c.superessential.hypermut)
 
+FigX1A <- plot.trajectory.differences(c.BiGG.core.hypermut.difference.from.genome,
+                                      hypermutator.epochs.df, my.color="black") +
+    ggtitle("BiGG core metabolic enzymes")
+
+FigX1B <- plot.trajectory.differences(c.superessential.hypermut.difference.from.genome,
+                                      hypermutator.epochs.df, my.color="red") +
+    ggtitle("Superessential metabolic enzymes")
+
+FigX1 <- plot_grid(FigX1A, FigX1B, labels=c('A','B'),nrow=2)
+save_plot("../results/metabolic-enzymes/FigX1.pdf",FigX1, base_height=7, base_asp=1)
+
+## new Figure X2 combines the specialist and generalist enzyme results
+## for hypermutators.
 c.specialist.hypermut.difference.from.genome <- calc.cumulative.difference.from.genome(
     c.specialists.hypermut)
 
 c.generalist.hypermut.difference.from.genome <- calc.cumulative.difference.from.genome(
     c.generalists.hypermut)
 
-plot.trajectory.differences(c.BiGG.core.hypermut.difference.from.genome,
-                            hypermutator.epochs.df)
 
-plot.trajectory.differences(c.superessential.hypermut.difference.from.genome,
-                            hypermutator.epochs.df)
+FigX2A <- plot.trajectory.differences(c.specialist.hypermut.difference.from.genome,
+                                      hypermutator.epochs.df, my.color="darkorchid4") +
+    ggtitle("Specialist enzymes")
 
-plot.trajectory.differences(c.specialist.hypermut.difference.from.genome,
-                            hypermutator.epochs.df)
-
-plot.trajectory.differences(c.generalist.hypermut.difference.from.genome,
-                            hypermutator.epochs.df)
+FigX2B <- plot.trajectory.differences(c.generalist.hypermut.difference.from.genome,
+                                      hypermutator.epochs.df,  my.color="springgreen4")  +
+    ggtitle("Generalist enzymes")
     
+FigX2 <- plot_grid(FigX2A, FigX2B, labels=c('A','B'),nrow=2)
+save_plot("../results/metabolic-enzymes/FigX2.pdf", FigX2, base_height=7, base_asp=1)
+
+## new Figure X3 combines results for core genes and essential genes in the Jenga genomes.
+c.minimal.core.hypermut.difference.from.genome <- calc.cumulative.difference.from.genome(
+    c.minimal.core.hypermut)
+
+c.minimal.essential.hypermut.difference.from.genome <- calc.cumulative.difference.from.genome(
+    c.minimal.essential.hypermut)
+
+
+FigX3A <- plot.trajectory.differences(c.minimal.core.hypermut.difference.from.genome,
+                                      hypermutator.epochs.df, my.color="blue") +
+    ggtitle("Core genes found in all 1000 minimal genomes")
+
+FigX3B <- plot.trajectory.differences(c.minimal.essential.hypermut.difference.from.genome,
+                                      hypermutator.epochs.df,  my.color="brown2")  +
+    ggtitle("Essential genes found in all 1000 minimal genomes")
+
+FigX3 <- plot_grid(FigX3A, FigX3B, labels=c('A','B'),nrow=2)
+save_plot("../results/metabolic-enzymes/FigX3.pdf", FigX3, base_height=7, base_asp=1)
+
+## new Figure X4 combines results for glucose essential genes and citrate essential genes in the Jenga genomes.
+c.glucose.essential.hypermut.difference.from.genome <- calc.cumulative.difference.from.genome(
+    c.glucose.essential.hypermut)
+
+c.citrate.essential.hypermut.difference.from.genome <- calc.cumulative.difference.from.genome(
+    c.citrate.essential.hypermut)
+
+c.acetate.essential.hypermut.difference.from.genome <- calc.cumulative.difference.from.genome(
+    c.acetate.essential.hypermut)
+
+
+FigX4A <- plot.trajectory.differences(c.glucose.essential.hypermut.difference.from.genome,
+                                      hypermutator.epochs.df, my.color="chocolate4") +
+    ggtitle("Genes essential for growth on glucose in the REL606 metabolic model")
+
+FigX4B <- plot.trajectory.differences(c.acetate.essential.hypermut.difference.from.genome,
+                                      hypermutator.epochs.df,  my.color="deeppink2")  +
+    ggtitle("Genes essential for growth on acetate in the REL606 metabolic model")
+
+FigX4 <- plot_grid(FigX4A, FigX4B, labels=c('A','B'),nrow=2)
+save_plot("../results/metabolic-enzymes/FigX4.pdf", FigX4, base_height=7, base_asp=1)
