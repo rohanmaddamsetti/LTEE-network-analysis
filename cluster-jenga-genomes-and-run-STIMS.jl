@@ -101,30 +101,30 @@ sorted_minimal_rxns_matrix = minimal_rxns_data |>
     ReactionToNetworkMatrix |>
     JaccardSortMatrix
 
-## Figure 7.
-Fig7A = heatmap(sorted_minimal_genome_matrix,
+## Figure 5.
+Fig5A = heatmap(sorted_minimal_genome_matrix,
                  c = cgrad(:blues, 2, categorical = true),
                  colorbar = false,
                  xlabel = "Genomes", ylabel = "Genes",
                  fontfamily = "Helvetica",
                 xrotation = 45)
 
-Fig7B = heatmap(sorted_essential_gene_matrix,
+Fig5B = heatmap(sorted_essential_gene_matrix,
                  c = cgrad(:blues, 2, categorical = true),
                  colorbar = false,
                  xlabel = "Genomes", ylabel = "Essential genes",
                  fontfamily = "Helvetica",
                  xrotation = 45)
 
-Fig7C = heatmap(sorted_minimal_rxns_matrix,
+Fig5C = heatmap(sorted_minimal_rxns_matrix,
                  c = cgrad(:blues, 2, categorical = true),
                  colorbar = false,
                  xlabel = "Genomes", ylabel = "Reactions",
                  fontfamily = "Helvetica",
                  xrotation = 45)
 
-Fig7 = plot(Fig7A, Fig7B, Fig7C, layout=(1,3), legend=false)
-savefig(Fig7, "../results/metabolic-enzymes/Fig7.pdf")
+Fig5 = plot(Fig5A, Fig5B, Fig5C, layout=(1,3), legend=false)
+savefig(Fig5, "../results/metabolic-enzymes/Fig5.pdf")
 
 ################################################################################
 ## Run STIMS statistics, quickly.

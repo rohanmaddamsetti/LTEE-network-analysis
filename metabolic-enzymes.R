@@ -204,73 +204,6 @@ write.csv(REL606.UpSet.data,file="../results/metabolic-enzymes/S1File.csv")
 ## I calculate the STIMS p-values in my julia script for speed.
 calculate.STIMS.pvalues <- FALSE
 
-## Functions to plot how the difference between the normalized cumulative number of
-## mutations in a gene set of interest changes, relative to the
-## normalized cumulative number of mutations across the genome.
-## Rather than bootstrapping a mean, its much simpler to calculate
-## the normalized cumulative number of mutations over the entire genome
-## (in this case, the set of all genes in the genome included in the analysis).
-
-.calc.cumulative.difference.from.genome <- function(genomic.trajectories, c.muts) {
-    c.mut.timepoints <- c.muts %>% select(Population, Generation)
-    
-matched.genomic.trajectories <- inner_join(genomic.trajectories,
-                                               c.mut.timepoints) %>%
-        rename(normalized.cs.for.genome = normalized.cs) %>%
-        select(Population, Generation, normalized.cs.for.genome)
-    
-    c.muts.difference.from.genome.df <- full_join(c.muts, matched.genomic.trajectories) %>%
-        mutate(normalized.cs.diff.from.genome = normalized.cs - normalized.cs.for.genome) %>%
-        select(Population, Generation, normalized.cs.diff.from.genome) %>%
-        rename(normalized.cs = normalized.cs.diff.from.genome) ## for plotting compatibility
-    return(c.muts.difference.from.genome.df)
-}
-
-## calculate the genome-wide average trajectory.
-genomic.trajectories <- calc.cumulative.muts(gene.mutation.data, REL606.genes)
-## single-argument function to actually use.
-calc.cumulative.difference.from.genome <- partial(
-    .f = .calc.cumulative.difference.from.genome,
-    genomic.trajectories)
-
-############################################
-
-plot.trajectory.differences <- function(cmut.diff.df, my.color="black") {
-    ## plot the difference between the genomic average trajectory,
-    ## and the trajectory for the given gene set of interest.
-    
-    p <- ggplot(cmut.diff.df, aes(x = Generation, y = normalized.cs)) +
-    ylab("Cumulative mutations (normalized)\nDeviation from genomic average") +
-    theme_classic() +
-    geom_step(size=0.2, color=my.color) +
-    theme(axis.title.x = element_text(size=13),
-          axis.title.y = element_text(size=13),
-          axis.text.x = element_text(size=13),
-          axis.text.y = element_text(size=13)) +
-        scale_y_continuous(labels=fancy_scientific,
-                           breaks = scales::extended_breaks(n = 6)) +
-        facet_wrap(.~Population, scales="free", nrow=2) +
-        xlab("Generations (x 10,000)")
-    return(p)
-}
-
-
-## add hypermutator epoch annotations to a figure.
-.annotate.figure.with.hypermutator.epoch <- function(hypermutator.epochs.df, fig) {
-    fig + 
-        geom_vline(data=hypermutator.epochs.df,
-                   aes(xintercept=hypermutator_start_gen), color="gray", linetype="dashed") +
-        geom_vline(data=hypermutator.epochs.df,
-                   aes(xintercept=hypermutator_end_gen), color="gray", linetype="dashed")
-}
-
-## single-argument function to actually use.
-annotate.figure.with.hypermutator.epoch <- partial(
-    .f = .annotate.figure.with.hypermutator.epoch,
-    hypermutator.epochs.df)
-
-
-################################################################################
 ## Run STIMS on BiGG Models E. coli core.
 ## Hypothesis: E. coli core metabolism
 ## is evolving under purifying selection in the LTEE.
@@ -290,27 +223,8 @@ Fig2A <- plot.base.layer(
     subset.size = length(BiGG.core$Gene),
     manual.pop.levels.vec = hypermutator.pops,
     plot.rows = 2) %>%
-    add.cumulative.mut.layer(c.BiGG.core.hypermut, my.color="black") %>%
-    annotate.figure.with.hypermutator.epoch() +
+    add.cumulative.mut.layer(c.BiGG.core.hypermut, my.color="black") +
     ggtitle("BiGG core enzymes")
-
-
-## Fig2B shows the deviation from the genome-wide average.
-
-c.BiGG.core.hypermut.difference.from.genome <- calc.cumulative.difference.from.genome(
-    c.BiGG.core.hypermut)
-
-newFig2B <- plot.trajectory.differences.base.layer(BiGG.core.hypermut.data, REL606.genes,
-                                                   subset.size=length(BiGG.core$Gene))
-
-
-Fig2B <- plot.trajectory.differences(c.BiGG.core.hypermut.difference.from.genome, my.color="black") %>%
-    annotate.figure.with.hypermutator.epoch()
-
-## Figure 2 shows the BiGG core gene results for hypermutators.
-Fig2 <- plot_grid(Fig2A, Fig2B, labels=c('A','B'),nrow=2)
-save_plot("../results/metabolic-enzymes/Fig2.pdf",Fig2, base_height=8,base_asp=1)
-
 
 ## calculate formal p-values.
 if (calculate.STIMS.pvalues)
@@ -346,26 +260,21 @@ c.superessential.hypermut <- calc.cumulative.muts(
     superessential.rxns.df,
     manual.pop.levels.vec = hypermutator.pops)
 
-Fig3A <- plot.base.layer(
+Fig2B <- plot.base.layer(
     hypermutator.data,
     REL606.genes,
     subset.size = length(unique(superessential.rxns.df$Gene)),
     manual.pop.levels.vec = hypermutator.pops,
     plot.rows = 2,
     my.color = "pink") %>%
-    add.cumulative.mut.layer(c.superessential.hypermut, my.color="red") %>%
-    annotate.figure.with.hypermutator.epoch() +
+    add.cumulative.mut.layer(c.superessential.hypermut, my.color="red") +
     ggtitle("Superessential metabolic enzymes")
 
-c.superessential.hypermut.difference.from.genome <- calc.cumulative.difference.from.genome(
-    c.superessential.hypermut)
 
-Fig3B <- plot.trajectory.differences(c.superessential.hypermut.difference.from.genome, my.color="red") %>%
-    annotate.figure.with.hypermutator.epoch()
+## Figure 2 shows the BiGG core gene and superessential gene results for hypermutators.
+Fig2 <- plot_grid(Fig2A, Fig2B, labels=c('A','B'),nrow=2)
+save_plot("../results/metabolic-enzymes/Fig2.pdf",Fig2, base_height=8,base_asp=1)
 
-## Figure 3 shows the superessential gene results for hypermutators.
-Fig3 <- plot_grid(Fig3A, Fig3B, labels=c('A','B'),nrow=2)
-save_plot("../results/metabolic-enzymes/Fig3.pdf", Fig3, base_height=8, base_asp=1)
 
 ## calculate formal p-values.
 if (calculate.STIMS.pvalues)
@@ -444,25 +353,15 @@ c.specialists.hypermut <- calc.cumulative.muts(
     specialist.enzymes,
     manual.pop.levels.vec = hypermutator.pops)
 
-Fig4A <- plot.base.layer(
+Fig3A <- plot.base.layer(
     hypermutator.data,
     REL606.genes,
     subset.size=length(unique(specialist.enzymes$Gene)),
     manual.pop.levels.vec = hypermutator.pops,
     plot.rows = 2,
     my.color = "plum1") %>%
-    add.cumulative.mut.layer(c.specialists.hypermut, my.color="darkorchid4") %>%
-    annotate.figure.with.hypermutator.epoch() +
+    add.cumulative.mut.layer(c.specialists.hypermut, my.color="darkorchid4") +
     ggtitle("Specialist enzymes")
-
-c.specialist.hypermut.difference.from.genome <- calc.cumulative.difference.from.genome(
-    c.specialists.hypermut)
-
-Fig4B <- plot.trajectory.differences(c.specialist.hypermut.difference.from.genome, my.color="darkorchid4") %>%
-    annotate.figure.with.hypermutator.epoch()
-
-Fig4 <- plot_grid(Fig4A, Fig4B, labels=c('A','B'),nrow=2)
-save_plot("../results/metabolic-enzymes/Fig4.pdf", Fig4, base_height=8, base_asp=1)
 
 
 generalist.hypermut.data <- hypermutator.data %>%
@@ -473,25 +372,20 @@ c.generalists.hypermut <- calc.cumulative.muts(
     generalist.enzymes,
     manual.pop.levels.vec = hypermutator.pops)
 
-Fig5A <- plot.base.layer(
+Fig3B <- plot.base.layer(
     hypermutator.data,
     REL606.genes,
     subset.size=length(unique(generalist.enzymes$Gene)),
     manual.pop.levels.vec = hypermutator.pops,
     plot.rows = 2,
     my.color = "darkolivegreen1") %>%
-    add.cumulative.mut.layer(c.generalists.hypermut, my.color="springgreen4") %>%
-    annotate.figure.with.hypermutator.epoch() +
+    add.cumulative.mut.layer(c.generalists.hypermut, my.color="springgreen4") +
     ggtitle("Generalist enzymes")
 
-c.generalist.hypermut.difference.from.genome <- calc.cumulative.difference.from.genome(
-    c.generalists.hypermut)
 
-Fig5B <- plot.trajectory.differences(c.generalist.hypermut.difference.from.genome, my.color="springgreen4") %>%
-    annotate.figure.with.hypermutator.epoch()
-    
-Fig5 <- plot_grid(Fig5A, Fig5B, labels=c('A','B'),nrow=2)
-save_plot("../results/metabolic-enzymes/Fig5.pdf", Fig5, base_height=8, base_asp=1)
+## Figure 3 shows the specialist and generalist gene results for hypermutators.
+Fig3 <- plot_grid(Fig3A, Fig3B, labels=c('A','B'),nrow=2)
+save_plot("../results/metabolic-enzymes/Fig3.pdf", Fig3, base_height=8, base_asp=1)
 
 
 ## plot just the nonmutator populations.
@@ -576,7 +470,7 @@ if (calculate.STIMS.pvalues)
 ## 12 Ara+6       8988 0.899 
 
 ###############################################################################
-## Figure 6. Genome Jenga analysis. Panel A is an illustration
+## Figure 4. Genome Jenga analysis. Panel A is an illustration
 ## of the Jenga Hypothesis. 
 
 minimal.genome.data <- read.csv(
@@ -587,7 +481,7 @@ minimal.rxns.data <- read.csv(
     "../results/metabolic-enzymes/jenga_minimal_reactions.csv")
 
 
-##### Figure 6, panels B, C, D.
+##### Figure 4, panels B, C, D.
 minimal.genome.count.df <- minimal.genome.data %>%
     group_by(locus_tag) %>%
     summarize(Count = n()) %>%
@@ -609,14 +503,14 @@ minimal.rxn.count.df <- minimal.rxns.data %>%
     mutate(Reaction = factor(Reaction,levels=.$Reaction)) %>%
     mutate(rank = row_number(Reaction))
 
-Fig6B <- minimal.genome.count.df %>%
+Fig4B <- minimal.genome.count.df %>%
     ggplot(aes(x = rank, y = Count)) +
     geom_point(size=0.5) +
     xlab("Genes") +
     ylab("Frequency in genomes") +
     theme_classic()
 
-Fig6C <- essential.gene.count.df %>% 
+Fig4C <- essential.gene.count.df %>% 
     ggplot(aes(x = rank, y = Count)) +
     geom_label(x = 95, y = 500, size = 2.75,
                label="202 essential\ngenes for\nviability in\nminimal glucose\nmedia in the\nancestral\nmetabolic\nnetwork",
@@ -628,16 +522,16 @@ Fig6C <- essential.gene.count.df %>%
     ylab("Frequency in genomes") +
     theme_classic()
 
-Fig6D <- minimal.rxn.count.df %>%
+Fig4D <- minimal.rxn.count.df %>%
     ggplot(aes(x = rank, y = Count)) +
     geom_point(size=0.5) +
     xlab("Metabolic reactions") +
     ylab("Frequency in genomes") +
     theme_classic()
 
-Fig6BCD <- plot_grid(Fig6B, Fig6C, Fig6D, labels=c('B','C','D'),nrow=1)
+Fig4BCD <- plot_grid(Fig4B, Fig4C, Fig4D, labels=c('B','C','D'),nrow=1)
 
-##### Figure 6, panels E, F, G.
+##### Figure 4, panels E, F, G.
 minimal.genome.sizes.df <- minimal.genome.data %>%
     group_by(Replicate) %>%
     summarize(NumGenes = n()) %>%
@@ -653,19 +547,19 @@ minimal.rxn.network.sizes.df <- minimal.rxns.data %>%
     summarize(NumRxns = n()) %>%
     arrange(desc(NumRxns))
 
-## Fig 6E. Minimal genomes have variable numbers of genes.
-Fig6E <- minimal.genome.sizes.df %>%
+## Fig 4E. Minimal genomes have variable numbers of genes.
+Fig4E <- minimal.genome.sizes.df %>%
     ggplot(aes(x = NumGenes)) +
     geom_histogram(binwidth=1) +
     theme_classic() +
     ylab("Count") +
     xlab("Genes per genome")
 
-## Fig 6F. Evolved genomes are more fragile, and the number of essential
+## Fig 4F. Evolved genomes are more fragile, and the number of essential
 ## genes varies across the minimal genomes.
 ## IMPORTANT RESULT! The predicted essentialomes are
 ## MUCH larger than the essentialome of REL606: 202 genes.
-Fig6F <- essentialome.sizes.df %>%
+Fig4F <- essentialome.sizes.df %>%
     ggplot(aes(x = NumEssentialGenes)) +
     geom_label(x = 242, y = 100, size = 2.75,
                label="202 essential genes\nfor viability in\nminimal glucose media\nin the ancestral\nmetabolic network",
@@ -676,19 +570,19 @@ Fig6F <- essentialome.sizes.df %>%
     xlab("Essential genes per genome") +
     geom_vline( xintercept=202, color="red", linetype="dashed")
 
-## Fig 6G. Idiosyncratic variation in reaction network size.
+## Fig 4G. Idiosyncratic variation in reaction network size.
 ## This distribution has multiple modes.
-Fig6G <- minimal.rxn.network.sizes.df %>%
+Fig4G <- minimal.rxn.network.sizes.df %>%
     ggplot(aes(x = NumRxns)) +
     geom_histogram(binwidth=1) +
     theme_classic() +
     ylab("Count") +
     xlab("Reactions per genome")
 
-Fig6EFG <- plot_grid(Fig6E, Fig6F, Fig6G, labels=c('E','F','G'),nrow=1)
+Fig4EFG <- plot_grid(Fig4E, Fig4F, Fig4G, labels=c('E','F','G'),nrow=1)
 
-Fig6BCDEFG <- plot_grid(Fig6BCD, Fig6EFG, nrow = 2)
-ggsave("../results/metabolic-enzymes/Fig6BCDEFG.pdf", height = 5, width = 7.5)
+Fig4BCDEFG <- plot_grid(Fig4BCD, Fig4EFG, nrow = 2)
+ggsave("../results/metabolic-enzymes/Fig4BCDEFG.pdf", height = 5, width = 7.5)
 ###############################################################################
 ## Make STIMS figure for core genes in the 1000 minimal genomes.
 
@@ -709,25 +603,17 @@ c.minimal.core.hypermut <- calc.cumulative.muts(
     minimal.core,
     manual.pop.levels.vec = hypermutator.pops)
 
-Fig8A <- plot.base.layer(
+Fig6 <- plot.base.layer(
     hypermutator.data,
     REL606.genes,
     subset.size=length(unique(minimal.core$Gene)),
     manual.pop.levels.vec = hypermutator.pops,
     plot.rows = 2,
     my.color = "skyblue") %>%
-    add.cumulative.mut.layer(c.minimal.core.hypermut, my.color="blue") %>%
-    annotate.figure.with.hypermutator.epoch() +
+    add.cumulative.mut.layer(c.minimal.core.hypermut, my.color="blue") +
     ggtitle("Core genes found in all 1000 minimal genomes") 
 
-c.minimal.core.hypermut.difference.from.genome <- calc.cumulative.difference.from.genome(
-    c.minimal.core.hypermut)
-
-Fig8B <- plot.trajectory.differences(c.minimal.core.hypermut.difference.from.genome, my.color="blue") %>%
-    annotate.figure.with.hypermutator.epoch()
-
-Fig8 <- plot_grid(Fig8A, Fig8B, labels=c('A','B'),nrow=2)
-save_plot("../results/metabolic-enzymes/Fig8.pdf", Fig8, base_height=8, base_asp=1)
+ggsave("../results/metabolic-enzymes/Fig6.pdf", Fig6, height=4)
 
 
 ## plot just the nonmutator populations.
@@ -872,5 +758,73 @@ expressed.putative.KOs <- anti_join(
     ## reorder the columns
     select(Population, Gene, total_est_counts, product, locus_tag,
            blattner, gene_length, start, end, strand)
+
+################################################################################
+## Functions to plot how the difference between the normalized cumulative number of
+## mutations in a gene set of interest changes, relative to the
+## normalized cumulative number of mutations across the genome.
+## Rather than bootstrapping a mean, its much simpler to calculate
+## the normalized cumulative number of mutations over the entire genome
+## (in this case, the set of all genes in the genome included in the analysis).
+
+.calc.cumulative.difference.from.genome <- function(genomic.trajectories, c.muts) {
+    c.mut.timepoints <- c.muts %>% select(Population, Generation)
+    
+    matched.genomic.trajectories <- inner_join(genomic.trajectories,
+                                               c.mut.timepoints) %>%
+        rename(normalized.cs.for.genome = normalized.cs) %>%
+        select(Population, Generation, normalized.cs.for.genome)
+    
+    c.muts.difference.from.genome.df <- full_join(c.muts, matched.genomic.trajectories) %>%
+        mutate(normalized.cs.diff.from.genome = normalized.cs - normalized.cs.for.genome) %>%
+        select(Population, Generation, normalized.cs.diff.from.genome) %>%
+        rename(normalized.cs = normalized.cs.diff.from.genome) ## for plotting compatibility
+    return(c.muts.difference.from.genome.df)
+}
+
+## calculate the genome-wide average trajectory.
+genomic.trajectories <- calc.cumulative.muts(gene.mutation.data, REL606.genes)
+## single-argument function to actually use.
+calc.cumulative.difference.from.genome <- partial(
+    .f = .calc.cumulative.difference.from.genome,
+    genomic.trajectories)
+
+############################################
+
+plot.trajectory.differences <- function(cmut.diff.df, my.color="black") {
+    ## plot the difference between the genomic average trajectory,
+    ## and the trajectory for the given gene set of interest.
+    
+    p <- ggplot(cmut.diff.df, aes(x = Generation, y = normalized.cs)) +
+    ylab("Cumulative mutations (normalized)\nDeviation from genomic average") +
+    theme_classic() +
+    geom_step(size=0.2, color=my.color) +
+    theme(axis.title.x = element_text(size=13),
+          axis.title.y = element_text(size=13),
+          axis.text.x = element_text(size=13),
+          axis.text.y = element_text(size=13)) +
+        scale_y_continuous(labels=fancy_scientific,
+                           breaks = scales::extended_breaks(n = 6)) +
+        facet_wrap(.~Population, scales="free", nrow=2) +
+        xlab("Generations (x 10,000)")
+    return(p)
+}
+
+
+## add hypermutator epoch annotations to a figure.
+.annotate.figure.with.hypermutator.epoch <- function(hypermutator.epochs.df, fig) {
+    fig + 
+        geom_vline(data=hypermutator.epochs.df,
+                   aes(xintercept=hypermutator_start_gen), color="gray", linetype="dashed") +
+        geom_vline(data=hypermutator.epochs.df,
+                   aes(xintercept=hypermutator_end_gen), color="gray", linetype="dashed")
+}
+
+## single-argument function to actually use.
+annotate.figure.with.hypermutator.epoch <- partial(
+    .f = .annotate.figure.with.hypermutator.epoch,
+    hypermutator.epochs.df)
+
+
 
 
