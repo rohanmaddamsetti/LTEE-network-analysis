@@ -40,7 +40,7 @@ LTEE.pop.vec <- c(nonmutator.pops, hypermutator.pops)
 ## cd LTEE-metagenomic-repo
 ## python rohan-write-csv.py > ../results/LTEE-metagenome-mutations.csv
 all.mutation.data <- read.csv(
-    '../results/LTEE-metagenome-mutations.csv',
+    "../results/LTEE-metagenome-mutations.csv",
     header=TRUE,as.is=TRUE) %>%
     mutate(Generation=t0/10000) %>%
     ## This for changing the ordering of populations in plots.
@@ -211,6 +211,30 @@ calculate.STIMS.pvalues <- FALSE
 ## the normalized cumulative number of mutations over the entire genome
 ## (in this case, the set of all genes in the genome included in the analysis).
 
+.calc.cumulative.difference.from.genome <- function(genomic.trajectories, c.muts) {
+    c.mut.timepoints <- c.muts %>% select(Population, Generation)
+    
+matched.genomic.trajectories <- inner_join(genomic.trajectories,
+                                               c.mut.timepoints) %>%
+        rename(normalized.cs.for.genome = normalized.cs) %>%
+        select(Population, Generation, normalized.cs.for.genome)
+    
+    c.muts.difference.from.genome.df <- full_join(c.muts, matched.genomic.trajectories) %>%
+        mutate(normalized.cs.diff.from.genome = normalized.cs - normalized.cs.for.genome) %>%
+        select(Population, Generation, normalized.cs.diff.from.genome) %>%
+        rename(normalized.cs = normalized.cs.diff.from.genome) ## for plotting compatibility
+    return(c.muts.difference.from.genome.df)
+}
+
+## calculate the genome-wide average trajectory.
+genomic.trajectories <- calc.cumulative.muts(gene.mutation.data, REL606.genes)
+## single-argument function to actually use.
+calc.cumulative.difference.from.genome <- partial(
+    .f = .calc.cumulative.difference.from.genome,
+    genomic.trajectories)
+
+############################################
+
 plot.trajectory.differences <- function(cmut.diff.df, my.color="black") {
     ## plot the difference between the genomic average trajectory,
     ## and the trajectory for the given gene set of interest.
@@ -230,28 +254,6 @@ plot.trajectory.differences <- function(cmut.diff.df, my.color="black") {
     return(p)
 }
 
-
-.calc.cumulative.difference.from.genome <- function(genomic.trajectories, c.muts) {
-    c.mut.timepoints <- c.muts %>% select(Population, Generation)
-    
-matched.genomic.trajectories <- inner_join(genomic.trajectories,
-                                               c.mut.timepoints) %>%
-        rename(normalized.cs.for.genome = normalized.cs) %>%
-        select(Population, Generation, normalized.cs.for.genome)
-    
-    c.muts.difference.from.genome.df <- full_join(c.muts, matched.genomic.trajectories) %>%
-        mutate(normalized.cs.diff.from.genome = normalized.cs - normalized.cs.for.genome) %>%
-        select(Population, Generation, normalized.cs.diff.from.genome) %>%
-        rename(normalized.cs = normalized.cs.diff.from.genome) ## for plotting compatibility
-    return(c.muts.difference.from.genome.df)
-}
-
-
-genomic.trajectories <- calc.cumulative.muts(gene.mutation.data, REL606.genes)
-## single-argument function to actually use.
-calc.cumulative.difference.from.genome <- partial(
-    .f = .calc.cumulative.difference.from.genome,
-    genomic.trajectories)
 
 ## add hypermutator epoch annotations to a figure.
 .annotate.figure.with.hypermutator.epoch <- function(hypermutator.epochs.df, fig) {
@@ -297,6 +299,10 @@ Fig2A <- plot.base.layer(
 
 c.BiGG.core.hypermut.difference.from.genome <- calc.cumulative.difference.from.genome(
     c.BiGG.core.hypermut)
+
+newFig2B <- plot.trajectory.differences.base.layer(BiGG.core.hypermut.data, REL606.genes,
+                                                   subset.size=length(BiGG.core$Gene))
+
 
 Fig2B <- plot.trajectory.differences(c.BiGG.core.hypermut.difference.from.genome, my.color="black") %>%
     annotate.figure.with.hypermutator.epoch()
