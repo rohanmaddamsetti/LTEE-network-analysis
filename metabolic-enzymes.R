@@ -577,9 +577,11 @@ Fig4G <- minimal.rxn.network.sizes.df %>%
     geom_histogram(binwidth=1) +
     theme_classic() +
     ylab("Count") +
-    xlab("Reactions per genome")
-
-Fig4EFG <- plot_grid(Fig4E, Fig4F, Fig4G, labels=c('E','F','G'),nrow=1)
+    xlab("Reactions per genome") +
+    ## make sure the axis is not cut off.
+    ## I can use the following to get the default margins:
+    ##  theme_get()$plot.margin
+    theme(plot.margin = unit(c(5.5,10,5.5,5.5), "points"))
 
 Fig4BCDEFG <- plot_grid(Fig4BCD, Fig4EFG, nrow = 2)
 ggsave("../results/metabolic-enzymes/Fig4BCDEFG.pdf", height = 5, width = 7.5)
